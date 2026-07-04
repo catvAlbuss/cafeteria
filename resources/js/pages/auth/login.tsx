@@ -1,139 +1,159 @@
 import { Form, Head } from '@inertiajs/react';
+import { useState } from 'react';
 import InputError from '@/components/input-error';
-import PasskeyVerify from '@/components/passkey-verify';
 import PasswordInput from '@/components/password-input';
-import TeamInvitationAlert from '@/components/team-invitation-alert';
-import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { register } from '@/routes';
-import { store } from '@/routes/login';
-import { request } from '@/routes/password';
-import type { TeamInvitationContext } from '@/types';
+import { X } from 'lucide-react';
 
 type Props = {
     status?: string;
     canResetPassword: boolean;
-    teamInvitation?: TeamInvitationContext | null;
 };
 
-export default function Login({
-    status,
-    canResetPassword,
-    teamInvitation,
-}: Props) {
+export default function Login({ status, canResetPassword }: Props) {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
     return (
         <>
-            <Head title="Log in" />
+            <Head title="Iniciar Sesión" />
 
-            {teamInvitation && (
-                <TeamInvitationAlert
-                    invitation={teamInvitation}
-                    action="Log in"
-                />
-            )}
-
-            <PasskeyVerify />
-
-            <Form
-                {...store.form()}
-                resetOnSuccess={['password']}
-                className="flex flex-col gap-6"
+            {/* Fondo de pantalla completa */}
+            <div 
+                className="flex min-h-screen items-center justify-center bg-cover bg-center"
+                style={{
+                    backgroundImage: `url('/img/login.png')`
+                }}
             >
-                {({ processing, errors }) => (
-                    <>
-                        <div className="grid gap-6">
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    required
-                                    autoFocus
-                                    tabIndex={1}
-                                    autoComplete="email"
-                                    placeholder="email@example.com"
-                                />
-                                <InputError message={errors.email} />
-                            </div>
+                {/* Capa oscura */}
+                <div className="absolute inset-0 bg-black/50"></div>
+                
+                {/* Contenido centrado */}
+                <div className="relative z-10 text-center">
+                    <div className="mb-12">
+                        <h1 className="font-serif text-6xl font-bold tracking-wider text-white drop-shadow-lg">
+                            DOLCE CAFFE
+                        </h1>
+                        <p className="mt-2 text-sm font-light tracking-[0.5em] text-white/80">
+                            EST. 2023
+                        </p>
+                    </div>
 
-                            <div className="grid gap-2">
-                                <div className="flex items-center">
-                                    <Label htmlFor="password">Password</Label>
-                                    {canResetPassword && (
-                                        <TextLink
-                                            href={request()}
-                                            className="ml-auto text-sm"
-                                            tabIndex={5}
-                                        >
-                                            Forgot password?
-                                        </TextLink>
-                                    )}
-                                </div>
-                                <PasswordInput
-                                    id="password"
-                                    name="password"
-                                    required
-                                    tabIndex={2}
-                                    autoComplete="current-password"
-                                    placeholder="Password"
-                                />
-                                <InputError message={errors.password} />
-                            </div>
-
-                            <div className="flex items-center space-x-3">
-                                <Checkbox
-                                    id="remember"
-                                    name="remember"
-                                    tabIndex={3}
-                                />
-                                <Label htmlFor="remember">Remember me</Label>
-                            </div>
-
-                            <Button
-                                type="submit"
-                                className="mt-4 w-full"
-                                tabIndex={4}
-                                disabled={processing}
-                                data-test="login-button"
-                            >
-                                {processing && <Spinner />}
-                                Log in
-                            </Button>
-                        </div>
-
-                        <div className="text-center text-sm text-muted-foreground">
-                            Don't have an account?{' '}
-                            <TextLink
-                                href={register({
-                                    query: {
-                                        invitation: teamInvitation?.code,
-                                    },
-                                })}
-                                data-test="register-link"
-                                tabIndex={5}
-                            >
-                                Sign up
-                            </TextLink>
-                        </div>
-                    </>
-                )}
-            </Form>
-
-            {status && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
-                    {status}
+                    <Button
+                        onClick={() => setIsModalOpen(true)}
+                        className="px-10 py-4 text-lg font-medium bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white border-2 border-white/50 rounded-lg transition-all duration-300 hover:scale-105"
+                    >
+                        Iniciar Sesión
+                    </Button>
                 </div>
-            )}
+
+                {/* MODAL */}
+                {isModalOpen && (
+                    <div 
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+                        onClick={() => setIsModalOpen(false)}
+                    >
+                        <div 
+                            className="relative w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <button
+                                onClick={() => setIsModalOpen(false)}
+                                className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+
+                            <h2 className="mb-6 text-center font-serif text-3xl font-bold text-amber-800">
+                                Iniciar Sesión
+                            </h2>
+
+                            <Form
+                                method="post"
+                                action="/login"
+                                className="flex flex-col gap-6"
+                            >
+                                {({ processing, errors }) => (
+                                    <>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="email" className="text-gray-700">
+                                                Correo electrónico
+                                            </Label>
+                                            <Input
+                                                id="email"
+                                                type="email"
+                                                name="email"
+                                                required
+                                                autoFocus
+                                                autoComplete="email"
+                                                placeholder="tucorreo@ejemplo.com"
+                                                className="border-gray-300 focus:border-amber-500 focus:ring-amber-500"
+                                            />
+                                            <InputError message={errors.email} />
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="password" className="text-gray-700">
+                                                Contraseña
+                                            </Label>
+                                            <PasswordInput
+                                                id="password"
+                                                name="password"
+                                                required
+                                                autoComplete="current-password"
+                                                placeholder="••••••••"
+                                                className="border-gray-300 focus:border-amber-500 focus:ring-amber-500"
+                                            />
+                                            <InputError message={errors.password} />
+                                        </div>
+
+                                        <div className="flex items-center space-x-3">
+                                            <Checkbox
+                                                id="remember"
+                                                name="remember"
+                                                className="border-gray-300 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600"
+                                            />
+                                            <Label htmlFor="remember" className="text-sm text-gray-600">
+                                                Recordarme
+                                            </Label>
+                                        </div>
+
+                                        <Button
+                                            type="submit"
+                                            className="w-full bg-amber-700 hover:bg-amber-800 text-white font-medium py-2 rounded-lg transition duration-200"
+                                            disabled={processing}
+                                        >
+                                            {processing && <Spinner />}
+                                            Iniciar Sesión
+                                        </Button>
+
+                                        {canResetPassword && (
+                                            <a
+                                                href="/forgot-password"
+                                                className="text-center text-sm text-amber-600 hover:text-amber-800 hover:underline"
+                                            >
+                                                ¿Olvidaste tu contraseña?
+                                            </a>
+                                        )}
+                                    </>
+                                )}
+                            </Form>
+
+                            {status && (
+                                <div className="mt-4 text-center text-sm font-medium text-green-600">
+                                    {status}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
         </>
     );
 }
 
-Login.layout = {
-    title: 'Log in to your account',
-    description: 'Enter your email and password below to log in',
-};
+
+Login.layout = (page: React.ReactNode) => page;
