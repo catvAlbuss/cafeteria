@@ -14,6 +14,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
+
+    Route::resource('platos', PlatoController::class);
 });
 
 // Rutas que requieren equipo (opcional)
@@ -28,23 +30,38 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('invitations/{invitation}', [TeamInvitationController::class, 'decline'])->name('invitations.decline');
 });
 
-//paginas 
+// RUTAS SIN EQUIPO (Dashboard y todas las páginas)
+Route::middleware(['auth'])->group(function () {
 
-Route::get('/ventas', function () {
-    return Inertia::render('dinero/ventas');
-})->name('ventas');
+    //  Dashboard
+    Route::get('/dashboard', function () {
+        return Inertia::render('dashboard');
+    })->name('dashboard');
 
-//pagina de caja//
-Route::get('/caja', function () {
-    return Inertia::render('dinero/caja');
-})->name('caja');
+    //  DINERO
+    Route::get('/caja', fn() => Inertia::render('dinero/caja'))->name('caja');
+    Route::get('/ventas', fn() => Inertia::render('dinero/ventas'))->name('ventas');
+    Route::get('/reportes', fn() => Inertia::render('dinero/reportes'))->name('reportes');
+    Route::get('/contador', fn() => Inertia::render('dinero/contador'))->name('contador');
 
-Route::get('/mesas', function () {
-    return Inertia::render('restaurante/mesas');
-})->name('mesas');
+    // RESTAURANTE
+    Route::get('/platos', fn() => Inertia::render('restaurante/platos'))->name('platos');
+    Route::get('/mesas', fn() => Inertia::render('restaurante/mesas'))->name('mesas');
+    Route::get('/mesas/distribucion', fn() => Inertia::render('restaurante/mesas-distribucion'))->name('mesas.distribucion');
+    Route::get('/covers', fn() => Inertia::render('restaurante/covers'))->name('covers');
 
-Route::get('/produccion', function () {
-    return Inertia::render('inventario/produccion');
-})->name('produccion');
+    //  INVENTARIO
+    Route::get('/produccion', fn() => Inertia::render('inventario/produccion'))->name('produccion');
+    Route::get('/cardex', fn() => Inertia::render('inventario/cardex'))->name('cardex');
+    Route::get('/mermas', fn() => Inertia::render('inventario/mermas'))->name('mermas');
+    Route::get('/etiquetas', fn() => Inertia::render('inventario/etiquetas'))->name('etiquetas');
 
+    //  CLIENTES
+    Route::get('/clientes', fn() => Inertia::render('clientes/clientes'))->name('clientes');
+    Route::get('/delivery', fn() => Inertia::render('clientes/delivery'))->name('delivery');
+
+    // CONFIGURACIÓN
+    Route::get('/configuracion', fn() => Inertia::render('configuracion/configuracion'))->name('configuracion');
+    Route::get('/perfil', fn() => Inertia::render('configuracion/perfil'))->name('perfil');
+});
 require __DIR__.'/settings.php';

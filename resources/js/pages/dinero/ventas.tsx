@@ -24,15 +24,20 @@ export default function Ventas() {
         { id: 2, nombre: 'Café Latte', precio: 12.00, categoria: 'Bebidas Calientes', imagen: '/img/productos/latte.jpg' },
         { id: 3, nombre: 'Cappuccino', precio: 14.00, categoria: 'Bebidas Calientes', imagen: '/img/productos/cappuccino.png' },
         { id: 4, nombre: 'Matcha Latte', precio: 16.00, categoria: 'Bebidas Frías', imagen: '/img/productos/matcha.png' },
-        { id: 5, nombre: 'Croissant', precio: 6.50, categoria: 'Panadería', imagen: '/img/productos/' },
-        { id: 6, nombre: 'Cheesecake', precio: 15.00, categoria: 'Postres', imagen: '/img/productos/' },
-        { id: 7, nombre: 'Sándwich de Pollo', precio: 18.00, categoria: 'Salados', imagen: '/img/productos/' },
-        { id: 8, nombre: 'Jugo Natural', precio: 10.00, categoria: 'Bebidas Frías', imagen: '/img/productos/' },
+        { id: 5, nombre: 'Croissant', precio: 6.50, categoria: 'Panadería', imagen: '/img/productos/Croissant.png' },
+        { id: 6, nombre: 'Cheesecake', precio: 15.00, categoria: 'Postres', imagen: '/img/productos/Cheesecake.png' },
+        { id: 7, nombre: 'Sándwich de Pollo', precio: 18.00, categoria: 'Salados', imagen: '/img/productos/SandwichDePollo.png' },
+        { id: 8, nombre: 'Jugo Natural', precio: 10.00, categoria: 'Bebidas Frías', imagen: '/img/productos/JugoNatural.png' },
     ];
 
     const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
     const [busqueda, setBusqueda] = useState('');
     const [cliente, setCliente] = useState('');
+
+    // 📋 Leer el número de mesa de la URL (ej: ?mesa=05)
+    const urlParams = new URLSearchParams(window.location.search);
+    const mesaInicial = urlParams.get('mesa') || '';
+    const [mesa, setMesa] = useState(mesaInicial);
 
     const productosFiltrados = productos.filter(p =>
         p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -72,7 +77,29 @@ export default function Ventas() {
             alert('Agrega productos al pedido');
             return;
         }
-        alert('✅ Pedido enviado a cocina');
+
+        // 📋 Crear el pedido
+        const nuevoPedido = {
+            id: Date.now(),
+            pedido: `#${String(Date.now()).slice(-4)}`,
+            mesa: mesa || 'No asignada',
+            cliente: cliente || 'Anónimo',
+            productos: carrito.map(item => `${item.cantidad}x ${item.nombre}`).join(' · '),
+            total: totalCarrito,
+            tiempo: 'hace un momento',
+            estado: 'pendiente',
+            items: carrito,
+        };
+
+        // 💾 Guardar en localStorage
+        const pedidosGuardados = JSON.parse(localStorage.getItem('pedidosPendientes') || '[]');
+        pedidosGuardados.unshift(nuevoPedido);
+        localStorage.setItem('pedidosPendientes', JSON.stringify(pedidosGuardados));
+
+        // ✅ Notificar al usuario
+        alert(`✅ Pedido enviado a cocina\n🪑 Mesa: ${mesa || 'No asignada'}\n👤 Cliente: ${cliente || 'Anónimo'}\n💰 Total: S/ ${totalCarrito.toFixed(2)}`);
+
+        // 🧹 Limpiar carrito
         setCarrito([]);
         setCliente('');
     };
@@ -83,6 +110,24 @@ export default function Ventas() {
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <h1 className="text-2xl font-bold text-white/90">Tomar Pedido</h1>
                 <p className="text-white/60 text-sm">Busca productos y arma el pedido</p>
+
+                {/* ===== ENCABEZADO CON MESA Y CLIENTE ===== */}
+                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#8D6B53]/20 flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-[#5A3D2B]">🪑 Mesa:</span>
+                        <span className="text-sm font-bold text-[#2D1B1A]">{mesa || 'No asignada'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                        <span className="text-sm font-medium text-[#5A3D2B]">👤 Cliente:</span>
+                        <input
+                            type="text"
+                            placeholder="Nombre del cliente"
+                            className="flex-1 p-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-[#C9A96E] outline-none"
+                            value={cliente}
+                            onChange={(e) => setCliente(e.target.value)}
+                        />
+                    </div>
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 

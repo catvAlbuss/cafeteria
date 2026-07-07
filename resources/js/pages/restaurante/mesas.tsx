@@ -1,13 +1,13 @@
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
-import { 
-    Users, 
-    Coffee, 
-    Armchair, 
-    Search, 
-    User, 
-    Clock, 
-    CheckCircle, 
+import {
+    Users,
+    Coffee,
+    Armchair,
+    Search,
+    User,
+    Clock,
+    CheckCircle,
     XCircle,
     Plus,
     Minus,
@@ -253,7 +253,7 @@ export default function MesasDistribucion() {
                                         key={mesa.id}
                                         className={`p-3 rounded-xl border-2 ${config.border} ${config.bg} shadow-sm hover:shadow-md transition-all duration-300`}
                                     >
-                                        {/* Número de mesa - CON TEXTO GRIS OSCURO */}
+                                        {/* Número de mesa */}
                                         <div className="text-center mb-1">
                                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full bg-white/80 ${config.border} border text-gray-700`}>
                                                 Mesa #{mesa.numero}
@@ -326,6 +326,19 @@ export default function MesasDistribucion() {
                                                 Cobrar
                                             </button>
                                         </div>
+
+                                        {/* ===== BOTÓN TOMAR PEDIDO (fuera del div de botones) ===== */}
+                                        {/* Solo aparece cuando la mesa está ocupada */}
+                                        {mesa.estado === 'ocupada' && (
+                                            <button
+                                                onClick={() => {
+                                                    window.location.href = `/ventas?mesa=${mesa.numero}`;
+                                                }}
+                                                className="w-full mt-2 py-1.5 bg-[#C9A96E] hover:bg-[#B8975D] text-white rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1"
+                                            >
+                                                🍽️ Tomar Pedido
+                                            </button>
+                                        )}
                                     </div>
                                 );
                             })}
