@@ -30,10 +30,10 @@ interface Plato {
 
 export default function Platos() {
     // 📋 Recibir platos desde el controlador
-    const { platos: platosIniciales } = usePage().props;
+    const { platos: platosIniciales = [] } = usePage<{ platos: Plato[] }>().props;
     
     // 📋 Estado - usar datos del controlador
-    const [platos, setPlatos] = useState<Plato[]>(platosIniciales || []);
+    const [platos, setPlatos] = useState<Plato[]>(platosIniciales);
     
     // 📋 Estado del modal
     const [modalAbierto, setModalAbierto] = useState(false);
