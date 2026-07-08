@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage, router } from '@inertiajs/react';
 import { useState } from 'react';
 import {
     Users,
@@ -54,23 +54,13 @@ interface Cliente {
 }
 
 export default function MesasDistribucion() {
-    // Estado de las mesas
-    const [mesas, setMesas] = useState<Mesa[]>([
-        { id: 1, numero: '01', capacidad: 8, sillas: 8, estado: 'libre' },
-        { id: 2, numero: '02', capacidad: 2, sillas: 2, estado: 'libre' },
-        { id: 3, numero: '03', capacidad: 2, sillas: 2, estado: 'libre' },
-        { id: 4, numero: '04', capacidad: 4, sillas: 4, estado: 'libre' },
-        { id: 5, numero: '05', capacidad: 8, sillas: 8, estado: 'libre' },
-        { id: 6, numero: '06', capacidad: 10, sillas: 10, estado: 'libre' },
-        { id: 7, numero: '07', capacidad: 2, sillas: 2, estado: 'pendiente' },
-        { id: 8, numero: '08', capacidad: 4, sillas: 4, estado: 'ocupada' },
-        { id: 9, numero: '09', capacidad: 8, sillas: 8, estado: 'reserva' },
-        { id: 10, numero: '10', capacidad: 2, sillas: 2, estado: 'libre' },
-        { id: 11, numero: '11', capacidad: 4, sillas: 4, estado: 'libre' },
-        { id: 12, numero: '12', capacidad: 10, sillas: 10, estado: 'libre' },
-    ]);
+    //  Recibir mesas desde el controlador
+    const { mesas: mesasIniciales } = usePage<{ mesas?: Mesa[] }>().props;
 
-    // Clientes activos (simulados)
+    //  Estado - usar datos del controlador
+    const [mesas, setMesas] = useState<Mesa[]>(mesasIniciales || []);
+
+    // Clientes activos (simulados - luego se conectará con BD)
     const [clientes, setClientes] = useState<Cliente[]>([
         { id: 1, nombre: 'María López', mesa: '01', personas: 2, estado: 'ocupada' },
         { id: 2, nombre: 'Carlos Ruiz', mesa: '02', personas: 4, estado: 'ocupada' },
@@ -126,36 +116,84 @@ export default function MesasDistribucion() {
         return coincideBusqueda && c.estado === filtroEstado;
     });
 
+    //  Cambiar estado de una mesa (conectado al controlador)
+    const cambiarEstado = (id: number, nuevoEstado: string) => {
+        router.patch(`/mesas/${id}`, {
+            estado: nuevoEstado,
+        }, {
+            onSuccess: () => {
+                // Actualizar el estado local
+                setMesas(mesas.map(mesa =>
+                    mesa.id === id ? { ...mesa, estado: nuevoEstado as Mesa['estado'] } : mesa
+                ));
+            },
+            onError: (errors) => {
+                alert('Error al cambiar estado: ' + Object.values(errors).join(' '));
+            }
+        });
+    };
+
+    //  Crear nueva mesa
+    const crearMesa = () => {
+        const numero = prompt('Ingrese el número de mesa:');
+        if (!numero) return;
+
+        const capacidad = prompt('Ingrese la capacidad (personas):');
+        if (!capacidad) return;
+
+        router.post('/mesas', {
+            numero: numero,
+            capacidad: parseInt(capacidad),
+            sillas: parseInt(capacidad),
+        }, {
+            onSuccess: () => {
+                router.reload();
+            },
+            onError: (errors) => {
+                alert('Error al crear mesa: ' + Object.values(errors).join(' '));
+            }
+        });
+    };
+
     return (
         <>
             <Head title="Distribución de Mesas" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4 bg-[#FBF7F0]">
 
-                {/* TÍTULO + LEYENDA DE COLORES (EN LA MISMA FILA) */}
+                {/* TÍTULO + LEYENDA + BOTÓN NUEVA MESA */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-[#2D1B1A]">  Gestión de Mesas</h1>
+                        <h1 className="text-2xl font-bold text-[#2D1B1A]"> Gestión de Mesas</h1>
                         <p className="text-[#5A3D2B] text-sm font-medium">Administración del restaurante</p>
                     </div>
-
-                    {/* Leyenda de colores - con texto gris oscuro */}
-                    <div className="flex flex-wrap items-center gap-3 p-2 bg-white/80 rounded-xl border border-[#8D6B53]/20">
-                        <span className="text-xs font-medium text-[#5A3D2B]">Estados:</span>
-                        <span className="flex items-center gap-1 text-xs text-gray-700">
-                            <span className="w-3 h-3 rounded-full bg-green-400"></span> Libre
-                        </span>
-                        <span className="flex items-center gap-1 text-xs text-gray-700">
-                            <span className="w-3 h-3 rounded-full bg-yellow-400"></span> Pendiente
-                        </span>
-                        <span className="flex items-center gap-1 text-xs text-gray-700">
-                            <span className="w-3 h-3 rounded-full bg-orange-400"></span> Ocupada
-                        </span>
-                        <span className="flex items-center gap-1 text-xs text-gray-700">
-                            <span className="w-3 h-3 rounded-full bg-blue-400"></span> Reserva
-                        </span>
-                        <span className="flex items-center gap-1 text-xs text-gray-700">
-                            <span className="w-3 h-3 rounded-full bg-purple-400"></span> Cobrar
-                        </span>
+                    <div className="flex items-center gap-4">
+                        {/*  Botón Nueva Mesa */}
+                        <button
+                            onClick={crearMesa}
+                            className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Nueva Mesa
+                        </button>
+                        {/* Leyenda de colores */}
+                        <div className="flex flex-wrap items-center gap-3 p-2 bg-white/80 rounded-xl border border-[#8D6B53]/20">
+                            <span className="text-xs font-medium text-[#5A3D2B]">Estados:</span>
+                            <span className="flex items-center gap-1 text-xs text-gray-700">
+                                <span className="w-3 h-3 rounded-full bg-green-400"></span> Libre
+                            </span>
+                            <span className="flex items-center gap-1 text-xs text-gray-700">
+                                <span className="w-3 h-3 rounded-full bg-yellow-400"></span> Pendiente
+                            </span>
+                            <span className="flex items-center gap-1 text-xs text-gray-700">
+                                <span className="w-3 h-3 rounded-full bg-orange-400"></span> Ocupada
+                            </span>
+                            <span className="flex items-center gap-1 text-xs text-gray-700">
+                                <span className="w-3 h-3 rounded-full bg-blue-400"></span> Reserva
+                            </span>
+                            <span className="flex items-center gap-1 text-xs text-gray-700">
+                                <span className="w-3 h-3 rounded-full bg-purple-400"></span> Cobrar
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -286,49 +324,32 @@ export default function MesasDistribucion() {
                                         {/* Botones de acción */}
                                         <div className="mt-2 flex flex-wrap gap-1">
                                             <button
-                                                onClick={() => {
-                                                    setMesas(mesas.map(m =>
-                                                        m.id === mesa.id ? { ...m, estado: 'libre' } : m
-                                                    ));
-                                                }}
+                                                onClick={() => cambiarEstado(mesa.id, 'libre')}
                                                 className="flex-1 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-[10px] font-medium transition"
                                             >
                                                 Libre
                                             </button>
                                             <button
-                                                onClick={() => {
-                                                    setMesas(mesas.map(m =>
-                                                        m.id === mesa.id ? { ...m, estado: 'ocupada' } : m
-                                                    ));
-                                                }}
+                                                onClick={() => cambiarEstado(mesa.id, 'ocupada')}
                                                 className="flex-1 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-[10px] font-medium transition"
                                             >
                                                 Ocupar
                                             </button>
                                             <button
-                                                onClick={() => {
-                                                    setMesas(mesas.map(m =>
-                                                        m.id === mesa.id ? { ...m, estado: 'pendiente' } : m
-                                                    ));
-                                                }}
+                                                onClick={() => cambiarEstado(mesa.id, 'pendiente')}
                                                 className="flex-1 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-[10px] font-medium transition"
                                             >
                                                 Espera
                                             </button>
                                             <button
-                                                onClick={() => {
-                                                    setMesas(mesas.map(m =>
-                                                        m.id === mesa.id ? { ...m, estado: 'listo_cobrar' } : m
-                                                    ));
-                                                }}
+                                                onClick={() => cambiarEstado(mesa.id, 'listo_cobrar')}
                                                 className="flex-1 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-[10px] font-medium transition"
                                             >
                                                 Cobrar
                                             </button>
                                         </div>
 
-                                        {/* ===== BOTÓN TOMAR PEDIDO (fuera del div de botones) ===== */}
-                                        {/* Solo aparece cuando la mesa está ocupada */}
+                                        {/*  Botón Tomar Pedido (solo cuando está ocupada) */}
                                         {mesa.estado === 'ocupada' && (
                                             <button
                                                 onClick={() => {
@@ -337,6 +358,18 @@ export default function MesasDistribucion() {
                                                 className="w-full mt-2 py-1.5 bg-[#C9A96E] hover:bg-[#B8975D] text-white rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1"
                                             >
                                                 🍽️ Tomar Pedido
+                                            </button>
+                                        )}
+
+                                        {/*  Botón Cobrar (solo cuando está listo_cobrar) */}
+                                        {mesa.estado === 'listo_cobrar' && (
+                                            <button
+                                                onClick={() => {
+                                                    window.location.href = `/caja?mesa=${mesa.numero}`;
+                                                }}
+                                                className="w-full mt-2 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 animate-pulse"
+                                            >
+                                                💰 Cobrar
                                             </button>
                                         )}
                                     </div>

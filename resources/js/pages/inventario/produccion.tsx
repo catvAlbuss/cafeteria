@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import {
     Search,
@@ -16,45 +16,103 @@ import {
 } from 'lucide-react';
 
 interface Pedido {
-    id: string;
-    nombre: string;
-    cantidad: number;
-    mesa: string;
-    tiempo: string;
-    estado: 'pendiente' | 'preparando' | 'listo' | 'entregado';
-    icono: string;
-    area: 'cocina' | 'bar' | 'horno' | 'postres';
-    cliente?: string;
+    id: number;
+    numero: string;
+    mesa_id: number | null;
+    mesa?: {
+        id: number;
+        numero: string;
+    } | null;
+    cliente: string;
+    productos: Array<{
+        nombre: string;
+        cantidad: number;
+        precio: number;
+        subtotal: number;
+    }>;
+    total: number;
+    estado: 'pendiente' | 'preparando' | 'listo' | 'entregado' | 'pagado' | 'cancelado';
+    observaciones: string | null;
+    hora_pedido: string;
+    hora_entrega: string | null;
+    created_at: string;
 }
 
 export default function Produccion() {
-    // 📋 Estado de los pedidos
-    const [pedidos, setPedidos] = useState<Pedido[]>([
-        { id: 'DC-001', nombre: 'Croissant Jamón y Queso', cantidad: 2, mesa: '4', tiempo: '8 min', estado: 'pendiente', icono: '🥐', area: 'cocina' },
-        { id: 'DC-002', nombre: 'Sandwich Club', cantidad: 1, mesa: '7', tiempo: '5 min', estado: 'preparando', icono: '🥪', area: 'cocina' },
-        { id: 'DC-003', nombre: 'Waffles con Frutas', cantidad: 1, mesa: '2', tiempo: '12 min', estado: 'listo', icono: '🧇', area: 'cocina' },
-        { id: 'B-001', nombre: 'Cappuccino', cantidad: 2, mesa: '5', tiempo: '5 min', estado: 'preparando', icono: '☕', area: 'bar' },
-        { id: 'B-002', nombre: 'Latte Vainilla', cantidad: 1, mesa: '3', tiempo: '4 min', estado: 'listo', icono: '🍵', area: 'bar', cliente: 'María' },
-        { id: 'B-003', nombre: 'Frappé Chocolate', cantidad: 3, mesa: '8', tiempo: '6 min', estado: 'pendiente', icono: '🥤', area: 'bar', cliente: 'Luis' },
-        { id: 'H-001', nombre: 'Croissant de Mantequilla', cantidad: 25, mesa: '-', tiempo: '25 min', estado: 'listo', icono: '🥐', area: 'horno' },
-        { id: 'H-002', nombre: 'Muffin Chocolate', cantidad: 12, mesa: '-', tiempo: '20 min', estado: 'preparando', icono: '🧁', area: 'horno' },
-        { id: 'P-001', nombre: 'Cheesecake de Fresa', cantidad: 2, mesa: '18', tiempo: '8 min', estado: 'preparando', icono: '🍮', area: 'postres', cliente: 'Ana' },
-        { id: 'P-002', nombre: 'Tiramisú', cantidad: 1, mesa: '1', tiempo: '6 min', estado: 'pendiente', icono: '🍰', area: 'postres', cliente: 'Carlo' },
-        { id: 'P-003', nombre: 'Brownie con Helado', cantidad: 2, mesa: '3', tiempo: '4 min', estado: 'listo', icono: '🍫', area: 'postres', cliente: 'Miguel' },
-    ]);
+    //  Recibir pedidos desde el controlador
+    const { pedidos: pedidosIniciales } = usePage().props as unknown as { pedidos: Pedido[] };
+
+    //  Estado - usar datos del controlador
+    const [pedidos, setPedidos] = useState<Pedido[]>(pedidosIniciales || []);
 
     const [busqueda, setBusqueda] = useState('');
     const [filtroEstado, setFiltroEstado] = useState<string>('todas');
 
-    // 🔔 Estado de notificaciones
+    //  Estado de notificaciones
     const [notificacionesAbiertas, setNotificacionesAbiertas] = useState(false);
-    const [notificaciones, setNotificaciones] = useState([
-        { id: 1, pedido: '#001', mesa: '05', cliente: 'Juan Pérez', productos: '2x Cappuccino · 1x Cheesecake', tiempo: 'hace 2 min', estado: 'pendiente' },
-        { id: 2, pedido: '#002', mesa: '03', cliente: 'María López', productos: '1x Latte · 2x Croissants', tiempo: 'hace 5 min', estado: 'pendiente' },
-        { id: 3, pedido: '#003', mesa: '08', cliente: 'Carlos Ruiz', productos: '3x Cafés americanos', tiempo: 'hace 8 min', estado: 'pendiente' },
-    ]);
 
-    // Cerrar panel al hacer clic fuera
+    //  Configuración de estados
+    const getEstadoConfig = (estado: string) => {
+        switch (estado) {
+            case 'pendiente': return { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Pendiente', icon: '🟠' };
+            case 'preparando': return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Preparando', icon: '🔵' };
+            case 'listo': return { bg: 'bg-green-100', text: 'text-green-600', label: 'Listo', icon: '🟢' };
+            case 'entregado': return { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Entregado', icon: '⚪' };
+            case 'pagado': return { bg: 'bg-purple-100', text: 'text-purple-600', label: 'Pagado', icon: '🟣' };
+            case 'cancelado': return { bg: 'bg-red-100', text: 'text-red-600', label: 'Cancelado', icon: '🔴' };
+            default: return { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Desconocido', icon: '⚪' };
+        }
+    };
+
+    //  Filtrar pedidos
+    const pedidosFiltrados = pedidos.filter(p => {
+        const coincideBusqueda = p.cliente.toLowerCase().includes(busqueda.toLowerCase()) ||
+            p.numero.toLowerCase().includes(busqueda.toLowerCase()) ||
+            (p.mesa && p.mesa.numero.includes(busqueda));
+        if (filtroEstado === 'todas') return coincideBusqueda;
+        return coincideBusqueda && p.estado === filtroEstado;
+    });
+
+    // Contar por estado
+    const contarPorEstado = (estado: string) => {
+        return pedidos.filter(p => p.estado === estado).length;
+    };
+
+    // Cambiar estado de un pedido (conectado al controlador)
+    const cambiarEstado = (id: number, nuevoEstado: string) => {
+        //  Buscar el pedido para obtener la mesa_id
+        const pedido = pedidos.find(p => p.id === id);
+
+        router.patch(`/pedidos/${id}`, {
+            estado: nuevoEstado,
+        }, {
+            onSuccess: () => {
+                // Actualizar el estado local
+                setPedidos(pedidos.map(pedido =>
+                    pedido.id === id ? { ...pedido, estado: nuevoEstado as Pedido['estado'] } : pedido
+                ));
+
+                //  Si el pedido se marca como LISTO, notificar a la mesa
+                if (nuevoEstado === 'listo' && pedido?.mesa_id) {
+                    router.post(`/mesas/${pedido.mesa_id}/pedido-listo`, {}, {
+                        onSuccess: () => {
+                            // Recargar para actualizar el indicador en Mesas
+                            router.reload();
+                        }
+                    });
+                }
+            },
+            onError: (errors) => {
+                alert('Error al cambiar estado: ' + Object.values(errors).join(' '));
+            }
+        });
+    };
+
+    //  Pedidos pendientes para notificaciones
+    const pedidosPendientes = pedidos.filter(p => p.estado === 'pendiente' || p.estado === 'preparando');
+    const pendientes = pedidosPendientes.length;
+
+    // Cerrar panel de notificaciones
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
@@ -66,43 +124,38 @@ export default function Produccion() {
         return () => document.removeEventListener('click', handleClickOutside);
     }, [notificacionesAbiertas]);
 
-    const pendientes = notificaciones.filter(n => n.estado === 'pendiente').length;
-
-    // 📊 Configuración de estados
-    const getEstadoConfig = (estado: string) => {
-        switch (estado) {
-            case 'pendiente': return { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Pendiente', icon: '🟠' };
-            case 'preparando': return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Preparando', icon: '🔵' };
-            case 'listo': return { bg: 'bg-green-100', text: 'text-green-600', label: 'Listo', icon: '🟢' };
-            case 'entregado': return { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Entregado', icon: '⚪' };
-            default: return { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Desconocido', icon: '⚪' };
-        }
-    };
-
-    // 🔍 Filtrar pedidos
-    const pedidosFiltrados = pedidos.filter(p => {
-        const coincideBusqueda = p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-            p.id.toLowerCase().includes(busqueda.toLowerCase()) ||
-            p.mesa.includes(busqueda);
-        if (filtroEstado === 'todas') return coincideBusqueda;
-        return coincideBusqueda && p.estado === filtroEstado;
-    });
-
-    // 📊 Contar por estado
-    const contarPorEstado = (estado: string) => {
-        return pedidos.filter(p => p.estado === estado).length;
-    };
-
-    // 📊 Cambiar estado de un pedido
-    const cambiarEstado = (id: string, nuevoEstado: Pedido['estado']) => {
-        setPedidos(pedidos.map(p =>
-            p.id === id ? { ...p, estado: nuevoEstado } : p
-        ));
-    };
-
-    // 📊 Obtener pedidos por área
+    // Obtener pedidos por área (clasificación por productos)
     const pedidosPorArea = (area: string) => {
-        return pedidosFiltrados.filter(p => p.area === area);
+        return pedidosFiltrados.filter(p => {
+            const tieneCocina = p.productos.some(prod =>
+                ['Croissant', 'Sandwich', 'Waffles', 'Pan'].some(nombre =>
+                    prod.nombre.includes(nombre)
+                )
+            );
+            const tieneBar = p.productos.some(prod =>
+                ['Cappuccino', 'Latte', 'Frappé', 'Café', 'Matcha', 'Jugo'].some(nombre =>
+                    prod.nombre.includes(nombre)
+                )
+            );
+            const tieneHorno = p.productos.some(prod =>
+                ['Croissant', 'Muffin', 'Pan'].some(nombre =>
+                    prod.nombre.includes(nombre)
+                )
+            );
+            const tienePostres = p.productos.some(prod =>
+                ['Cheesecake', 'Tiramisú', 'Brownie', 'Donut'].some(nombre =>
+                    prod.nombre.includes(nombre)
+                )
+            );
+
+            switch (area) {
+                case 'cocina': return tieneCocina && !tieneHorno && !tienePostres;
+                case 'bar': return tieneBar;
+                case 'horno': return tieneHorno;
+                case 'postres': return tienePostres;
+                default: return true;
+            }
+        });
     };
 
     return (
@@ -113,12 +166,12 @@ export default function Produccion() {
                 {/* ===== TÍTULO Y CAMPANITA ===== */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-[#2D1B1A]">🔧 Producción</h1>
+                        <h1 className="text-2xl font-bold text-[#2D1B1A]"> Producción</h1>
                         <p className="text-[#5A3D2B] text-sm font-medium">Control de pedidos en cocina, bar, horno y postres</p>
                     </div>
                     <div className="flex items-center gap-4">
 
-                        {/* 🔔 Campanita de notificaciones */}
+                        {/*  Campanita de notificaciones */}
                         <div className="relative notificaciones-container">
                             <button
                                 onClick={() => setNotificacionesAbiertas(!notificacionesAbiertas)}
@@ -152,35 +205,31 @@ export default function Produccion() {
                                                 ✅ No hay pedidos pendientes
                                             </div>
                                         ) : (
-                                            notificaciones.filter(n => n.estado === 'pendiente').map((noti) => (
+                                            pedidosPendientes.map((pedido) => (
                                                 <div
-                                                    key={noti.id}
+                                                    key={pedido.id}
                                                     className="p-3 rounded-xl hover:bg-orange-50 transition border border-gray-100 mb-2 last:mb-0 hover:border-orange-200"
                                                 >
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2 flex-wrap">
                                                                 <span className="text-xs font-bold bg-orange-100 text-orange-600 px-2 py-0.5 rounded">
-                                                                    {noti.pedido}
+                                                                    {pedido.numero}
                                                                 </span>
-                                                                <span className="text-xs text-gray-400">{noti.tiempo}</span>
+                                                                <span className="text-xs text-gray-400">
+                                                                    {new Date(pedido.hora_pedido).toLocaleTimeString()}
+                                                                </span>
                                                             </div>
                                                             <p className="text-sm font-medium text-[#2D1B1A] mt-1">
-                                                                🪑 Mesa {noti.mesa} - {noti.cliente}
+                                                                🪑 Mesa {pedido.mesa?.numero || 'No asignada'} - {pedido.cliente}
                                                             </p>
-                                                            <p className="text-xs text-gray-500 truncate">{noti.productos}</p>
+                                                            <p className="text-xs text-gray-500 truncate">
+                                                                {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}
+                                                            </p>
                                                         </div>
                                                         <button
                                                             onClick={() => {
-                                                                // Marcar como tomado
-                                                                const pedidosActualizados = notificaciones.map(n =>
-                                                                    n.id === noti.id ? { ...n, estado: 'tomado' } : n
-                                                                );
-                                                                setNotificaciones(pedidosActualizados);
-                                                                localStorage.setItem('pedidosPendientes', JSON.stringify(pedidosActualizados));
-
-                                                                // Redirigir a producción con el pedido
-                                                                window.location.href = `/produccion?pedido=${noti.id}`;
+                                                                cambiarEstado(pedido.id, 'preparando');
                                                             }}
                                                             className="ml-2 px-3 py-1.5 bg-[#C9A96E] hover:bg-[#B8975D] text-white rounded-lg text-xs font-semibold transition whitespace-nowrap flex items-center gap-1"
                                                         >
@@ -217,7 +266,7 @@ export default function Produccion() {
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                             <input
                                 type="text"
-                                placeholder=" Buscar pedido, producto o mesa..."
+                                placeholder=" Buscar pedido, cliente o mesa..."
                                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#1A1A1A] placeholder-gray-400"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
@@ -227,8 +276,8 @@ export default function Produccion() {
                             <button
                                 onClick={() => setFiltroEstado('todas')}
                                 className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'todas'
-                                        ? 'bg-[#C9A96E] text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    ? 'bg-[#C9A96E] text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                     }`}
                             >
                                 Todas
@@ -236,8 +285,8 @@ export default function Produccion() {
                             <button
                                 onClick={() => setFiltroEstado('pendiente')}
                                 className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'pendiente'
-                                        ? 'bg-orange-600 text-white'
-                                        : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                                    ? 'bg-orange-600 text-white'
+                                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
                                     }`}
                             >
                                 Pendientes
@@ -245,8 +294,8 @@ export default function Produccion() {
                             <button
                                 onClick={() => setFiltroEstado('preparando')}
                                 className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'preparando'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                     }`}
                             >
                                 Preparando
@@ -254,8 +303,8 @@ export default function Produccion() {
                             <button
                                 onClick={() => setFiltroEstado('listo')}
                                 className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'listo'
-                                        ? 'bg-green-600 text-white'
-                                        : 'bg-green-100 text-green-600 hover:bg-green-200'
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-green-100 text-green-600 hover:bg-green-200'
                                     }`}
                             >
                                 Listos
@@ -279,15 +328,15 @@ export default function Produccion() {
 
                         <div className="p-4 grid grid-cols-3 gap-2 text-center">
                             <div className="bg-orange-100 rounded-xl py-2">
-                                <p className="text-orange-700 font-bold">{pedidos.filter(p => p.area === 'cocina' && p.estado === 'pendiente').length}</p>
+                                <p className="text-orange-700 font-bold">{pedidosPorArea('cocina').filter(p => p.estado === 'pendiente').length}</p>
                                 <p className="text-gray-500 text-xs">Pendientes</p>
                             </div>
                             <div className="bg-blue-100 rounded-xl py-2">
-                                <p className="text-blue-700 font-bold">{pedidos.filter(p => p.area === 'cocina' && p.estado === 'preparando').length}</p>
+                                <p className="text-blue-700 font-bold">{pedidosPorArea('cocina').filter(p => p.estado === 'preparando').length}</p>
                                 <p className="text-gray-500 text-xs">Preparando</p>
                             </div>
                             <div className="bg-green-100 rounded-xl py-2">
-                                <p className="text-green-600 font-bold">{pedidos.filter(p => p.area === 'cocina' && p.estado === 'listo').length}</p>
+                                <p className="text-green-600 font-bold">{pedidosPorArea('cocina').filter(p => p.estado === 'listo').length}</p>
                                 <p className="text-gray-500 text-xs">Listos</p>
                             </div>
                         </div>
@@ -298,10 +347,10 @@ export default function Produccion() {
                                 return (
                                     <div key={pedido.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow-sm transition">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-xl">{pedido.icono}</div>
+                                            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-xl">🍽️</div>
                                             <div>
-                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.id} - {pedido.nombre}</h4>
-                                                <p className="text-gray-500 text-xs">Mesa {pedido.mesa} · {pedido.tiempo}</p>
+                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.numero} - {pedido.cliente}</h4>
+                                                <p className="text-gray-500 text-xs">Mesa {pedido.mesa?.numero || '-'} · {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -346,15 +395,15 @@ export default function Produccion() {
 
                         <div className="p-4 grid grid-cols-3 gap-2 text-center">
                             <div className="bg-orange-100 rounded-xl py-2">
-                                <p className="text-orange-700 font-bold">{pedidos.filter(p => p.area === 'bar' && p.estado === 'pendiente').length}</p>
+                                <p className="text-orange-700 font-bold">{pedidosPorArea('bar').filter(p => p.estado === 'pendiente').length}</p>
                                 <p className="text-gray-500 text-xs">Pendientes</p>
                             </div>
                             <div className="bg-blue-100 rounded-xl py-2">
-                                <p className="text-blue-700 font-bold">{pedidos.filter(p => p.area === 'bar' && p.estado === 'preparando').length}</p>
+                                <p className="text-blue-700 font-bold">{pedidosPorArea('bar').filter(p => p.estado === 'preparando').length}</p>
                                 <p className="text-gray-500 text-xs">Preparando</p>
                             </div>
                             <div className="bg-green-100 rounded-xl py-2">
-                                <p className="text-green-600 font-bold">{pedidos.filter(p => p.area === 'bar' && p.estado === 'listo').length}</p>
+                                <p className="text-green-600 font-bold">{pedidosPorArea('bar').filter(p => p.estado === 'listo').length}</p>
                                 <p className="text-gray-500 text-xs">Listos</p>
                             </div>
                         </div>
@@ -365,10 +414,10 @@ export default function Produccion() {
                                 return (
                                     <div key={pedido.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow-sm transition">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl">{pedido.icono}</div>
+                                            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl">☕</div>
                                             <div>
-                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.id} - {pedido.nombre}</h4>
-                                                <p className="text-gray-500 text-xs">Mesa {pedido.mesa} · {pedido.tiempo}</p>
+                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.numero} - {pedido.cliente}</h4>
+                                                <p className="text-gray-500 text-xs">Mesa {pedido.mesa?.numero || '-'} · {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -413,15 +462,15 @@ export default function Produccion() {
 
                         <div className="p-4 grid grid-cols-3 gap-2 text-center">
                             <div className="bg-orange-100 rounded-xl py-2">
-                                <p className="text-orange-700 font-bold">{pedidos.filter(p => p.area === 'horno' && p.estado === 'pendiente').length}</p>
+                                <p className="text-orange-700 font-bold">{pedidosPorArea('horno').filter(p => p.estado === 'pendiente').length}</p>
                                 <p className="text-gray-500 text-xs">Pendientes</p>
                             </div>
                             <div className="bg-blue-100 rounded-xl py-2">
-                                <p className="text-blue-700 font-bold">{pedidos.filter(p => p.area === 'horno' && p.estado === 'preparando').length}</p>
+                                <p className="text-blue-700 font-bold">{pedidosPorArea('horno').filter(p => p.estado === 'preparando').length}</p>
                                 <p className="text-gray-500 text-xs">Horneando</p>
                             </div>
                             <div className="bg-green-100 rounded-xl py-2">
-                                <p className="text-green-600 font-bold">{pedidos.filter(p => p.area === 'horno' && p.estado === 'listo').length}</p>
+                                <p className="text-green-600 font-bold">{pedidosPorArea('horno').filter(p => p.estado === 'listo').length}</p>
                                 <p className="text-gray-500 text-xs">Listos</p>
                             </div>
                         </div>
@@ -432,10 +481,10 @@ export default function Produccion() {
                                 return (
                                     <div key={pedido.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow-sm transition">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-xl">{pedido.icono}</div>
+                                            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-xl">🔥</div>
                                             <div>
-                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.id} - {pedido.nombre}</h4>
-                                                <p className="text-gray-500 text-xs">{pedido.cantidad} unid. · {pedido.tiempo}</p>
+                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.numero} - {pedido.cliente}</h4>
+                                                <p className="text-gray-500 text-xs">{pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -480,19 +529,19 @@ export default function Produccion() {
 
                         <div className="p-4 grid grid-cols-4 gap-2 text-center">
                             <div className="bg-orange-100 rounded-xl py-2">
-                                <p className="text-orange-700 font-bold">{pedidos.filter(p => p.area === 'postres' && p.estado === 'pendiente').length}</p>
+                                <p className="text-orange-700 font-bold">{pedidosPorArea('postres').filter(p => p.estado === 'pendiente').length}</p>
                                 <p className="text-gray-500 text-xs">Pendientes</p>
                             </div>
                             <div className="bg-blue-100 rounded-xl py-2">
-                                <p className="text-blue-700 font-bold">{pedidos.filter(p => p.area === 'postres' && p.estado === 'preparando').length}</p>
+                                <p className="text-blue-700 font-bold">{pedidosPorArea('postres').filter(p => p.estado === 'preparando').length}</p>
                                 <p className="text-gray-500 text-xs">Decorando</p>
                             </div>
                             <div className="bg-green-100 rounded-xl py-2">
-                                <p className="text-green-600 font-bold">{pedidos.filter(p => p.area === 'postres' && p.estado === 'listo').length}</p>
+                                <p className="text-green-600 font-bold">{pedidosPorArea('postres').filter(p => p.estado === 'listo').length}</p>
                                 <p className="text-gray-500 text-xs">Listos</p>
                             </div>
                             <div className="bg-purple-100 rounded-xl py-2">
-                                <p className="text-purple-700 font-bold">{pedidos.filter(p => p.area === 'postres').length}</p>
+                                <p className="text-purple-700 font-bold">{pedidosPorArea('postres').length}</p>
                                 <p className="text-gray-500 text-xs">Total</p>
                             </div>
                         </div>
@@ -503,10 +552,10 @@ export default function Produccion() {
                                 return (
                                     <div key={pedido.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow-sm transition">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-pink-100 flex items-center justify-center text-xl">{pedido.icono}</div>
+                                            <div className="w-10 h-10 rounded-xl bg-pink-100 flex items-center justify-center text-xl">🍰</div>
                                             <div>
-                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.id} - {pedido.nombre}</h4>
-                                                <p className="text-gray-500 text-xs">Mesa {pedido.mesa} · {pedido.tiempo}</p>
+                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.numero} - {pedido.cliente}</h4>
+                                                <p className="text-gray-500 text-xs">Mesa {pedido.mesa?.numero || '-'} · {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">

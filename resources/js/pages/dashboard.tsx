@@ -24,7 +24,7 @@ const formatNumber = (num: number): string => {
 };
 
 export default function Dashboard() {
-    // 📊 Datos
+    //   Datos
     const stats = {
         ventasHoy: 4820,
         ventasCambio: 12,
@@ -46,74 +46,7 @@ export default function Dashboard() {
             <Head title="Dashboard - Dolce Cafe" />
             
             <div className="space-y-10 p-6 bg-[#FBF3E7]">
-                
-                {/* ============================================================ */}
-                {/* HERO */}
-                {/* ============================================================ */}
-                <section className="relative overflow-hidden rounded-3xl bg-[#F8EEE1] border border-[#EFE1CC]">
-                    
-                    {/* doodles decorativos */}
-                    <svg className="absolute top-6 right-[38%] h-16 w-16 text-[#C9A876] opacity-60 hidden lg:block" viewBox="0 0 80 80" fill="none">
-                        <path d="M5 40C5 20 25 8 45 12C60 15 65 30 55 38C48 44 38 40 40 30" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                    <svg className="absolute bottom-8 left-0 h-24 w-24 text-[#C9A876] opacity-50 hidden lg:block" viewBox="0 0 100 100" fill="none">
-                        <path d="M0 20C20 20 30 0 50 5C70 10 65 35 45 32" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                        <path d="M0 55C15 55 20 70 35 68" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-
-                    <div className="relative grid grid-cols-1 lg:grid-cols-2 items-center">
-                        
-                        {/* texto */}
-                        <div className="relative z-10 p-8 lg:p-14">
-                            <div className="inline-flex items-center gap-2 mb-5">
-                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#4A3222]">
-                                    <Bean className="h-3.5 w-3.5 text-white" />
-                                </span>
-                                <span className="text-[11px] font-bold tracking-widest text-[#8A7458] uppercase">
-                                    Café de calidad, momentos inolvidables
-                                </span>
-                            </div>
-
-                            <h1 className="font-serif text-4xl lg:text-5xl font-extrabold text-[#3B2A1E] leading-tight">
-                                El sabor que
-                                <br />
-                                hace tu día <span className="font-script text-orange-500 text-5xl lg:text-6xl font-normal">mejor</span>
-                            </h1>
-
-                            <p className="mt-5 text-[#7A6A57] text-base leading-7 max-w-md">
-                                En Dolce Cafe ofrecemos cafés de especialidad, preparados con pasión y los mejores ingredientes para ti.
-                            </p>
-
-                            <div className="mt-7 flex flex-wrap items-center gap-6">
-                                <div>
-                                    <p className="text-xl font-extrabold text-[#3B2A1E]">{formatCurrency(stats.ventasHoy)}</p>
-                                    <p className="text-xs text-[#9C8B76]">ventas hoy</p>
-                                </div>
-                                <span className="h-8 w-px bg-[#DCCBAE]"></span>
-                                <div>
-                                    <p className="text-xl font-extrabold text-[#3B2A1E]">{stats.mesasActivas}</p>
-                                    <p className="text-xs text-[#9C8B76]">mesas activas</p>
-                                </div>
-                                <span className="h-8 w-px bg-[#DCCBAE]"></span>
-                                <div>
-                                    <p className="text-xl font-extrabold text-[#3B2A1E]">{stats.clientes}</p>
-                                    <p className="text-xs text-[#9C8B76]">clientes</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* imagen */}
-                        <div className="relative h-64 lg:h-[420px] w-full">
-                            <div className="absolute inset-0 bg-gradient-to-r from-[#F8EEE1] via-[#F8EEE1]/40 lg:via-transparent to-transparent z-10 lg:w-24"></div>
-                            <img
-                                src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1200&q=80"
-                                alt="Café con arte latte"
-                                className="h-full w-full object-cover"
-                            />
-                        </div>
-
-                    </div>
-                </section>
+                D
 
                 {/* ============================================================ */}
                 {/* ACCESOS RÁPIDOS */}
