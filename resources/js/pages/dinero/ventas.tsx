@@ -1,5 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
+import { User, Armchair } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
@@ -52,6 +53,7 @@ export default function Ventas() {
     // Estado del carrito
     const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
     const [busqueda, setBusqueda] = useState('');
+    const [pedidoEnviado, setPedidoEnviado] = useState(false);
 
 
     // Leer el número de mesa de la URL
@@ -71,7 +73,7 @@ export default function Ventas() {
                     setMesaInfo(response.data);
                 })
                 .catch(error => {
-                    console.error('Error al cargar mesa:', error);
+
                 });
         }
     }, [mesa]);
@@ -99,7 +101,6 @@ export default function Ventas() {
         }
     };
 
-    // Quitar producto del carrito
     const quitarProducto = (id: number) => {
         const existente = carrito.find(item => item.id === id);
         if (existente && existente.cantidad > 1) {
@@ -113,7 +114,7 @@ export default function Ventas() {
         }
     };
 
-    // Enviar pedido al controlador
+
     const enviarPedido = () => {
         if (carrito.length === 0) {
             alert('Agrega productos al pedido');
@@ -133,6 +134,10 @@ export default function Ventas() {
             observaciones: '',
         }, {
             onSuccess: () => {
+                // Ocultar la información de la mesa
+                setPedidoEnviado(true);
+
+                // Mostrar toast de éxito
                 toast.success('✅ Pedido enviado a cocina', {
                     description: `Mesa: ${mesa || 'No asignada'} | Mesero: ${mesaInfo?.mesero || 'No asignado'} | Total: S/ ${totalCarrito.toFixed(2)}`,
                     duration: 5000,
@@ -143,7 +148,10 @@ export default function Ventas() {
                     },
                 });
 
+                // Limpiar carrito
                 setCarrito([]);
+
+                // ❌ ELIMINÉ EL setTimeout QUE REDIRIGÍA A /mesas
             },
             onError: (errors) => {
                 alert('❌ Error al enviar pedido: ' + Object.values(errors).join(' '));
@@ -159,22 +167,66 @@ export default function Ventas() {
                 {/* Título */}
                 <h1 className="text-2xl font-bold text-[#4A2C2A]">☕ Tomar Pedido</h1>
                 <p className="text-[#8D6B53] text-sm">Busca productos y arma el pedido</p>
+                {/* Información de la mesa - Solo aparece si hay una mesa seleccionada */}
+                {mesaInfo && !pedidoEnviado && (
+                    <div className="relative bg-white rounded-xl p-5 shadow-md border-l-4 border-[#C9A96E]">
+                        <div className="absolute -top-2 -right-2">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${mesaInfo.estado === 'ocupada' ? 'bg-orange-500' :
+                                    mesaInfo.estado === 'pendiente' ? 'bg-yellow-500' :
+                                        'bg-green-500'
+                                }`}>
+                                {mesaInfo.estado || 'Libre'}
+                            </span>
+                        </div>
 
-                {/* Encabezado con Mesa y Mesero */}
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-[#8D6B53]/20 flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-[#5A3D2B]">🪑 Mesa:</span>
-                        <span className="text-sm font-bold text-[#2D1B1A]">
-                            {mesaInfo ? `#${mesaInfo.numero} (${mesaInfo.capacidad} pers., ${mesaInfo.sillas} sillas)` : mesa || 'No asignada'}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-6">
+                            {/* Mesa */}
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-full bg-[#FBF7F0] border-2 border-[#C9A96E] flex items-center justify-center">
+                                    <span className="text-xl font-bold text-[#2D1B1A]">
+                                        #{mesaInfo.numero}
+                                    </span>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] uppercase text-[#8D6B53] font-medium tracking-wider">
+                                        Mesa
+                                    </p>
+                                    <p className="text-sm text-[#2D1B1A] font-medium">
+                                        {mesaInfo.capacidad} personas
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Separador */}
+                            <div className="hidden sm:block w-px h-10 bg-[#8D6B53]/20"></div>
+
+                            {/* Mesero */}
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-[#C9A96E]/10 flex items-center justify-center">
+                                    <User className="w-5 h-5 text-[#C9A96E]" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] uppercase text-[#8D6B53] font-medium tracking-wider">
+                                        Mesero
+                                    </p>
+                                    <p className="text-sm text-[#2D1B1A] font-medium">
+                                        {mesaInfo.mesero || 'No asignado'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Sillas */}
+                            <div className="flex items-center gap-2 ml-auto">
+                                <Armchair className="w-4 h-4 text-[#8D6B53]" />
+                                <span className="text-sm text-[#2D1B1A] font-medium">
+                                    {mesaInfo.sillas} sillas
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-[#5A3D2B]">👤 Mesero:</span>
-                        <span className="text-sm font-bold text-[#2D1B1A]">
-                            {mesaInfo?.mesero || 'No asignado'}
-                        </span>
-                    </div>
-                </div>
+                )}
+
+
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
@@ -183,7 +235,7 @@ export default function Ventas() {
                         <div className="mb-4">
                             <input
                                 type="text"
-                                placeholder="🔍 Buscar producto (ej: café, latte, sandwich...)"
+                                placeholder=" Buscar producto (ej: café, latte, sandwich...)"
                                 className="w-full p-3 rounded-xl border border-[#8D6B53]/30 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#1A1A1A] placeholder-gray-500 bg-white shadow-sm"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}

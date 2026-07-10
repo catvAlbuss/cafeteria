@@ -1,18 +1,38 @@
 import { createInertiaApp } from '@inertiajs/react';
+import { createRoot } from 'react-dom/client';
+import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import axios from 'axios';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
-const csrfToken = typeof document !== 'undefined'
-    ? document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
-    : null;
+
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+if (csrfToken) {
+    axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
+    axios.defaults.withCredentials = true;
+}
+
+const pages = import.meta.glob('./pages/**/*.tsx', { eager: true }) as Record<string, { default: any }>;
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
+    resolve: (name) => {
+        const page = pages[`./pages/${name}.tsx`];
+        if (!page) {
+            // Fallback a resolvePageComponent si no encuentra
+            return resolvePageComponent(
+                `./pages/${name}.tsx`,
+                import.meta.glob('./pages/**/*.tsx')
+            );
+        }
+        return page.default;
+    },
     layout: (name) => {
         switch (true) {
             case name === 'welcome':
@@ -40,5 +60,4 @@ createInertiaApp({
     },
 });
 
-// This will set light / dark mode on load...
 initializeTheme();

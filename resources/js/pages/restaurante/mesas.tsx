@@ -11,7 +11,301 @@ import {
     useDroppable,
     type DragEndEvent,
 } from '@dnd-kit/core';
-import { Armchair, Search, Plus, User } from 'lucide-react';
+import { 
+    Armchair, 
+    Search, 
+    Plus, 
+    User, 
+    Check, 
+    X,
+    ClipboardList,
+    Users,
+    Utensils,
+    Receipt,
+    Package,
+    ChefHat,
+    CircleCheck,
+    CircleX,  
+    ShoppingCart,
+    Calendar,
+    AlertCircle,
+    Eye
+} from 'lucide-react';
+// ============================================================
+// COMPONENTE MODAL PARA MESERO
+// ============================================================
+
+interface ModalMeseroProps {
+    isOpen: boolean;
+    mesa: Mesa | null;
+    onClose: () => void;
+    onConfirm: (mesero: string) => void;
+}
+
+function ModalMesero({ isOpen, mesa, onClose, onConfirm }: ModalMeseroProps) {
+    const [nombreMesero, setNombreMesero] = useState('');
+    const [error, setError] = useState('');
+
+    if (!isOpen || !mesa) return null;
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const nombreTrim = nombreMesero.trim();
+
+        if (!nombreTrim) {
+            setError('Por favor ingresa el nombre del mesero');
+            return;
+        }
+
+        if (nombreTrim.length < 2) {
+            setError('El nombre debe tener al menos 2 caracteres');
+            return;
+        }
+
+        setError('');
+        onConfirm(nombreTrim);
+        setNombreMesero('');
+        onClose();
+    };
+
+    const handleClose = () => {
+        setNombreMesero('');
+        setError('');
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+
+                {/* Header con gradiente */}
+                <div className="bg-gradient-to-r from-[#2D1B1A] to-[#4A2C2A] px-5 py-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-[#C9A96E] rounded-full flex items-center justify-center">
+                                <User className="w-4 h-4 text-white" />
+                            </div>
+                            <div>
+                                <h3 className="text-white font-semibold text-sm">
+                                    Tomar Pedido
+                                </h3>
+                                <p className="text-gray-300 text-[10px]">
+                                    Mesa #{mesa.numero}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={handleClose}
+                            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition text-white/60 hover:text-white"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Body */}
+                <form onSubmit={handleSubmit} className="p-5">
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            <span className="flex items-center gap-1.5">
+                                <User className="w-3.5 h-3.5 text-[#C9A96E]" />
+                                Nombre del mesero
+                            </span>
+                        </label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Ej: Fiorela, Angel..."
+                                className={`w-full px-4 py-2.5 border-2 rounded-xl focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 text-sm text-gray-900 placeholder-gray-400 ${error ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                                    }`}
+                                value={nombreMesero}
+                                onChange={(e) => {
+                                    setNombreMesero(e.target.value);
+                                    if (error) setError('');
+                                }}
+                                autoFocus
+                            />
+                            {nombreMesero && (
+                                <button
+                                    type="button"
+                                    onClick={() => setNombreMesero('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </div>
+                        {error && (
+                            <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1">
+                                <span>⚠</span>
+                                {error}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Sugerencias rápidas */}
+                    <div className="mb-4">
+                        <p className="text-[10px] text-gray-400 mb-1.5">Sugerencias:</p>
+                        <div className="flex gap-1.5 flex-wrap">
+                            {['Fiorela', 'Angel', 'María', 'Carlos', 'Lucía'].map((nombre) => (
+                                <button
+                                    key={nombre}
+                                    type="button"
+                                    onClick={() => {
+                                        setNombreMesero(nombre);
+                                        setError('');
+                                    }}
+                                    className={`px-2.5 py-1 text-[10px] rounded-full border transition ${nombreMesero === nombre
+                                        ? 'border-[#C9A96E] bg-[#C9A96E]/10 text-[#C9A96E] font-medium'
+                                        : 'border-gray-200 text-gray-500 hover:border-[#C9A96E] hover:text-[#C9A96E]'
+                                        }`}
+                                >
+                                    {nombre}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Botones */}
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-50 font-medium text-sm transition"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            className="flex-1 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-medium text-sm transition flex items-center justify-center gap-1.5"
+                        >
+                            <Check className="w-3.5 h-3.5" />
+                            Aceptar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+// ============================================================
+// COMPONENTE TARJETA DE PEDIDO (MODAL FLOTANTE)
+// ============================================================
+
+interface TarjetaPedidoProps {
+    pedido: any;
+    mesaNumero: string;
+    mesero: string;
+    onClose: () => void;
+}
+
+function TarjetaPedido({ pedido, mesaNumero, mesero, onClose }: TarjetaPedidoProps) {
+    const productos = typeof pedido.productos === 'string'
+        ? JSON.parse(pedido.productos)
+        : pedido.productos;
+
+    const total = typeof pedido.total === 'number'
+        ? pedido.total
+        : parseFloat(pedido.total) || 0;
+
+    const fecha = new Date(pedido.created_at).toLocaleString('es-PE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+
+    return (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-[#2D1B1A] to-[#4A2C2A] px-5 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-[#C9A96E] rounded-full flex items-center justify-center">
+                            <span className="text-lg">📋</span>
+                        </div>
+                        <div>
+                            <h3 className="text-white font-semibold text-base">Detalle del Pedido</h3>
+                            <p className="text-gray-300 text-xs">Mesa #{mesaNumero} · {fecha}</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition text-white/60 hover:text-white"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-5 max-h-[60vh] overflow-y-auto">
+                    {/* Mesero */}
+                    <div className="flex items-center gap-2 bg-[#FBF7F0] rounded-lg px-3 py-2 mb-4">
+                        <User className="w-4 h-4 text-[#C9A96E]" />
+                        <span className="text-sm text-[#2D1B1A]">
+                            <span className="font-medium">Mesero:</span> {mesero || 'No asignado'}
+                        </span>
+                    </div>
+
+                    {/* Productos */}
+                    <div className="space-y-2">
+                        <p className="text-xs font-bold uppercase text-[#8D6B53] tracking-wider">Productos</p>
+                        <div className="border-t border-[#8D6B53]/20 pt-2">
+                            {productos && productos.length > 0 ? (
+                                productos.map((item: any, index: number) => (
+                                    <div key={index} className="flex justify-between py-2 border-b border-[#8D6B53]/10 last:border-0">
+                                        <div>
+                                            <p className="text-sm font-medium text-[#2D1B1A]">
+                                                {item.cantidad}x {item.nombre}
+                                            </p>
+                                            <p className="text-xs text-[#8D6B53]">S/ {item.precio.toFixed(2)} c/u</p>
+                                        </div>
+                                        <p className="text-sm font-bold text-[#C9A96E]">S/ {item.subtotal.toFixed(2)}</p>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-gray-400 text-center py-4">Sin productos en este pedido</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Total */}
+                    <div className="mt-4 pt-4 border-t-2 border-dashed border-[#C9A96E]/30">
+                        <div className="flex justify-between items-center">
+                            <span className="text-base font-bold text-[#2D1B1A] uppercase">Total</span>
+                            <span className="text-xl font-bold text-[#C9A96E]">S/ {total.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    {/* Estado */}
+                    {pedido.estado && (
+                        <div className="mt-3 flex items-center gap-2">
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${pedido.estado === 'entregado' ? 'bg-green-100 text-green-700' :
+                                pedido.estado === 'cocina' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-gray-100 text-gray-700'
+                                }`}>
+                                {pedido.estado === 'cocina' ? '👨‍🍳 En cocina' :
+                                    pedido.estado === 'entregado' ? '✅ Entregado' :
+                                        pedido.estado || 'Pendiente'}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-4 border-t border-gray-200">
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-medium text-sm transition"
+                    >
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 interface Mesa {
     id: number;
@@ -121,11 +415,12 @@ function PlanoMesa({ mesa, colorClass, disabled }: { mesa: Mesa; colorClass: str
 // -----------------------------------------------------------------------
 // Tarjeta de mesa (también es zona "droppable" para recibir sillas)
 // -----------------------------------------------------------------------
-function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro }: {
+function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onVerPedido }: {
     mesa: Mesa;
     onCambiarEstado: (id: number, estado: string) => void;
     onTomarPedido: (mesa: Mesa) => void;
     onAbrirModalCobro: (mesa: Mesa) => void;
+    onVerPedido?: (mesa: Mesa) => void;
 }) {
     const config = getEstadoConfig(mesa.estado);
     const { setNodeRef, isOver } = useDroppable({ id: `mesa-${mesa.id}`, data: { mesaId: mesa.id } });
@@ -180,7 +475,7 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro }: {
                 <button onClick={() => onCambiarEstado(mesa.id, 'pendiente')} className="py-2 sm:py-1.5 bg-yellow-500 hover:bg-yellow-600 active:scale-95 text-white rounded text-[11px] font-medium transition">
                     Espera
                 </button>
-                {/* ✅ Solo mostrar "Cobrar" si la mesa NO está en listo_cobrar */}
+                {/*  Solo mostrar "Cobrar" si la mesa NO está en listo_cobrar */}
                 {mesa.estado !== 'listo_cobrar' && (
                     <button onClick={() => onCambiarEstado(mesa.id, 'listo_cobrar')} className="py-2 sm:py-1.5 bg-purple-500 hover:bg-purple-600 active:scale-95 text-white rounded text-[11px] font-medium transition">
                         Cobrar
@@ -213,10 +508,13 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro }: {
 
             {mesa.estado === 'ocupada' && (
                 <button
-                    onClick={() => { window.location.href = `/ventas?mesa=${mesa.numero}`; }}
+                    onClick={() => {
+
+                        if (onVerPedido) onVerPedido(mesa);
+                    }}
                     className="w-full mt-2 py-2.5 bg-[#C9A96E] hover:bg-[#B8975D] text-white rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 active:scale-95"
                 >
-                    🍽️ Ver Pedido
+                    📋 Ver Pedido
                 </button>
             )}
 
@@ -238,13 +536,13 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro }: {
 // Componente principal
 // -----------------------------------------------------------------------
 export default function MesasDistribucion() {
+
     const { mesas: mesasIniciales, pedidos: pedidosIniciales, flash } = usePage<{
         mesas?: Mesa[];
         pedidos?: any[];
         flash?: FlashProps
     }>().props;
-    console.log('📦 Pedidos desde usePage:', pedidosIniciales);
-    console.log('📦 Mesas desde usePage:', mesasIniciales);
+
     const [mesas, setMesas] = useState<Mesa[]>(mesasIniciales || []);
 
     const [clientes] = useState<Cliente[]>([
@@ -261,21 +559,20 @@ export default function MesasDistribucion() {
     const [modalCobroAbierto, setModalCobroAbierto] = useState(false);
     const [mesaCobro, setMesaCobro] = useState<Mesa | null>(null);
     const [pedidoCobro, setPedidoCobro] = useState<any | null>(null);
+    const [modalMeseroAbierto, setModalMeseroAbierto] = useState(false);
+    const [mesaSeleccionada, setMesaSeleccionada] = useState<Mesa | null>(null);
+
+    const [modalPedidoAbierto, setModalPedidoAbierto] = useState(false);
+    const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any | null>(null);
     const pedidos = pedidosIniciales || [];
 
     const abrirModalCobro = (mesa: Mesa) => {
-        console.log('🪑 ID de mesa:', mesa.id);
-        console.log('📦 pedidos disponibles:', pedidos);
 
         const pedidoActivo = pedidos.find(p => p.mesa_id === mesa.id);
-        console.log('✅ Pedido encontrado:', pedidoActivo);
-        console.log('📋 Productos:', pedidoActivo?.productos);
 
-        // ✅ PRIMERO establecer el pedido
+
         setPedidoCobro(pedidoActivo || null);
-        // ✅ LUEGO la mesa
         setMesaCobro(mesa);
-        // ✅ FINALMENTE abrir el modal
         setModalCobroAbierto(true);
     };
     const sensors = useSensors(
@@ -317,19 +614,44 @@ export default function MesasDistribucion() {
         });
     };
 
-    // Un solo flujo: tomar pedido = ocupar + asignar mesero + pintar naranja
-    const tomarPedido = (mesa: Mesa) => {
-        const mesero = prompt('Nombre del mesero que atiende la mesa:');
-        if (!mesero) return;
 
-        router.patch(`/mesas/${mesa.id}`, { estado: 'ocupada', mesero }, {
+    const tomarPedido = (mesa: Mesa) => {
+        setMesaSeleccionada(mesa);
+        setModalMeseroAbierto(true);
+    };
+
+    const confirmarMesero = (mesero: string) => {
+        if (!mesaSeleccionada) return;
+
+        router.patch(`/mesas/${mesaSeleccionada.id}`, { estado: 'ocupada', mesero }, {
             preserveScroll: true,
             onSuccess: () => {
-                setMesas(prev => prev.map(m => m.id === mesa.id ? { ...m, estado: 'ocupada', mesero } : m));
-                window.location.href = `/ventas?mesa=${mesa.numero}`;
+                setMesas(prev => prev.map(m =>
+                    m.id === mesaSeleccionada.id ? { ...m, estado: 'ocupada', mesero } : m
+                ));
+                window.location.href = `/ventas?mesa=${mesaSeleccionada.numero}`;
             },
             onError: (errors) => alert('Error al tomar pedido: ' + Object.values(errors).join(' ')),
         });
+    };
+
+    const verPedido = (mesa: Mesa) => {
+
+        // Buscar el pedido activo de esta mesa
+        const pedido = pedidos.find(p => p.mesa_id === mesa.id);
+        if (pedido) {
+            // Crear un objeto con los datos necesarios incluyendo el número de mesa
+            const pedidoConMesa = {
+                ...pedido,
+                mesa_numero: mesa.numero,
+                mesero: mesa.mesero || 'No asignado'
+            };
+            // Guardar el pedido seleccionado y abrir la tarjeta
+            setPedidoSeleccionado(pedidoConMesa);
+            setModalPedidoAbierto(true);
+        } else {
+            alert('No hay pedido para esta mesa');
+        }
     };
 
     const crearMesa = () => {
@@ -344,7 +666,6 @@ export default function MesasDistribucion() {
         });
     };
 
-    // Drag & drop de sillas entre mesas
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over) return;
@@ -480,16 +801,43 @@ export default function MesasDistribucion() {
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                                 {mesas.map((mesa) => (
                                     <MesaCard
-                                        key={mesa.id} mesa={mesa} onCambiarEstado={cambiarEstado} onTomarPedido={tomarPedido} onAbrirModalCobro={abrirModalCobro} />
+                                        key={mesa.id} mesa={mesa} onCambiarEstado={cambiarEstado} onTomarPedido={tomarPedido} onAbrirModalCobro={abrirModalCobro} onVerPedido={verPedido} />
                                 ))}
                             </div>
                         </DndContext>
+
                     </div>
                 </div>
+
+                {modalPedidoAbierto && pedidoSeleccionado && (
+                    <div className="relative z-50">
+                        {modalPedidoAbierto && pedidoSeleccionado && (
+                            <TarjetaPedido
+                                pedido={pedidoSeleccionado}
+                                mesaNumero={pedidoSeleccionado.mesa_numero}
+                                mesero={pedidoSeleccionado.mesero || 'No asignado'}
+                                onClose={() => {
+                                    setModalPedidoAbierto(false);
+                                    setPedidoSeleccionado(null);
+                                }}
+                            />
+                        )}
+                    </div>
+                )}
+
+                <ModalMesero
+                    isOpen={modalMeseroAbierto}
+                    mesa={mesaSeleccionada}
+                    onClose={() => {
+                        setModalMeseroAbierto(false);
+                        setMesaSeleccionada(null);
+                    }}
+                    onConfirm={confirmarMesero}
+                />
                 <ModalCobro
                     isOpen={modalCobroAbierto}
                     mesa={mesaCobro}
-                    pedido={pedidoCobro} 
+                    pedido={pedidoCobro}
                     onClose={() => setModalCobroAbierto(false)}
                     onSuccess={() => {
                         setModalCobroAbierto(false);

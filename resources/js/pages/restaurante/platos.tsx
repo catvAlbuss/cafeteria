@@ -29,19 +29,19 @@ interface Plato {
 }
 
 export default function Platos() {
-    // 📋 Recibir platos desde el controlador
+    //  Recibir platos desde el controlador
     const { platos: platosIniciales = [] } = usePage<{ platos: Plato[] }>().props;
     
-    // 📋 Estado - usar datos del controlador
+    //  Estado - usar datos del controlador
     const [platos, setPlatos] = useState<Plato[]>(platosIniciales);
     
-    // 📋 Estado del modal
+    //  Estado del modal
     const [modalAbierto, setModalAbierto] = useState(false);
     const [modalVerAbierto, setModalVerAbierto] = useState(false);
     const [platoSeleccionado, setPlatoSeleccionado] = useState<Plato | null>(null);
     const [esEdicion, setEsEdicion] = useState(false);
 
-    // 📋 Estado del formulario
+    //  Estado del formulario
     const [formulario, setFormulario] = useState({
         id: '',
         nombre: '',
@@ -55,12 +55,12 @@ export default function Platos() {
     const [modalEtiquetaAbierto, setModalEtiquetaAbierto] = useState(false);
     const [etiquetaActual, setEtiquetaActual] = useState<Plato | null>(null);
 
-    // 📋 Filtros
+    //  Filtros
     const [filtroCategoria, setFiltroCategoria] = useState('');
     const [filtroEstado, setFiltroEstado] = useState('');
     const [ordenPor, setOrdenPor] = useState('');
 
-    // 📊 Filtrar y ordenar platos
+    //  Filtrar y ordenar platos
     const platosFiltrados = platos
         .filter(p => {
             const catOk = !filtroCategoria || p.categoria === filtroCategoria;
@@ -74,7 +74,7 @@ export default function Platos() {
             return 0;
         });
 
-    // 📊 Resumen
+    //  Resumen
     const resumen = {
         activos: platos.filter(p => p.stock > 0).length,
         agotados: platos.filter(p => p.stock === 0).length,
@@ -82,11 +82,11 @@ export default function Platos() {
         stockTotal: platos.reduce((sum, p) => sum + p.stock, 0),
     };
 
-    // 📊 Top productos
+    // Top productos
     const topProductos = [...platos].sort((a, b) => b.vendidos - a.vendidos).slice(0, 4);
     const maxVendidos = topProductos.length ? topProductos[0].vendidos : 1;
 
-    // 📊 Top categorías
+    //  Top categorías
     const categoriasTotales: Record<string, number> = {};
     platos.forEach(p => {
         categoriasTotales[p.categoria] = (categoriasTotales[p.categoria] || 0) + p.vendidos;
@@ -94,7 +94,7 @@ export default function Platos() {
     const topCategorias = Object.entries(categoriasTotales).sort((a, b) => b[1] - a[1]);
     const maxCategoriaVentas = topCategorias.length ? topCategorias[0][1] : 1;
 
-    // 📋 Funciones CRUD
+    //  Funciones CRUD
     const abrirNuevo = () => {
         setEsEdicion(false);
         setFormulario({
@@ -116,7 +116,7 @@ export default function Platos() {
         setModalAbierto(true);
     };
 
-    // ✅ Guardar plato (crear/editar) con Inertia
+    //  Guardar plato (crear/editar) con Inertia
     const guardarPlato = () => {
         if (!formulario.nombre || formulario.precio < 0 || formulario.stock < 0) {
             alert('Complete todos los campos correctamente.');
@@ -137,7 +137,7 @@ export default function Platos() {
         });
     };
 
-    // ✅ Eliminar plato con Inertia
+    //  Eliminar plato con Inertia
     const eliminarPlato = (id: string) => {
         if (!confirm('¿Seguro que deseas eliminar este plato?')) return;
         
@@ -156,7 +156,7 @@ export default function Platos() {
         setModalVerAbierto(true);
     };
 
-    // 📋 Formatear moneda
+    // Formatear moneda
     const formatCurrency = (amount: number): string => {
         return `S/ ${amount.toFixed(2)}`;
     };
@@ -169,7 +169,7 @@ export default function Platos() {
                 {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-[#2D1B1A]">🍽️ Platos</h1>
+                        <h1 className="text-3xl font-bold text-[#2D1B1A]">Platos</h1>
                         <p className="text-[#5A3D2B] text-sm mt-1">Gestión del menú de la cafetería</p>
                     </div>
                     <button
