@@ -1,5 +1,7 @@
 <?php
 
+// DESPUÉS
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -13,12 +15,17 @@ class Mesa extends Model
         'estado',
         'cliente',
         'personas',
+        'mesero',
     ];
 
-    // Método para cambiar estado
     public function cambiarEstado(string $nuevoEstado): void
     {
         $this->estado = $nuevoEstado;
         $this->save();
+    }
+
+    public function pedidos()
+    {
+        return $this->hasMany(Pedido::class);
     }
 }

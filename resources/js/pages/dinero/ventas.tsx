@@ -1,7 +1,7 @@
-import { Head, router } from '@inertiajs/react';
-
+import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { toast } from 'sonner';
 
 interface Producto {
     id: number;
@@ -18,16 +18,26 @@ interface ItemCarrito {
     cantidad: number;
     imagen: string;
 }
+
 interface MesaInfo {
     id: number;
     numero: string;
     capacidad: number;
     sillas: number;
     estado: string;
+    mesero?: string | null;
+}
+
+interface Mesa {
+    id: number;
+    numero: string;
 }
 
 export default function Ventas() {
-    //  Productos del menú
+    //  Recibir mesas desde el controlador
+    const { mesas: mesasIniciales } = usePage<{ mesas?: Mesa[] }>().props;
+
+    // Productos del menú
     const productos: Producto[] = [
         { id: 1, nombre: 'Café Americano', precio: 8.00, categoria: 'Bebidas Calientes', imagen: '/img/productos/cafe_americano.png' },
         { id: 2, nombre: 'Café Latte', precio: 12.00, categoria: 'Bebidas Calientes', imagen: '/img/productos/latte.jpg' },
@@ -39,18 +49,21 @@ export default function Ventas() {
         { id: 8, nombre: 'Jugo Natural', precio: 10.00, categoria: 'Bebidas Frías', imagen: '/img/productos/JugoNatural.png' },
     ];
 
-    //  Estado del carrito
+    // Estado del carrito
     const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
     const [busqueda, setBusqueda] = useState('');
-    const [cliente, setCliente] = useState('');
 
-    //  Leer el número de mesa de la URL
+
+    // Leer el número de mesa de la URL
     const urlParams = new URLSearchParams(window.location.search);
     const mesaInicial = urlParams.get('mesa') || '';
     const [mesa, setMesa] = useState(mesaInicial);
     const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(null);
-    const [clienteCarrito, setClienteCarrito] = useState('');
 
+    //  Usar mesas desde la BD
+    const [mesas] = useState<Mesa[]>(mesasIniciales || []);
+
+    // Cargar datos completos de la mesa
     useEffect(() => {
         if (mesa) {
             axios.get(`/api/mesas/${mesa}`)
@@ -63,32 +76,16 @@ export default function Ventas() {
         }
     }, [mesa]);
 
-    //  Estado de las mesas (temporal, luego se obtiene de la BD)
-    const [mesas] = useState([
-        { id: 1, numero: '01' },
-        { id: 2, numero: '02' },
-        { id: 3, numero: '03' },
-        { id: 4, numero: '04' },
-        { id: 5, numero: '05' },
-        { id: 6, numero: '06' },
-        { id: 7, numero: '07' },
-        { id: 8, numero: '08' },
-        { id: 9, numero: '09' },
-        { id: 10, numero: '10' },
-        { id: 11, numero: '11' },
-        { id: 12, numero: '12' },
-    ]);
-
-    //  Total del carrito
+    // Total del carrito
     const totalCarrito = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
 
-    //  Filtrar productos
+    // Filtrar productos
     const productosFiltrados = productos.filter(p =>
         p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
         p.categoria.toLowerCase().includes(busqueda.toLowerCase())
     );
 
-    // ➕ Agregar producto al carrito
+    // Agregar producto al carrito
     const agregarProducto = (producto: Producto) => {
         const existente = carrito.find(item => item.id === producto.id);
         if (existente) {
@@ -102,7 +99,7 @@ export default function Ventas() {
         }
     };
 
-    // ➖ Quitar producto del carrito
+    // Quitar producto del carrito
     const quitarProducto = (id: number) => {
         const existente = carrito.find(item => item.id === id);
         if (existente && existente.cantidad > 1) {
@@ -116,19 +113,16 @@ export default function Ventas() {
         }
     };
 
-    //  Enviar pedido al controlador
+    // Enviar pedido al controlador
     const enviarPedido = () => {
         if (carrito.length === 0) {
             alert('Agrega productos al pedido');
             return;
         }
 
-        // Buscar la mesa por número
-        const mesaEncontrada = mesas.find(m => m.numero === mesa);
-
         router.post('/pedidos', {
-            mesa_id: mesaEncontrada?.id || null,
-            cliente: cliente || 'Anónimo',
+            mesa_id: mesaInfo?.id || null,
+            cliente: 'Anónimo',
             productos: carrito.map(item => ({
                 nombre: item.nombre,
                 cantidad: item.cantidad,
@@ -139,12 +133,20 @@ export default function Ventas() {
             observaciones: '',
         }, {
             onSuccess: () => {
-                alert(`✅ Pedido enviado a cocina\n🪑 Mesa: ${mesa || 'No asignada'}\n👤 Cliente: ${cliente || 'Anónimo'}\n💰 Total: S/ ${totalCarrito.toFixed(2)}`);
+                toast.success('✅ Pedido enviado a cocina', {
+                    description: `Mesa: ${mesa || 'No asignada'} | Mesero: ${mesaInfo?.mesero || 'No asignado'} | Total: S/ ${totalCarrito.toFixed(2)}`,
+                    duration: 5000,
+                    style: {
+                        background: '#2D1B1A',
+                        color: '#FBF3E7',
+                        border: '1px solid #C9A96E',
+                    },
+                });
+
                 setCarrito([]);
-                setCliente('');
             },
             onError: (errors) => {
-                alert('Error al enviar pedido: ' + Object.values(errors).join(' '));
+                alert('❌ Error al enviar pedido: ' + Object.values(errors).join(' '));
             }
         });
     };
@@ -158,7 +160,7 @@ export default function Ventas() {
                 <h1 className="text-2xl font-bold text-[#4A2C2A]">☕ Tomar Pedido</h1>
                 <p className="text-[#8D6B53] text-sm">Busca productos y arma el pedido</p>
 
-                {/* Encabezado con Mesa y Cliente */}
+                {/* Encabezado con Mesa y Mesero */}
                 <div className="bg-white rounded-xl p-4 shadow-sm border border-[#8D6B53]/20 flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-[#5A3D2B]">🪑 Mesa:</span>
@@ -166,18 +168,11 @@ export default function Ventas() {
                             {mesaInfo ? `#${mesaInfo.numero} (${mesaInfo.capacidad} pers., ${mesaInfo.sillas} sillas)` : mesa || 'No asignada'}
                         </span>
                     </div>
-                    <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                        <span className="text-sm font-medium text-[#5A3D2B]">👤 Cliente:</span>
-                        <input
-                            type="text"
-                            placeholder="Nombre del cliente"
-                            className="flex-1 p-2 border border-gray-200 rounded-lg text-sm focus:ring-1 focus:ring-[#C9A96E] outline-none text-[#2D1B1A] bg-white"
-                            value={cliente}
-                            onChange={(e) => {
-                                setCliente(e.target.value);
-                                setClienteCarrito(e.target.value); 
-                            }}
-                        />
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-[#5A3D2B]">👤 Mesero:</span>
+                        <span className="text-sm font-bold text-[#2D1B1A]">
+                            {mesaInfo?.mesero || 'No asignado'}
+                        </span>
                     </div>
                 </div>
 

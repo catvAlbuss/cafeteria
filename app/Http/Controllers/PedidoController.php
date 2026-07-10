@@ -67,13 +67,16 @@ class PedidoController extends Controller
         ]);
 
         // Actualizar estado de la mesa
-        if ($pedido->mesa_id) {
-            $mesa = Mesa::find($pedido->mesa_id);
-            if ($mesa && $mesa->estado !== 'ocupada') {
-                $mesa->estado = 'ocupada';
-                $mesa->save();
-            }
+       if ($pedido->mesa_id) {
+    $mesa = Mesa::find($pedido->mesa_id);
+    if ($mesa && $mesa->estado !== 'ocupada') {
+        $mesa->estado = 'ocupada';
+        if (!$mesa->mesero) {
+            $mesa->mesero = auth()->user()->name;
         }
+        $mesa->save();
+    }
+}
 
         return redirect()->back()->with('success', 'Pedido creado correctamente');
     }
@@ -139,12 +142,15 @@ class PedidoController extends Controller
 
         // Si el pedido tiene mesa, liberarla
         if ($pedido->mesa_id) {
-            $mesa = Mesa::find($pedido->mesa_id);
-            if ($mesa && $mesa->estado === 'ocupada') {
-                $mesa->estado = 'libre';
-                $mesa->save();
-            }
-        }
+    $mesa = Mesa::find($pedido->mesa_id);
+    if ($mesa && $mesa->estado === 'ocupada') {
+        $mesa->estado = 'libre';
+        $mesa->mesero = null;
+        $mesa->cliente = null;
+        $mesa->personas = null;
+        $mesa->save();
+    }
+}
 
         return redirect()->back()->with('success', 'Pedido cobrado correctamente');
     }

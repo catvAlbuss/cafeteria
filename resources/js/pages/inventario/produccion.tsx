@@ -79,25 +79,25 @@ export default function Produccion() {
     };
 
     // Cambiar estado de un pedido (conectado al controlador)
+
     const cambiarEstado = (id: number, nuevoEstado: string) => {
-        //  Buscar el pedido para obtener la mesa_id
         const pedido = pedidos.find(p => p.id === id);
 
         router.patch(`/pedidos/${id}`, {
             estado: nuevoEstado,
         }, {
             onSuccess: () => {
-                // Actualizar el estado local
-                setPedidos(pedidos.map(pedido =>
-                    pedido.id === id ? { ...pedido, estado: nuevoEstado as Pedido['estado'] } : pedido
+                // Actualizar estado local
+                setPedidos(prev => prev.map(p =>
+                    p.id === id ? { ...p, estado: nuevoEstado as Pedido['estado'] } : p
                 ));
 
-                //  Si el pedido se marca como LISTO, notificar a la mesa
+                // Si se marca como LISTO, notificar a la mesa
                 if (nuevoEstado === 'listo' && pedido?.mesa_id) {
                     router.post(`/mesas/${pedido.mesa_id}/pedido-listo`, {}, {
                         onSuccess: () => {
-                            // Recargar para actualizar el indicador en Mesas
-                            router.reload();
+                            
+                            window.location.reload();
                         }
                     });
                 }
@@ -109,7 +109,7 @@ export default function Produccion() {
     };
 
     //  Pedidos pendientes para notificaciones
-    const pedidosPendientes = pedidos.filter(p => p.estado === 'pendiente' || p.estado === 'preparando');
+    const pedidosPendientes = pedidos.filter(p => p.estado === 'pendiente');
     const pendientes = pedidosPendientes.length;
 
     // Cerrar panel de notificaciones
@@ -208,7 +208,10 @@ export default function Produccion() {
                                             pedidosPendientes.map((pedido) => (
                                                 <div
                                                     key={pedido.id}
-                                                    className="p-3 rounded-xl hover:bg-orange-50 transition border border-gray-100 mb-2 last:mb-0 hover:border-orange-200"
+                                                    className={`p-3 rounded-xl transition border mb-2 last:mb-0 ${pedido.estado === 'preparando'
+                                                        ? 'bg-blue-100 border-blue-400'
+                                                        : 'bg-white border-gray-100 hover:bg-orange-50 hover:border-orange-200'
+                                                        }`}
                                                 >
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex-1 min-w-0">
@@ -229,11 +232,15 @@ export default function Produccion() {
                                                         </div>
                                                         <button
                                                             onClick={() => {
-                                                                cambiarEstado(pedido.id, 'preparando');
+
+                                                                const confirmar = confirm(` Tomar pedido #${pedido.numero}\n\nMesa: ${pedido.mesa?.numero || 'No asignada'}\nCliente: ${pedido.cliente}\nProductos: ${pedido.productos.length} items\n\n¿Confirmas que lo prepararás?`);
+                                                                if (confirmar) {
+                                                                    cambiarEstado(pedido.id, 'preparando');
+                                                                }
                                                             }}
-                                                            className="ml-2 px-3 py-1.5 bg-[#C9A96E] hover:bg-[#B8975D] text-white rounded-lg text-xs font-semibold transition whitespace-nowrap flex items-center gap-1"
+                                                            className="ml-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold transition whitespace-nowrap flex items-center gap-1"
                                                         >
-                                                            Tomar <ChevronRight className="w-3 h-3" />
+                                                            ⚡ Tomar
                                                         </button>
                                                     </div>
                                                 </div>
@@ -345,7 +352,14 @@ export default function Produccion() {
                             {pedidosPorArea('cocina').map((pedido) => {
                                 const estado = getEstadoConfig(pedido.estado);
                                 return (
-                                    <div key={pedido.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow-sm transition">
+                                    <div
+                                        key={pedido.id}
+                                        className={`flex items-center justify-between border-2 rounded-xl p-3 hover:shadow-sm transition ${pedido.estado === 'preparando' ? 'bg-blue-100 border-blue-600' :
+                                            pedido.estado === 'listo' ? 'bg-green-100 border-green-500' :
+                                                pedido.estado === 'pendiente' ? 'bg-orange-50 border-orange-300' :
+                                                    'bg-white border-gray-200'
+                                            }`}
+                                    >
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-xl">🍽️</div>
                                             <div>
@@ -367,10 +381,15 @@ export default function Produccion() {
                                             )}
                                             {pedido.estado === 'preparando' && (
                                                 <button
-                                                    onClick={() => cambiarEstado(pedido.id, 'listo')}
+                                                    onClick={() => {
+                                                        const confirmar = confirm(`✅ Marcar como listo\n\nPedido #${pedido.numero}\nMesa: ${pedido.mesa?.numero || 'No asignada'}\nCliente: ${pedido.cliente}\n\n¿Ya está listo para entregar?`);
+                                                        if (confirmar) {
+                                                            cambiarEstado(pedido.id, 'listo');
+                                                        }
+                                                    }}
                                                     className="text-green-500 hover:text-green-700 text-xs font-medium"
                                                 >
-                                                    Listo
+                                                    ✅ Listo
                                                 </button>
                                             )}
                                         </div>
@@ -412,7 +431,14 @@ export default function Produccion() {
                             {pedidosPorArea('bar').map((pedido) => {
                                 const estado = getEstadoConfig(pedido.estado);
                                 return (
-                                    <div key={pedido.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow-sm transition">
+                                    <div
+                                        key={pedido.id}
+                                        className={`flex items-center justify-between border-2 rounded-xl p-3 hover:shadow-sm transition ${pedido.estado === 'preparando' ? 'border-blue-600 bg-blue-50' :
+                                            pedido.estado === 'listo' ? 'border-green-500 bg-green-50' :
+                                                pedido.estado === 'pendiente' ? 'border-orange-300 bg-orange-50' :
+                                                    'border-gray-200 bg-white'
+                                            }`}
+                                    >
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl">☕</div>
                                             <div>

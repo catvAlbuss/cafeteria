@@ -77,6 +77,10 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('mesas', MesaController::class);
     Route::patch('/mesas/{mesa}/estado', [MesaController::class, 'update'])->name('mesas.estado');
     Route::get('/api/mesas/{numero}', [MesaController::class, 'getByNumero'])->name('api.mesas.byNumero');
+    Route::post('/mesas/{mesa}/pedido-listo', [MesaController::class, 'marcarPedidoListo'])->name('mesas.pedido-listo');
+    Route::post('/mesas/{mesa}/entregar', [MesaController::class, 'entregar'])->name('mesas.entregar');
+    Route::patch('/mesas/{origen}/transferir-silla/{destino}', [MesaController::class, 'transferirSilla'])
+    ->name('mesas.transferir-silla');
     
     // PEDIDOS
     Route::resource('pedidos', PedidoController::class);
@@ -97,9 +101,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 
-// ============================================================
-//  RUTAS CON EQUIPO (Opcional - Comentadas)
-// ============================================================
+
 
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])
