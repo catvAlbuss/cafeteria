@@ -6,18 +6,20 @@ use App\Models\Plato;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
+
 class PlatoController extends Controller
 {
-    public function index()
-    {
-        $platos = Plato::all();
-        return Inertia::render('restaurante/platos', [
-            'platos' => $platos
-        ]);
-    }
+  public function index()
+{
+    $platos = Plato::all();
+    return Inertia::render('restaurante/platos', [
+        'platos' => $platos
+    ]);
+}
 
     public function store(Request $request)
     {
+        
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'categoria' => 'required|string',
@@ -25,7 +27,7 @@ class PlatoController extends Controller
             'precio' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'imagen' => 'nullable|string',
-            'emoji' => 'nullable|string',
+            
         ]);
 
         $plato = Plato::create($validated);
@@ -41,7 +43,7 @@ class PlatoController extends Controller
             'precio' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'imagen' => 'nullable|string',
-            'emoji' => 'nullable|string',
+            
         ]);
 
         $plato->update($validated);
@@ -53,4 +55,17 @@ class PlatoController extends Controller
         $plato->delete();
         return redirect()->back()->with('success', 'Plato eliminado correctamente');
     }
+    
+public function toggleDisponibilidad(Request $request, $id)
+{
+    try {
+        $plato = Plato::findOrFail($id);
+        $plato->disponible = $request->input('disponible', !$plato->disponible);
+        $plato->save();
+
+        return redirect()->back()->with('success', 'Disponibilidad actualizada correctamente');
+    } catch (\Exception $e) {
+        return redirect()->back()->with('error', 'Error al actualizar disponibilidad: ' . $e->getMessage());
+    }
+}
 }

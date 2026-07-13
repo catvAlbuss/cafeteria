@@ -9,13 +9,23 @@ class Pedido extends Model
     protected $fillable = [
         'numero',
         'mesa_id',
+        'mesa',        
         'cliente',
+        'tipo',        
         'productos',
         'total',
         'estado',
         'observaciones',
         'hora_pedido',
         'hora_entrega',
+        'caja_id',
+        'metodo_pago',
+        // 🚚 Campos de delivery
+        'codigo',
+        'telefono',
+        'direccion',
+        'repartidor',
+        'estado_delivery',
     ];
 
     protected $casts = [
@@ -28,6 +38,12 @@ class Pedido extends Model
     public function mesa()
     {
         return $this->belongsTo(Mesa::class);
+    }
+
+    // Relación con caja
+    public function caja()
+    {
+        return $this->belongsTo(Caja::class);
     }
 
     // Generar número de pedido automático

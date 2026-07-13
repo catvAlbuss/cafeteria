@@ -1,6 +1,7 @@
 import { Head, usePage, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import ModalCobro from '@/components/modals/ModalCobro';
+
 import {
     DndContext,
     PointerSensor,
@@ -11,12 +12,12 @@ import {
     useDroppable,
     type DragEndEvent,
 } from '@dnd-kit/core';
-import { 
-    Armchair, 
-    Search, 
-    Plus, 
-    User, 
-    Check, 
+import {
+    Armchair,
+    Search,
+    Plus,
+    User,
+    Check,
     X,
     ClipboardList,
     Users,
@@ -25,7 +26,7 @@ import {
     Package,
     ChefHat,
     CircleCheck,
-    CircleX,  
+    CircleX,
     ShoppingCart,
     Calendar,
     AlertCircle,
@@ -319,14 +320,6 @@ interface Mesa {
     pedido_listo?: boolean;
 }
 
-interface Cliente {
-    id: number;
-    nombre: string;
-    mesa: string;
-    personas: number;
-    estado: 'ocupada' | 'pendiente' | 'reserva' | 'libre';
-    telefono?: string;
-}
 
 interface FlashProps {
     success?: string;
@@ -545,15 +538,6 @@ export default function MesasDistribucion() {
 
     const [mesas, setMesas] = useState<Mesa[]>(mesasIniciales || []);
 
-    const [clientes] = useState<Cliente[]>([
-        { id: 1, nombre: 'María López', mesa: '01', personas: 2, estado: 'ocupada' },
-        { id: 2, nombre: 'Carlos Ruiz', mesa: '02', personas: 4, estado: 'ocupada' },
-        { id: 3, nombre: 'Disponible', mesa: '03', personas: 6, estado: 'libre' },
-        { id: 4, nombre: 'José Pérez', mesa: '04', personas: 5, estado: 'reserva' },
-    ]);
-
-    const [busquedaCliente, setBusquedaCliente] = useState('');
-    const [filtroEstado, setFiltroEstado] = useState<string>('todas');
 
 
     const [modalCobroAbierto, setModalCobroAbierto] = useState(false);
@@ -565,6 +549,25 @@ export default function MesasDistribucion() {
     const [modalPedidoAbierto, setModalPedidoAbierto] = useState(false);
     const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any | null>(null);
     const pedidos = pedidosIniciales || [];
+    const [isClient, setIsClient] = useState(false);
+
+
+    const cambiarEstado = (id: number, nuevoEstado: string) => {
+        const mesasAnteriores = mesas;
+       
+        setMesas(prev => prev.map(m =>
+            m.id === id ? { ...m, estado: nuevoEstado as Mesa['estado'] } : m
+        ));
+
+        router.patch(`/mesas/${id}`, { estado: nuevoEstado }, {
+            preserveScroll: true,
+            preserveState: true,
+            onError: (errors) => {
+                setMesas(mesasAnteriores); // revertir solo si falla
+                alert('Error al cambiar estado: ' + Object.values(errors).join(' '));
+            },
+        });
+    };
 
     const abrirModalCobro = (mesa: Mesa) => {
 
@@ -583,6 +586,9 @@ export default function MesasDistribucion() {
     useEffect(() => {
         if (mesasIniciales) setMesas(mesasIniciales);
     }, [mesasIniciales]);
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     // Aviso de capacidad excedida (viene del backend vía flash)
     useEffect(() => {
@@ -598,21 +604,7 @@ export default function MesasDistribucion() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [flash]);
 
-    const clientesFiltrados = useMemo(() => clientes.filter(c => {
-        const coincideBusqueda = c.nombre.toLowerCase().includes(busquedaCliente.toLowerCase()) || c.mesa.includes(busquedaCliente);
-        if (filtroEstado === 'todas') return coincideBusqueda;
-        return coincideBusqueda && c.estado === filtroEstado;
-    }), [clientes, busquedaCliente, filtroEstado]);
 
-    const cambiarEstado = (id: number, nuevoEstado: string) => {
-        router.patch(`/mesas/${id}`, { estado: nuevoEstado }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setMesas(prev => prev.map(m => m.id === id ? { ...m, estado: nuevoEstado as Mesa['estado'] } : m));
-            },
-            onError: (errors) => alert('Error al cambiar estado: ' + Object.values(errors).join(' ')),
-        });
-    };
 
 
     const tomarPedido = (mesa: Mesa) => {
@@ -741,90 +733,49 @@ export default function MesasDistribucion() {
                     Tip: arrastra una silla 🪑 a otra mesa libre para redistribuirlas.
                 </p>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-
-                    {/* CLIENTES */}
-                    <div className="lg:col-span-1 bg-white rounded-xl border border-[#8D6B53]/20 p-4 shadow-sm order-2 lg:order-1">
-                        <div className="flex gap-2 mb-4 flex-wrap">
-                            {['todas', 'libre', 'reserva', 'ocupada'].map(f => (
-                                <button
-                                    key={f}
-                                    onClick={() => setFiltroEstado(f)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition capitalize
-                                        ${filtroEstado === f ? 'bg-[#2D1B1A] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                >
-                                    {f === 'todas' ? 'Todas' : f}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                            <input
-                                type="text"
-                                placeholder="Buscar cliente..."
-                                className="w-full p-2.5 pl-9 rounded-lg border border-[#8D6B53]/20 text-sm text-[#1A1A1A] placeholder-gray-500 bg-[#FBF7F0] focus:ring-1 focus:ring-[#C9A96E] outline-none"
-                                value={busquedaCliente}
-                                onChange={(e) => setBusquedaCliente(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="space-y-2 max-h-[300px] lg:max-h-[400px] overflow-y-auto pr-1">
-                            {clientesFiltrados.map((cliente) => {
-                                const config = getEstadoConfig(cliente.estado);
-                                return (
-                                    <div key={cliente.id} className={`p-3 rounded-lg border ${config.border} ${config.bg} hover:shadow-sm transition`}>
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="font-medium text-[#2D1B1A] text-sm">{cliente.nombre}</p>
-                                                <p className="text-xs text-[#8D6B53]">Mesa {cliente.mesa}</p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs text-gray-500">{cliente.personas} pers.</span>
-                                                <span className={`text-xs font-medium ${config.text}`}>{config.label}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {clientesFiltrados.length === 0 && (
-                                <div className="text-center py-4 text-gray-400 text-sm">No se encontraron clientes</div>
-                            )}
-                        </div>
+                {/* 👇 PLANO DE MESAS - SIN BARRA LATERAL */}
+                <div className="w-full">
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-sm font-semibold text-[#5A3D2B]">Distribución de Mesas — tiempo real</h2>
+                        <span className="text-xs text-[#8D6B53]">
+                            {mesas.filter(m => m.estado === 'ocupada').length} ocupadas · {mesas.length} total
+                        </span>
                     </div>
 
-                    {/* PLANO DE MESAS */}
-                    <div className="lg:col-span-2 order-1 lg:order-2">
-                        <h2 className="text-sm font-semibold text-[#5A3D2B] mb-3">Distribución de Mesas — tiempo real</h2>
-
+                    {isClient && (
                         <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+                            <div className="grid grid-cols-3 gap-3 sm:gap-4">
                                 {mesas.map((mesa) => (
                                     <MesaCard
-                                        key={mesa.id} mesa={mesa} onCambiarEstado={cambiarEstado} onTomarPedido={tomarPedido} onAbrirModalCobro={abrirModalCobro} onVerPedido={verPedido} />
+                                        key={mesa.id}
+                                        mesa={mesa}
+                                        onCambiarEstado={cambiarEstado}
+                                        onTomarPedido={tomarPedido}
+                                        onAbrirModalCobro={abrirModalCobro}
+                                        onVerPedido={verPedido}
+                                    />
                                 ))}
                             </div>
                         </DndContext>
-
-                    </div>
+                    )}
                 </div>
 
+                {/* TARJETA DE PEDIDO */}
                 {modalPedidoAbierto && pedidoSeleccionado && (
-                    <div className="relative z-50">
-                        {modalPedidoAbierto && pedidoSeleccionado && (
-                            <TarjetaPedido
-                                pedido={pedidoSeleccionado}
-                                mesaNumero={pedidoSeleccionado.mesa_numero}
-                                mesero={pedidoSeleccionado.mesero || 'No asignado'}
-                                onClose={() => {
-                                    setModalPedidoAbierto(false);
-                                    setPedidoSeleccionado(null);
-                                }}
-                            />
-                        )}
+                    <div className="mt-4">
+                        <TarjetaPedido
+                            pedido={pedidoSeleccionado}
+                            mesaNumero={pedidoSeleccionado.mesa_numero}
+                            mesero={pedidoSeleccionado.mesero || 'No asignado'}
+                            onClose={() => {
+                                setModalPedidoAbierto(false);
+                                setPedidoSeleccionado(null);
+                            }}
+                        />
                     </div>
                 )}
 
+                {/* MODALES */}
                 <ModalMesero
                     isOpen={modalMeseroAbierto}
                     mesa={mesaSeleccionada}
@@ -841,7 +792,7 @@ export default function MesasDistribucion() {
                     onClose={() => setModalCobroAbierto(false)}
                     onSuccess={() => {
                         setModalCobroAbierto(false);
-                        router.reload();
+                        router.reload({ only: ['mesas', 'pedidos'], preserveScroll: true });
                     }}
                 />
             </div>

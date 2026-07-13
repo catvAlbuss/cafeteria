@@ -11,15 +11,19 @@ class MesaController extends Controller
 {
     //  Listar todas las mesas
     public function index()
-{
-    $mesas = Mesa::orderBy('numero')->get();
-    $pedidos = Pedido::whereIn('estado', ['listo', 'entregado'])->get();
-    
-    return Inertia::render('restaurante/mesas', [
-        'mesas' => $mesas,
-        'pedidos' => $pedidos
-    ]);
-}
+    {
+        $mesas = Mesa::orderBy('numero')->get();
+
+        //  Antes solo traía 'listo' y 'entregado' — eso dejaba fuera los pedidos
+        //  que todavía están en cocina (pendiente/preparando), y por eso "Ver Pedido"
+        //  y el cobro no los veían. Ahora trae TODO lo que no esté ya cerrado.
+        $pedidos = Pedido::whereNotIn('estado', ['pagado', 'cancelado'])->get();
+
+        return Inertia::render('restaurante/mesas', [
+            'mesas' => $mesas,
+            'pedidos' => $pedidos
+        ]);
+    }
 
     //  Crear una nueva mesa
     public function store(Request $request)
@@ -34,25 +38,25 @@ class MesaController extends Controller
         return redirect()->back()->with('success', 'Mesa creada correctamente');
     }
 
-public function update(Request $request, Mesa $mesa)
-{
-    $validated = $request->validate([
-        'estado' => 'required|in:libre,pendiente,ocupada,reserva,listo_cobrar',
-        'cliente' => 'nullable|string',
-        'personas' => 'nullable|integer|min:1',
-        'mesero' => 'nullable|string',
-    ]);
+    public function update(Request $request, Mesa $mesa)
+    {
+        $validated = $request->validate([
+            'estado' => 'required|in:libre,pendiente,ocupada,reserva,listo_cobrar',
+            'cliente' => 'nullable|string',
+            'personas' => 'nullable|integer|min:1',
+            'mesero' => 'nullable|string',
+        ]);
 
-    if ($validated['estado'] === 'libre') {
-        $validated['mesero'] = null;
-        $validated['cliente'] = null;
-        $validated['personas'] = null;
-        $validated['pedido_listo'] = false; 
+        if ($validated['estado'] === 'libre') {
+            $validated['mesero'] = null;
+            $validated['cliente'] = null;
+            $validated['personas'] = null;
+            $validated['pedido_listo'] = false;
+        }
+
+        $mesa->update($validated);
+        return redirect()->back()->with('success', 'Estado de mesa actualizado');
     }
-
-    $mesa->update($validated);
-    return redirect()->back()->with('success', 'Estado de mesa actualizado');
-}
 
     //  Ver detalle de una mesa
     public function show(Mesa $mesa)
@@ -77,13 +81,54 @@ public function update(Request $request, Mesa $mesa)
         return redirect()->back()->with('success', 'Pedido listo para entregar');
     }
 
-    //  Entregar pedido (quitar el indicador)
+    //  Entregar pedido: libera la bandera de la mesa Y marca los pedidos como entregados
     public function entregar(Request $request, Mesa $mesa)
     {
         $mesa->pedido_listo = false;
         $mesa->estado = 'ocupada';
         $mesa->save();
+
+        //  Antes esto no pasaba: los pedidos quedaban en "listo" para siempre,
+        //  nunca llegaban a "entregado" aunque el mesero ya los hubiera servido.
+        Pedido::where('mesa_id', $mesa->id)
+            ->where('estado', 'listo')
+            ->update([
+                'estado' => 'entregado',
+                'hora_entrega' => now(),
+            ]);
+
         return redirect()->back()->with('success', 'Pedido entregado');
+    }
+
+    //  Cobrar la cuenta completa de una mesa (agrupa TODOS los pedidos no pagados/cancelados)
+    public function cobrarCuenta(Request $request, Mesa $mesa)
+    {
+        $validated = $request->validate([
+            'metodo_pago' => 'required|in:efectivo,tarjeta,yape',
+            'monto_recibido' => 'nullable|numeric|min:0',
+        ]);
+
+        $pedidos = Pedido::where('mesa_id', $mesa->id)
+            ->whereNotIn('estado', ['pagado', 'cancelado'])
+            ->get();
+
+        if ($pedidos->isEmpty()) {
+            return redirect()->back()->with('error', 'Esta mesa no tiene pedidos por cobrar');
+        }
+
+        foreach ($pedidos as $pedido) {
+            $pedido->estado = 'pagado';
+            $pedido->save();
+        }
+
+        $mesa->estado = 'libre';
+        $mesa->mesero = null;
+        $mesa->cliente = null;
+        $mesa->personas = null;
+        $mesa->pedido_listo = false;
+        $mesa->save();
+
+        return redirect()->back()->with('success', 'Cuenta cobrada correctamente');
     }
 
     //  Tomar pedido: asigna mesero autenticado y ocupa la mesa
@@ -132,13 +177,13 @@ public function update(Request $request, Mesa $mesa)
     }
 
     public function getByNumero($numero)
-{
-    $mesa = Mesa::where('numero', $numero)->first();
-    
-    if (!$mesa) {
-        return response()->json(['error' => 'Mesa no encontrada'], 404);
+    {
+        $mesa = Mesa::where('numero', $numero)->first();
+
+        if (!$mesa) {
+            return response()->json(['error' => 'Mesa no encontrada'], 404);
+        }
+
+        return response()->json($mesa);
     }
-    
-    return response()->json($mesa);
-}
 }

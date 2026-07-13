@@ -1,6 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { User, Armchair } from 'lucide-react';
+import { UserRound, Armchair, Search, Minus, Plus, ShoppingBag, Send, ShoppingCart } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
@@ -10,6 +10,8 @@ interface Producto {
     precio: number;
     categoria: string;
     imagen: string;
+    stock: number;
+    disponible: boolean;
 }
 
 interface ItemCarrito {
@@ -34,63 +36,94 @@ interface Mesa {
     numero: string;
 }
 
+// -----------------------------------------------------------------------
+// Mismos tokens de color que mesa.tsx, para que el sistema se vea unificado.
+// -----------------------------------------------------------------------
+const ESTADOS = {
+    libre: { label: 'Libre', soft: 'bg-[#1F8A5F]/10 text-[#1F8A5F]', solid: 'bg-[#1F8A5F]' },
+    pendiente: { label: 'Pendiente', soft: 'bg-[#B7791F]/10 text-[#B7791F]', solid: 'bg-[#B7791F]' },
+    ocupada: { label: 'Ocupada', soft: 'bg-[#C24A26]/10 text-[#C24A26]', solid: 'bg-[#C24A26]' },
+    reserva: { label: 'Reserva', soft: 'bg-[#3E5FCE]/10 text-[#3E5FCE]', solid: 'bg-[#3E5FCE]' },
+    listo_cobrar: { label: 'Cobrar', soft: 'bg-[#7B4FC9]/10 text-[#7B4FC9]', solid: 'bg-[#7B4FC9]' },
+} as const;
+
+const getEstadoConfig = (estado: string) => ESTADOS[estado as keyof typeof ESTADOS] ?? ESTADOS.libre;
+
 export default function Ventas() {
-    //  Recibir mesas desde el controlador
-    const { mesas: mesasIniciales } = usePage<{ mesas?: Mesa[] }>().props;
+    
+    const { platos = [], mesaInfo: mesaInfoProp = null } = usePage().props as any;
 
-    // Productos del menú
-    const productos: Producto[] = [
-        { id: 1, nombre: 'Café Americano', precio: 8.00, categoria: 'Bebidas Calientes', imagen: '/img/productos/cafe_americano.png' },
-        { id: 2, nombre: 'Café Latte', precio: 12.00, categoria: 'Bebidas Calientes', imagen: '/img/productos/latte.jpg' },
-        { id: 3, nombre: 'Cappuccino', precio: 14.00, categoria: 'Bebidas Calientes', imagen: '/img/productos/cappuccino.png' },
-        { id: 4, nombre: 'Matcha Latte', precio: 16.00, categoria: 'Bebidas Frías', imagen: '/img/productos/matcha.png' },
-        { id: 5, nombre: 'Croissant', precio: 6.50, categoria: 'Panadería', imagen: '/img/productos/Croissant.png' },
-        { id: 6, nombre: 'Cheesecake', precio: 15.00, categoria: 'Postres', imagen: '/img/productos/Cheesecake.png' },
-        { id: 7, nombre: 'Sándwich de Pollo', precio: 18.00, categoria: 'Salados', imagen: '/img/productos/SandwichDePollo.png' },
-        { id: 8, nombre: 'Jugo Natural', precio: 10.00, categoria: 'Bebidas Frías', imagen: '/img/productos/JugoNatural.png' },
-    ];
-
-    // Estado del carrito
+  
+    const [productos, setProductos] = useState<Producto[]>([]);
     const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
     const [busqueda, setBusqueda] = useState('');
     const [pedidoEnviado, setPedidoEnviado] = useState(false);
 
+   
+useEffect(() => {
+    if (platos && platos.length > 0) {
+        const productosProcesados = platos.map((p: any) => ({
+            id: p.id,
+            nombre: p.nombre,
+            precio: typeof p.precio === 'string' ? parseFloat(p.precio) : p.precio,
+            categoria: p.categoria || '',
+            imagen: p.imagen || '/img/productos/placeholder.jpg',
+            stock: typeof p.stock === 'string' ? parseInt(p.stock) : p.stock,
+            disponible: p.disponible === 1 || p.disponible === true,
+        }));
+        setProductos(productosProcesados);
+    }
+}, [platos]);
 
-    // Leer el número de mesa de la URL
+
     const urlParams = new URLSearchParams(window.location.search);
     const mesaInicial = urlParams.get('mesa') || '';
-    const [mesa, setMesa] = useState(mesaInicial);
-    const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(null);
+    const [mesa] = useState(mesaInicial);
+    const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(mesaInfoProp);
 
-    //  Usar mesas desde la BD
-    const [mesas] = useState<Mesa[]>(mesasIniciales || []);
-
-    // Cargar datos completos de la mesa
     useEffect(() => {
-        if (mesa) {
+        if (mesa && !mesaInfoProp) {
             axios.get(`/api/mesas/${mesa}`)
                 .then(response => {
                     setMesaInfo(response.data);
                 })
-                .catch(error => {
-
+                .catch(() => {
+                    // silencioso: si falla, simplemente no mostramos la tarjeta de mesa
                 });
         }
-    }, [mesa]);
+    }, [mesa, mesaInfoProp]);
 
-    // Total del carrito
+
     const totalCarrito = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
 
-    // Filtrar productos
-    const productosFiltrados = productos.filter(p =>
-        p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        p.categoria.toLowerCase().includes(busqueda.toLowerCase())
-    );
 
-    // Agregar producto al carrito
+    const productosFiltrados = productos
+        .filter(p => p.stock > 0) // 👈 Solo productos con stock
+        .filter(p =>
+            p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+            p.categoria.toLowerCase().includes(busqueda.toLowerCase())
+        );
+
     const agregarProducto = (producto: Producto) => {
+
+        if (!producto.disponible) {
+            toast.warning('Este producto no está disponible');
+            return;
+        }
+
+
+        if (producto.stock <= 0) {
+            toast.warning('Este producto está agotado');
+            return;
+        }
+
         const existente = carrito.find(item => item.id === producto.id);
         if (existente) {
+            // Verificar que no exceda el stock
+            if (existente.cantidad + 1 > producto.stock) {
+                toast.error('No hay suficiente stock');
+                return;
+            }
             setCarrito(carrito.map(item =>
                 item.id === producto.id
                     ? { ...item, cantidad: item.cantidad + 1 }
@@ -117,7 +150,18 @@ export default function Ventas() {
 
     const enviarPedido = () => {
         if (carrito.length === 0) {
-            alert('Agrega productos al pedido');
+            toast.warning('Agrega productos al pedido');
+            return;
+        }
+
+        // Verificar stock antes de enviar
+        const productosSinStock = carrito.filter(item => {
+            const producto = productos.find(p => p.id === item.id);
+            return producto && item.cantidad > producto.stock;
+        });
+
+        if (productosSinStock.length > 0) {
+            toast.error('Algunos productos no tienen stock suficiente');
             return;
         }
 
@@ -125,6 +169,7 @@ export default function Ventas() {
             mesa_id: mesaInfo?.id || null,
             cliente: 'Anónimo',
             productos: carrito.map(item => ({
+                id: item.id,
                 nombre: item.nombre,
                 cantidad: item.cantidad,
                 precio: item.precio,
@@ -134,12 +179,10 @@ export default function Ventas() {
             observaciones: '',
         }, {
             onSuccess: () => {
-                // Ocultar la información de la mesa
                 setPedidoEnviado(true);
 
-                // Mostrar toast de éxito
-                toast.success('✅ Pedido enviado a cocina', {
-                    description: `Mesa: ${mesa || 'No asignada'} | Mesero: ${mesaInfo?.mesero || 'No asignado'} | Total: S/ ${totalCarrito.toFixed(2)}`,
+                toast.success('Pedido enviado a cocina', {
+                    description: `Mesa: ${mesa || 'No asignada'} · Mesero: ${mesaInfo?.mesero || 'No asignado'} · Total: S/ ${totalCarrito.toFixed(2)}`,
                     duration: 5000,
                     style: {
                         background: '#2D1B1A',
@@ -148,13 +191,10 @@ export default function Ventas() {
                     },
                 });
 
-                // Limpiar carrito
                 setCarrito([]);
-
-                // ❌ ELIMINÉ EL setTimeout QUE REDIRIGÍA A /mesas
             },
             onError: (errors) => {
-                alert('❌ Error al enviar pedido: ' + Object.values(errors).join(' '));
+                toast.error('Error al enviar pedido: ' + Object.values(errors).join(' '));
             }
         });
     };
@@ -162,33 +202,33 @@ export default function Ventas() {
     return (
         <>
             <Head title="Ventas" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4 bg-[#FBF7F0]">
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-3 sm:p-4 bg-[#FBF7F0]">
 
                 {/* Título */}
-                <h1 className="text-2xl font-bold text-[#4A2C2A]">☕ Tomar Pedido</h1>
-                <p className="text-[#8D6B53] text-sm">Busca productos y arma el pedido</p>
-                {/* Información de la mesa - Solo aparece si hay una mesa seleccionada */}
+                <div>
+                    <h1 className="text-xl sm:text-2xl font-bold text-[#2D1B1A] tracking-tight">Tomar Pedido</h1>
+                    <p className="text-[#8D6B53] text-xs sm:text-sm font-medium">Busca productos y arma el pedido</p>
+                </div>
+
+                {/* Información de la mesa */}
                 {mesaInfo && !pedidoEnviado && (
-                    <div className="relative bg-white rounded-xl p-5 shadow-md border-l-4 border-[#C9A96E]">
+                    <div className="relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-black/5">
                         <div className="absolute -top-2 -right-2">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${mesaInfo.estado === 'ocupada' ? 'bg-orange-500' :
-                                    mesaInfo.estado === 'pendiente' ? 'bg-yellow-500' :
-                                        'bg-green-500'
-                                }`}>
-                                {mesaInfo.estado || 'Libre'}
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide text-white shadow-sm ${getEstadoConfig(mesaInfo.estado).solid}`}>
+                                {getEstadoConfig(mesaInfo.estado).label}
                             </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-6">
+                        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                             {/* Mesa */}
                             <div className="flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-full bg-[#FBF7F0] border-2 border-[#C9A96E] flex items-center justify-center">
-                                    <span className="text-xl font-bold text-[#2D1B1A]">
+                                    <span className="text-lg font-bold text-[#2D1B1A]">
                                         #{mesaInfo.numero}
                                     </span>
                                 </div>
                                 <div>
-                                    <p className="text-[10px] uppercase text-[#8D6B53] font-medium tracking-wider">
+                                    <p className="text-[10px] uppercase text-[#8D6B53] font-semibold tracking-wider">
                                         Mesa
                                     </p>
                                     <p className="text-sm text-[#2D1B1A] font-medium">
@@ -197,16 +237,15 @@ export default function Ventas() {
                                 </div>
                             </div>
 
-                            {/* Separador */}
-                            <div className="hidden sm:block w-px h-10 bg-[#8D6B53]/20"></div>
+                            <div className="hidden sm:block w-px h-10 bg-black/5" />
 
                             {/* Mesero */}
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-[#C9A96E]/10 flex items-center justify-center">
-                                    <User className="w-5 h-5 text-[#C9A96E]" />
+                                <div className="w-10 h-10 rounded-full bg-[#2D1B1A]/5 flex items-center justify-center">
+                                    <UserRound className="w-5 h-5 text-[#2D1B1A]" strokeWidth={2} />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] uppercase text-[#8D6B53] font-medium tracking-wider">
+                                    <p className="text-[10px] uppercase text-[#8D6B53] font-semibold tracking-wider">
                                         Mesero
                                     </p>
                                     <p className="text-sm text-[#2D1B1A] font-medium">
@@ -216,8 +255,8 @@ export default function Ventas() {
                             </div>
 
                             {/* Sillas */}
-                            <div className="flex items-center gap-2 ml-auto">
-                                <Armchair className="w-4 h-4 text-[#8D6B53]" />
+                            <div className="flex items-center gap-2 ml-auto bg-[#FBF7F0] px-3 py-1.5 rounded-full border border-black/5">
+                                <Armchair className="w-4 h-4 text-[#8D6B53]" strokeWidth={2} />
                                 <span className="text-sm text-[#2D1B1A] font-medium">
                                     {mesaInfo.sillas} sillas
                                 </span>
@@ -226,65 +265,120 @@ export default function Ventas() {
                     </div>
                 )}
 
-
-
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
                     {/* COLUMNA 1: Buscador y productos */}
                     <div className="lg:col-span-2">
-                        <div className="mb-4">
+                        <div className="relative mb-4">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" strokeWidth={2} />
                             <input
                                 type="text"
-                                placeholder=" Buscar producto (ej: café, latte, sandwich...)"
-                                className="w-full p-3 rounded-xl border border-[#8D6B53]/30 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#1A1A1A] placeholder-gray-500 bg-white shadow-sm"
+                                placeholder="Buscar producto (ej: café, latte, sandwich...)"
+                                className="w-full p-3 pl-10 rounded-xl border border-black/5 focus:ring-2 focus:ring-[#2D1B1A]/15 focus:border-transparent outline-none text-[#1A1A1A] placeholder-gray-500 bg-white shadow-sm"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
                             />
                         </div>
 
-                        {/* Lista de productos */}
+                        {/* Grid de productos */}
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                            {productosFiltrados.map((producto) => (
-                                <div
-                                    key={producto.id}
-                                    className="bg-white rounded-xl border border-[#8D6B53]/20 hover:shadow-md transition cursor-pointer hover:border-[#C9A96E] overflow-hidden group"
-                                    onClick={() => agregarProducto(producto)}
-                                >
-                                    <div className="h-32 bg-[#F5EDE3] flex items-center justify-center overflow-hidden">
-                                        <img
-                                            src={producto.imagen}
-                                            alt={producto.nombre}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).src = '/img/productos/placeholder.jpg';
-                                            }}
-                                        />
-                                    </div>
-                                    <div className="p-3">
-                                        <p className="font-medium text-[#4A2C2A] text-sm">{producto.nombre}</p>
-                                        <p className="text-[#C9A96E] font-bold">S/ {producto.precio.toFixed(2)}</p>
-                                        <p className="text-xs text-[#8D6B53]">{producto.categoria}</p>
-                                    </div>
-                                </div>
-                            ))}
-                            {productosFiltrados.length === 0 && (
+                            {productosFiltrados.length === 0 ? (
                                 <div className="col-span-full text-center py-8 text-[#8D6B53]">
-                                    No se encontraron productos
+                                    {busqueda ? 'No se encontraron productos' : 'No hay productos disponibles'}
                                 </div>
+                            ) : (
+                                productosFiltrados.map((producto) => (
+                                    <div
+                                        key={producto.id}
+                                        className={`relative bg-white rounded-2xl border border-black/5 hover:shadow-md transition overflow-hidden group ${producto.disponible && producto.stock > 0
+                                            ? 'cursor-pointer hover:border-[#C9A96E]/50 active:scale-[0.98]'
+                                            : 'cursor-not-allowed opacity-70'
+                                            }`}
+                                        onClick={() => {
+                                            if (producto.disponible && producto.stock > 0) {
+                                                agregarProducto(producto);
+                                            } else {
+                                                toast.warning('Este producto no está disponible');
+                                            }
+                                        }}
+                                    >
+                                        {/* Badge: No disponible */}
+                                        {!producto.disponible && (
+                                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10 rounded-2xl">
+                                                <span className="text-white font-bold text-xs px-3 py-1 bg-red-600 rounded-full shadow-lg">
+                                                    🚫 No disponible
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Badge: Agotado */}
+                                        {producto.disponible && producto.stock <= 0 && (
+                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-2xl">
+                                                <span className="text-white font-bold text-xs px-3 py-1 bg-orange-500 rounded-full shadow-lg">
+                                                    ⚠️ Agotado
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        <div className="h-32 bg-[#F5EDE3] flex items-center justify-center overflow-hidden">
+                                            <img
+                                                src={producto.imagen}
+                                                alt={producto.nombre}
+                                                className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = '/img/productos/placeholder.jpg';
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="p-3">
+                                            <p className="font-medium text-[#2D1B1A] text-sm">{producto.nombre}</p>
+                                            <div className="flex justify-between items-center mt-1">
+                                                <p className="text-[#C9A96E] font-bold">S/ {Number(producto.precio).toFixed(2)}</p>
+                                                <span className="text-xs text-gray-400">Stock: {producto.stock}</span>
+                                            </div>
+                                            <p className="text-xs text-[#8D6B53]">{producto.categoria}</p>
+
+                                            {/* Botón Agregar */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (producto.disponible && producto.stock > 0) {
+                                                        agregarProducto(producto);
+                                                    } else {
+                                                        toast.warning('Este producto no está disponible');
+                                                    }
+                                                }}
+                                                disabled={!producto.disponible || producto.stock <= 0}
+                                                className={`w-full mt-2 py-1.5 rounded-lg text-xs font-semibold transition ${producto.disponible && producto.stock > 0
+                                                    ? 'bg-[#C9A96E] hover:bg-[#B8975D] text-white'
+                                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                    }`}
+                                            >
+                                                {producto.disponible && producto.stock > 0 ? '+ Agregar' : 'No disponible'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
                             )}
                         </div>
                     </div>
 
                     {/* COLUMNA 2: Carrito */}
-                    <div className="bg-white rounded-xl border border-[#8D6B53]/20 p-4">
-                        <h2 className="font-bold text-[#4A2C2A] mb-3">🛒 Pedido</h2>
+                    <div className="bg-white rounded-2xl border border-black/5 p-4 shadow-sm h-fit">
+                        <h2 className="flex items-center gap-2 font-bold text-[#2D1B1A] mb-3">
+                            <ShoppingCart className="w-4 h-4" strokeWidth={2.25} />
+                            Pedido
+                        </h2>
 
                         {carrito.length === 0 ? (
-                            <p className="text-[#8D6B53] text-sm text-center py-8">Sin productos</p>
+                            <div className="flex flex-col items-center gap-2 py-8">
+                                <ShoppingBag className="w-8 h-8 text-gray-300" strokeWidth={1.5} />
+                                <p className="text-[#8D6B53] text-sm">Sin productos</p>
+                            </div>
                         ) : (
                             <div className="space-y-2 max-h-64 overflow-y-auto">
                                 {carrito.map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between border-b border-[#8D6B53]/10 py-2">
+                                    <div key={item.id} className="flex items-center justify-between border-b border-black/5 py-2">
                                         <div className="flex items-center gap-2">
                                             <img
                                                 src={item.imagen}
@@ -295,24 +389,40 @@ export default function Ventas() {
                                                 }}
                                             />
                                             <div>
-                                                <p className="text-sm font-medium text-[#4A2C2A]">{item.nombre}</p>
+                                                <p className="text-sm font-medium text-[#2D1B1A]">{item.nombre}</p>
                                                 <p className="text-xs text-[#8D6B53]">S/ {item.precio.toFixed(2)} x {item.cantidad}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => quitarProducto(item.id)}
-                                                className="w-6 h-6 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition text-sm flex items-center justify-center font-bold"
+                                                className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition flex items-center justify-center active:scale-90"
                                             >
-                                                -
+                                                <Minus className="w-3.5 h-3.5" strokeWidth={2.5} />
                                             </button>
-                                            <span className="text-sm font-bold text-[#4A2C2A]">{item.cantidad}</span>
-                                            <button
-                                                onClick={() => agregarProducto({ id: item.id, nombre: item.nombre, precio: item.precio, categoria: '', imagen: item.imagen })}
-                                                className="w-6 h-6 rounded-full bg-[#C9A96E]/20 text-[#C9A96E] hover:bg-[#C9A96E]/30 transition text-sm flex items-center justify-center font-bold"
-                                            >
-                                                +
-                                            </button>
+                                            <span className="text-sm font-bold text-[#2D1B1A] w-4 text-center">{item.cantidad}</span>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => quitarProducto(item.id)}
+                                                    className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition flex items-center justify-center active:scale-90"
+                                                >
+                                                    <Minus className="w-3.5 h-3.5" strokeWidth={2.5} />
+                                                </button>
+                                                <span className="text-sm font-bold text-[#2D1B1A] w-4 text-center">{item.cantidad}</span>
+                                                <button
+                                                    onClick={() => {
+                                                        const producto = productos.find(p => p.id === item.id);
+                                                        if (producto && producto.stock > item.cantidad) {
+                                                            agregarProducto(producto);
+                                                        } else {
+                                                            toast.error('Stock insuficiente');
+                                                        }
+                                                    }}
+                                                    className="w-6 h-6 rounded-full bg-[#2D1B1A]/5 text-[#2D1B1A] hover:bg-[#2D1B1A]/10 transition flex items-center justify-center active:scale-90"
+                                                >
+                                                    <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -320,17 +430,18 @@ export default function Ventas() {
                         )}
 
                         {carrito.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-[#8D6B53]/20">
-                                <div className="flex justify-between font-bold text-[#4A2C2A]">
-                                    <span>Total:</span>
-                                    <span className="text-[#C9A96E]">S/ {totalCarrito.toFixed(2)}</span>
+                            <div className="mt-4 pt-4 border-t border-black/5">
+                                <div className="flex justify-between items-baseline font-bold text-[#2D1B1A]">
+                                    <span className="text-sm">Total</span>
+                                    <span className="text-[#C9A96E] text-lg">S/ {totalCarrito.toFixed(2)}</span>
                                 </div>
 
                                 <button
                                     onClick={enviarPedido}
-                                    className="w-full mt-3 py-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white rounded-lg font-medium transition"
+                                    className="w-full mt-3 py-2.5 bg-[#2D1B1A] hover:bg-[#1E1211] text-white rounded-xl font-semibold text-sm transition flex items-center justify-center gap-2 active:scale-95 shadow-sm"
                                 >
-                                    📨 Enviar Pedido
+                                    <Send className="w-4 h-4" strokeWidth={2.25} />
+                                    Enviar Pedido
                                 </button>
                             </div>
                         )}

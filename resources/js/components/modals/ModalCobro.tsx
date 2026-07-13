@@ -51,23 +51,22 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
     const ticketRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (exito) {
-            const timer = setTimeout(() => {
-                onClose();
-                router.reload();
-            }, 3000);
-            return () => clearTimeout(timer);
+        if (isOpen && mesa) {
+            setExito(false);
+            setCargando(false);
+            setMetodoPago('efectivo');
+            setMontoRecibido('');
         }
-    }, [exito, onClose]);
+    }, [isOpen, mesa?.id]);
 
     if (!isOpen || !mesa) return null;
 
-    const total = typeof pedido?.total === 'number' 
-        ? pedido.total 
+    const total = typeof pedido?.total === 'number'
+        ? pedido.total
         : parseFloat(pedido?.total as string) || 0;
 
-    const productos = pedido?.productos 
-        ? (typeof pedido.productos === 'string' ? JSON.parse(pedido.productos) : pedido.productos) 
+    const productos = pedido?.productos
+        ? (typeof pedido.productos === 'string' ? JSON.parse(pedido.productos) : pedido.productos)
         : [];
 
     const montoRecibidoNum = parseFloat(montoRecibido) || 0;
@@ -75,24 +74,39 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
 
     const handleCobrar = () => {
         setCargando(true);
-        setTimeout(() => {
-            setCargando(false);
-            setExito(true);
-            
-            if (ticketRef.current) {
-                const printWindow = window.open('', '_blank');
-                if (printWindow) {
-                    const ticketHTML = ticketRef.current.innerHTML;
-                    printWindow.document.write(`
+
+        const ventaData = {
+            mesa_id: mesa.id,
+            mesa: `Mesa ${mesa.numero}`,
+            cliente: 'Anónimo',
+            productos: productos.map((item: ProductoPedido) => ({
+                nombre: item.nombre,
+                cantidad: item.cantidad,
+                precio: item.precio,
+                subtotal: item.subtotal
+            })),
+            total: total,
+            metodo_pago: metodoPago,
+            tipo: 'mesa',
+            estado: 'pagado',
+        };
+
+        console.log('📤 Registrando venta:', ventaData);
+
+        router.post('/pedidos', ventaData, {
+            onSuccess: () => {
+                console.log('✅ Venta registrada correctamente');
+
+                // ✅ Imprimir ticket
+                if (ticketRef.current) {
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                        printWindow.document.write(`
                         <html>
                             <head>
                                 <title>Comprobante de Pago</title>
                                 <style>
-                                    * {
-                                        margin: 0;
-                                        padding: 0;
-                                        box-sizing: border-box;
-                                    }
+                                    * { margin: 0; padding: 0; box-sizing: border-box; }
                                     body { 
                                         font-family: 'Segoe UI', Arial, sans-serif;
                                         background: #f5f5f5;
@@ -169,10 +183,7 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                                         padding: 2px 0;
                                         color: #1a1a1a;
                                     }
-                                    .product-name {
-                                        flex: 1;
-                                        color: #1a1a1a;
-                                    }
+                                    .product-name { flex: 1; color: #1a1a1a; }
                                     .product-price {
                                         font-weight: 600;
                                         min-width: 60px;
@@ -194,13 +205,8 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                                         padding: 3px 0;
                                         color: #1a1a1a;
                                     }
-                                    .payment-label {
-                                        color: #444;
-                                    }
-                                    .payment-value {
-                                        font-weight: 600;
-                                        color: #1a1a1a;
-                                    }
+                                    .payment-label { color: #444; }
+                                    .payment-value { font-weight: 600; color: #1a1a1a; }
                                     .payment-method-value {
                                         color: #1a1a1a;
                                         font-weight: 700;
@@ -227,11 +233,6 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                                         border-bottom: 2px dashed #ccc;
                                         margin: 8px 0;
                                     }
-                                    .divider-solid {
-                                        border: none;
-                                        border-bottom: 1.5px solid #ddd;
-                                        margin: 6px 0;
-                                    }
                                 </style>
                             </head>
                             <body>
@@ -239,24 +240,37 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                             </body>
                         </html>
                     `);
-                    printWindow.document.close();
-                    printWindow.focus();
-                    setTimeout(() => {
-                        printWindow.print();
-                    }, 500);
+                        printWindow.document.close();
+                        printWindow.focus();
+                        setTimeout(() => {
+                            printWindow.print();
+                        }, 500);
+                    }
                 }
-            }
 
-            router.patch(`/mesas/${mesa.id}`, { estado: 'libre' }, {
-                onSuccess: () => {
-                    setTimeout(() => {
-                        onSuccess();
-                        onClose();
-                        router.reload();
-                    }, 1500);
-                }
-            });
-        }, 1500);
+                router.patch(`/mesas/${mesa.id}`, { estado: 'libre' }, {
+                    onSuccess: () => {
+                        setCargando(false);
+                        setExito(true);
+
+                        
+                        setTimeout(() => {
+                            onSuccess(); // el padre hace router.reload({ only: ['mesas','pedidos'] })
+                        }, 1200);
+                    },
+                    onError: (error) => {
+                        console.log('❌ Error al liberar mesa:', error);
+                        setCargando(false);
+                        alert('La venta se registró pero hubo un error al liberar la mesa.');
+                    }
+                });
+            },
+            onError: (errors) => {
+                console.log('❌ Error al registrar la venta:', errors);
+                setCargando(false);
+                alert('Error al registrar la venta: ' + Object.values(errors).join(' '));
+            }
+        });
     };
 
     const handleClose = () => {
@@ -278,7 +292,7 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[95vh] flex flex-col">
-                
+
                 {/* ===== HEADER ===== */}
                 <div className="flex justify-between items-center px-5 py-3 border-b border-gray-200 bg-[#FBF7F0] flex-shrink-0">
                     <div className="flex items-center gap-2">
@@ -303,9 +317,9 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
 
                 {!exito ? (
                     <div className="p-4 space-y-3 overflow-y-auto flex-1">
-                        
+
                         {/* ===== TICKET ===== */}
-                        <div 
+                        <div
                             ref={ticketRef}
                             className="bg-white rounded-xl p-4 border border-gray-200"
                             id="ticket-print"
@@ -345,10 +359,10 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                                 </div>
                                 {productos.length > 0 ? (
                                     productos.map((item: ProductoPedido, index: number) => (
-                                        <div key={index} style={{ 
-                                            display: 'flex', 
-                                            justifyContent: 'space-between', 
-                                            fontSize: '13px', 
+                                        <div key={index} style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            fontSize: '13px',
                                             padding: '2px 0',
                                             color: '#000000'
                                         }}>
@@ -367,10 +381,10 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
 
                             {/* TOTAL */}
                             <div className="pt-2 mb-2" style={{ borderTop: '2px dashed #ccc' }}>
-                                <div style={{ 
-                                    display: 'flex', 
-                                    justifyContent: 'space-between', 
-                                    fontSize: '16px', 
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '16px',
                                     fontWeight: 700,
                                     color: '#000000',
                                     padding: '4px 0'
@@ -383,20 +397,20 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                             {/* PAGO Y CAMBIO */}
                             {metodoPago === 'efectivo' && montoRecibidoNum > 0 && (
                                 <div className="pt-2 mb-2" style={{ borderTop: '1.5px dashed #ccc' }}>
-                                    <div style={{ 
-                                        display: 'flex', 
-                                        justifyContent: 'space-between', 
-                                        fontSize: '13px', 
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        fontSize: '13px',
                                         padding: '3px 0',
                                         color: '#000000'
                                     }}>
                                         <span style={{ color: '#333333' }}>Efectivo</span>
                                         <span style={{ fontWeight: 600, color: '#000000' }}>{montoRecibidoNum.toFixed(2)}</span>
                                     </div>
-                                    <div style={{ 
-                                        display: 'flex', 
-                                        justifyContent: 'space-between', 
-                                        fontSize: '13px', 
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        fontSize: '13px',
                                         padding: '3px 0',
                                         color: '#000000'
                                     }}>
@@ -408,10 +422,10 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
 
                             {/* MÉTODO DE PAGO */}
                             <div className="pt-2 mb-2" style={{ borderTop: '1.5px dashed #ccc' }}>
-                                <div style={{ 
-                                    display: 'flex', 
-                                    justifyContent: 'space-between', 
-                                    fontSize: '13px', 
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '13px',
                                     padding: '3px 0',
                                     color: '#000000'
                                 }}>
@@ -424,10 +438,10 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
 
                             {/* APROBACIÓN (TARJETA) */}
                             {metodoPago === 'tarjeta' && (
-                                <div style={{ 
-                                    display: 'flex', 
-                                    justifyContent: 'space-between', 
-                                    fontSize: '12px', 
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '12px',
                                     padding: '4px 0',
                                     borderBottom: '1.5px dashed #ccc',
                                     marginBottom: '8px',
@@ -453,33 +467,30 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                         <div className="grid grid-cols-3 gap-2 flex-shrink-0">
                             <button
                                 onClick={() => setMetodoPago('efectivo')}
-                                className={`py-2 rounded-xl font-medium transition flex flex-col items-center gap-0.5 text-xs ${
-                                    metodoPago === 'efectivo'
-                                        ? 'bg-[#C9A96E] text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                                className={`py-2 rounded-xl font-medium transition flex flex-col items-center gap-0.5 text-xs ${metodoPago === 'efectivo'
+                                    ? 'bg-[#C9A96E] text-white shadow-md'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
                             >
                                 <Banknote className="w-4 h-4" />
                                 <span>Efectivo</span>
                             </button>
                             <button
                                 onClick={() => setMetodoPago('tarjeta')}
-                                className={`py-2 rounded-xl font-medium transition flex flex-col items-center gap-0.5 text-xs ${
-                                    metodoPago === 'tarjeta'
-                                        ? 'bg-[#C9A96E] text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                                className={`py-2 rounded-xl font-medium transition flex flex-col items-center gap-0.5 text-xs ${metodoPago === 'tarjeta'
+                                    ? 'bg-[#C9A96E] text-white shadow-md'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
                             >
                                 <CreditCard className="w-4 h-4" />
                                 <span>Tarjeta</span>
                             </button>
                             <button
                                 onClick={() => setMetodoPago('yape')}
-                                className={`py-2 rounded-xl font-medium transition flex flex-col items-center gap-0.5 text-xs ${
-                                    metodoPago === 'yape'
-                                        ? 'bg-[#C9A96E] text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                                className={`py-2 rounded-xl font-medium transition flex flex-col items-center gap-0.5 text-xs ${metodoPago === 'yape'
+                                    ? 'bg-[#C9A96E] text-white shadow-md'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
                             >
                                 <Smartphone className="w-4 h-4" />
                                 <span>Yape/Plin</span>
@@ -525,11 +536,10 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                         <button
                             onClick={handleCobrar}
                             disabled={cargando || (metodoPago === 'efectivo' && montoRecibidoNum < total)}
-                            className={`w-full py-2.5 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-sm flex-shrink-0 ${
-                                cargando || (metodoPago === 'efectivo' && montoRecibidoNum < total)
-                                    ? 'bg-gray-300 cursor-not-allowed'
-                                    : 'bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white'
-                            }`}
+                            className={`w-full py-2.5 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-sm flex-shrink-0 ${cargando || (metodoPago === 'efectivo' && montoRecibidoNum < total)
+                                ? 'bg-gray-300 cursor-not-allowed'
+                                : 'bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white'
+                                }`}
                         >
                             {cargando ? (
                                 <>

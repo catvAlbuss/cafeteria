@@ -14,6 +14,7 @@ class Plato extends Model
         'stock',
         'vendidos',
         'imagen',
-        'emoji',
+        'disponible',
+        
     ];
 }

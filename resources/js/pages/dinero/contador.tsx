@@ -1,102 +1,58 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import {
     Calculator,
-    DollarSign,
     TrendingUp,
-    TrendingDown,
     Wallet,
-    CreditCard,
     Clock,
     CheckCircle,
-    AlertCircle,
     Printer,
     FileSpreadsheet,
-    ArrowRight,
-    Eye,
-    EyeOff,
-    Coffee,
-    ShoppingBag,
-    Users,
-    Truck,
     Plus,
     X,
-    User,
-    Calendar,
-    Search,
+    Eye,
     Trash2,
-    FileText
+    Search,
+    User,
+    Calendar
 } from 'lucide-react';
-
-interface Movimiento {
-    id: number;
-    tipo: 'ingreso' | 'egreso';
-    descripcion: string;
-    monto: number;
-    hora: string;
-    categoria?: string;
-}
 
 interface RegistroCaja {
     id: number;
     caja: string;
     empleado: string;
     turno: 'Mañana' | 'Tarde' | 'Noche';
-    montoInicial: number;
-    fechaApertura: string;
-    montoFinal: number | null;
-    ventasDia: number | null;
+    monto_inicial: number;
+    fecha_apertura: string;
+    monto_final: number | null;
+    ventas_dia: number | null;
     observaciones: string;
-    fechaCierre: string | null;
+    fecha_cierre: string | null;
     estado: 'Abierta' | 'Cerrada';
 }
 
 export default function Contador() {
-    const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+    // 📊 Recibir datos del backend
+    const { 
+        cajas = [], 
+        cajaActual = null, 
+        resumen = { ingresos: 0, cajaActual: 0 }, 
+        movimientos = [], 
+        ingresosDetalle = [],
+        estadisticas = { totalPedidosHoy: 0, totalCajasAbiertas: 0, totalCajasCerradas: 0 }
+    } = usePage().props as any;
 
-    // 📊 Datos de ejemplo
-    const resumen = {
-        ingresos: 18240,
-        gastos: 6580,
-        gananciaNeta: 11660,
-        cajaActual: 3450,
-    };
+    // Estados
+    const [registros, setRegistros] = useState<RegistroCaja[]>(cajas);
+    const [cajaActiva, setCajaActiva] = useState<RegistroCaja | null>(cajaActual);
 
-    const ingresosDetalle = [
-        { concepto: 'Ventas en caja', monto: 4820 },
-        { concepto: 'Deliverys', monto: 1240 },
-        { concepto: 'Pedidos mesa', monto: 2100 },
-    ];
-
-    const gastosDetalle = [
-        { concepto: 'Insumos', monto: 1800 },
-        { concepto: 'Personal', monto: 2500 },
-        { concepto: 'Servicios', monto: 680 },
-    ];
-
-    const movimientos: Movimiento[] = [
-        { id: 1, tipo: 'ingreso', descripcion: 'Venta en caja', monto: 120, hora: '10:15 AM' },
-        { id: 2, tipo: 'egreso', descripcion: 'Compra insumos', monto: 340, hora: '11:00 AM' },
-        { id: 3, tipo: 'ingreso', descripcion: 'Delivery', monto: 85, hora: '11:40 AM' },
-        { id: 4, tipo: 'ingreso', descripcion: 'Pedido mesa #5', monto: 210, hora: '12:20 PM' },
-        { id: 5, tipo: 'egreso', descripcion: 'Pago personal', monto: 500, hora: '01:00 PM' },
-    ];
-
-    // 📋 Estado de apertura/cierre
-    const [registros, setRegistros] = useState<RegistroCaja[]>(() => {
-        const saved = localStorage.getItem('registrosCaja');
-        return saved ? JSON.parse(saved) : [];
-    });
-
-    const [cajaActual, setCajaActual] = useState<RegistroCaja | null>(null);
-
-    // 📋 Estado de modales
+    // Modales
     const [modalAperturaAbierto, setModalAperturaAbierto] = useState(false);
     const [modalCierreAbierto, setModalCierreAbierto] = useState(false);
     const [modalDetalleAbierto, setModalDetalleAbierto] = useState(false);
     const [registroSeleccionado, setRegistroSeleccionado] = useState<RegistroCaja | null>(null);
 
-    // 📋 Estado del formulario de apertura
+    // Formularios
     const [formApertura, setFormApertura] = useState({
         empleado: '',
         caja: 'Caja 01',
@@ -104,57 +60,50 @@ export default function Contador() {
         montoInicial: 0,
     });
 
-    // 📋 Estado del formulario de cierre
     const [formCierre, setFormCierre] = useState({
         montoFinal: 0,
         ventasDia: 0,
         observaciones: '',
     });
 
-    // 📋 Filtros
+    // Filtros
     const [filtroEstado, setFiltroEstado] = useState('');
     const [filtroEmpleado, setFiltroEmpleado] = useState('');
     const [fechaInicio, setFechaInicio] = useState('');
     const [fechaFin, setFechaFin] = useState('');
 
-    // 💾 Guardar en localStorage
+    // Actualizar cuando cambian los props
     useEffect(() => {
-        localStorage.setItem('registrosCaja', JSON.stringify(registros));
-    }, [registros]);
+        setRegistros(cajas);
+        setCajaActiva(cajaActual);
+    }, [cajas, cajaActual]);
 
-    // 🔍 Verificar si hay caja abierta
-    useEffect(() => {
-        const abierta = registros.find(r => r.estado === 'Abierta');
-        setCajaActual(abierta || null);
-    }, [registros]);
-
-    // 📊 Formatear números
-    const formatCurrency = (amount: number): string => {
-        return `S/ ${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+    // Formatear moneda - Maneja strings y números
+    const formatCurrency = (amount: number | string): string => {
+        const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+        if (isNaN(num) || num === null || num === undefined) return 'S/ 0.00';
+        return `S/ ${num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
     };
 
-    // 📊 Totales
-    const totalIngresosDetalle = ingresosDetalle.reduce((sum, i) => sum + i.monto, 0);
-    const totalGastosDetalle = gastosDetalle.reduce((sum, g) => sum + g.monto, 0);
-
-    // 📊 Resumen de registros
+    // Totales
+    const totalIngresosDetalle = ingresosDetalle.reduce((sum: number, i: any) => sum + (i.monto || 0), 0);
     const totalRegistros = registros.length;
     const cajasAbiertas = registros.filter(r => r.estado === 'Abierta').length;
     const cajasCerradas = registros.filter(r => r.estado === 'Cerrada').length;
-    const montoTotal = registros.reduce((acc, r) => acc + (r.estado === 'Cerrada' ? (r.montoFinal || 0) : r.montoInicial), 0);
+    const montoTotal = registros.reduce((acc, r) => acc + (r.estado === 'Cerrada' ? (r.monto_final || 0) : r.monto_inicial), 0);
 
-    // 📊 Filtrar registros
+    // Filtrar registros
     const registrosFiltrados = registros.filter(r => {
         if (filtroEstado && r.estado !== filtroEstado) return false;
         if (filtroEmpleado && !r.empleado.toLowerCase().includes(filtroEmpleado.toLowerCase())) return false;
         if (fechaInicio) {
-            const fecha = new Date(r.fechaApertura);
+            const fecha = new Date(r.fecha_apertura);
             const fInicio = new Date(fechaInicio);
             fInicio.setHours(0, 0, 0, 0);
             if (fecha < fInicio) return false;
         }
         if (fechaFin) {
-            const fecha = new Date(r.fechaApertura);
+            const fecha = new Date(r.fecha_apertura);
             const fFin = new Date(fechaFin);
             fFin.setHours(23, 59, 59, 999);
             if (fecha > fFin) return false;
@@ -162,14 +111,9 @@ export default function Contador() {
         return true;
     });
 
-    // 📋 Funciones de apertura
+    // Funciones
     const abrirModalApertura = () => {
-        setFormApertura({
-            empleado: '',
-            caja: 'Caja 01',
-            turno: 'Mañana',
-            montoInicial: 0,
-        });
+        setFormApertura({ empleado: '', caja: 'Caja 01', turno: 'Mañana', montoInicial: 0 });
         setModalAperturaAbierto(true);
     };
 
@@ -179,25 +123,17 @@ export default function Contador() {
             return;
         }
 
-        const nuevoRegistro: RegistroCaja = {
-            id: Date.now(),
-            caja: formApertura.caja,
-            empleado: formApertura.empleado,
-            turno: formApertura.turno,
-            montoInicial: formApertura.montoInicial,
-            fechaApertura: new Date().toISOString(),
-            montoFinal: null,
-            ventasDia: null,
-            observaciones: '',
-            fechaCierre: null,
-            estado: 'Abierta',
-        };
-
-        setRegistros([nuevoRegistro, ...registros]);
-        setModalAperturaAbierto(false);
+        router.post('/contador/abrir', formApertura, {
+            onSuccess: () => {
+                setModalAperturaAbierto(false);
+                router.reload();
+            },
+            onError: (errors) => {
+                alert('Error al abrir caja: ' + Object.values(errors).join(' '));
+            }
+        });
     };
 
-    // 📋 Funciones de cierre
     const abrirModalCierre = () => {
         const abierta = registros.find(r => r.estado === 'Abierta');
         if (!abierta) {
@@ -205,11 +141,7 @@ export default function Contador() {
             return;
         }
         setRegistroSeleccionado(abierta);
-        setFormCierre({
-            montoFinal: 0,
-            ventasDia: 0,
-            observaciones: '',
-        });
+        setFormCierre({ montoFinal: 0, ventasDia: 0, observaciones: '' });
         setModalCierreAbierto(true);
     };
 
@@ -220,23 +152,17 @@ export default function Contador() {
             return;
         }
 
-        setRegistros(registros.map(r =>
-            r.id === registroSeleccionado.id
-                ? {
-                    ...r,
-                    montoFinal: formCierre.montoFinal,
-                    ventasDia: formCierre.ventasDia,
-                    observaciones: formCierre.observaciones,
-                    fechaCierre: new Date().toISOString(),
-                    estado: 'Cerrada',
-                }
-                : r
-        ));
-
-        setModalCierreAbierto(false);
+        router.post(`/contador/cerrar/${registroSeleccionado.id}`, formCierre, {
+            onSuccess: () => {
+                setModalCierreAbierto(false);
+                router.reload();
+            },
+            onError: (errors) => {
+                alert('Error al cerrar caja: ' + Object.values(errors).join(' '));
+            }
+        });
     };
 
-    // 📋 Funciones de historial
     const verDetalle = (registro: RegistroCaja) => {
         setRegistroSeleccionado(registro);
         setModalDetalleAbierto(true);
@@ -244,7 +170,12 @@ export default function Contador() {
 
     const eliminarRegistro = (id: number) => {
         if (!confirm('¿Seguro que deseas eliminar este registro?')) return;
-        setRegistros(registros.filter(r => r.id !== id));
+        router.delete(`/contador/${id}`, {
+            onSuccess: () => router.reload(),
+            onError: (errors) => {
+                alert('Error al eliminar: ' + Object.values(errors).join(' '));
+            }
+        });
     };
 
     return (
@@ -255,11 +186,11 @@ export default function Contador() {
                 {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-[#2D1B1A]">🧾 Contador</h1>
+                        <h1 className="text-3xl font-bold text-[#2D1B1A]">💰 Contador</h1>
                         <p className="text-[#5A3D2B] text-sm mt-1">Control financiero, apertura y cierre de caja</p>
                     </div>
                     <div className="flex flex-wrap gap-3">
-                        {!cajaActual ? (
+                        {!cajaActiva ? (
                             <button
                                 onClick={abrirModalApertura}
                                 className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold"
@@ -284,21 +215,21 @@ export default function Contador() {
                 </div>
 
                 {/* ===== ESTADO DE CAJA ACTUAL ===== */}
-                {cajaActual && (
+                {cajaActiva && (
                     <div className="bg-gradient-to-r from-[#C9A96E] to-[#E8D5A3] rounded-2xl p-4 text-[#2D1B1A] flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-4">
                             <Wallet className="w-6 h-6" />
                             <div>
                                 <p className="text-sm font-medium">Caja abierta</p>
                                 <p className="text-xs opacity-80">
-                                    {cajaActual.empleado} · {cajaActual.turno} · {new Date(cajaActual.fechaApertura).toLocaleString()}
+                                    {cajaActiva.empleado} · {cajaActiva.turno} · {new Date(cajaActiva.fecha_apertura).toLocaleString()}
                                 </p>
                             </div>
                         </div>
                         <div className="flex items-center gap-6">
                             <div>
                                 <p className="text-xs opacity-80">Saldo inicial</p>
-                                <p className="font-bold">{formatCurrency(cajaActual.montoInicial)}</p>
+                                <p className="font-bold">{formatCurrency(cajaActiva.monto_inicial)}</p>
                             </div>
                             <span className="px-3 py-1 bg-green-600 text-white rounded-full text-xs font-semibold">
                                 Activa
@@ -307,71 +238,36 @@ export default function Contador() {
                     </div>
                 )}
 
-                {/* ===== FILTRO DE FECHA ===== */}
-                <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#F3E1C8] flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-[#5A3D2B]" />
-                        <span className="text-sm font-medium text-[#5A3D2B]">Fecha:</span>
-                    </div>
-                    <input
-                        type="date"
-                        className="border border-[#F3E1C8] rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#2D1B1A]"
-                        value={fecha}
-                        onChange={(e) => setFecha(e.target.value)}
-                    />
-                    <button className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                        Aplicar
-                    </button>
-                    <button className="text-[#5A3D2B] hover:text-[#2D1B1A] text-sm font-medium transition">
-                        Hoy
-                    </button>
-                </div>
-
                 {/* ===== RESUMEN FINANCIERO ===== */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                     
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8] hover:shadow-md transition">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-[#5A3D2B] font-medium">Ingresos</p>
-                                <h2 className="text-3xl font-bold text-green-600 mt-1">{formatCurrency(resumen.ingresos)}</h2>
+                                <p className="text-sm text-[#5A3D2B] font-medium">Ingresos del día</p>
+                                <h2 className="text-3xl font-bold text-green-600 mt-1">{formatCurrency(resumen.ingresos || 0)}</h2>
                             </div>
                             <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
                                 <TrendingUp className="w-6 h-6 text-green-600" />
                             </div>
                         </div>
                         <div className="mt-2">
-                            <span className="text-xs text-[#5A3D2B]/60">Total del período</span>
+                            <span className="text-xs text-[#5A3D2B]/60">Total de ventas del día</span>
                         </div>
                     </div>
 
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8] hover:shadow-md transition">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-[#5A3D2B] font-medium">Gastos</p>
-                                <h2 className="text-3xl font-bold text-red-600 mt-1">{formatCurrency(resumen.gastos)}</h2>
-                            </div>
-                            <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
-                                <TrendingDown className="w-6 h-6 text-red-600" />
-                            </div>
-                        </div>
-                        <div className="mt-2">
-                            <span className="text-xs text-[#5A3D2B]/60">Total del período</span>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8] hover:shadow-md transition">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-[#5A3D2B] font-medium">Ganancia neta</p>
-                                <h2 className="text-3xl font-bold text-[#2D1B1A] mt-1">{formatCurrency(resumen.gananciaNeta)}</h2>
+                                <p className="text-sm text-[#5A3D2B] font-medium">Ventas totales</p>
+                                <h2 className="text-3xl font-bold text-[#2D1B1A] mt-1">{formatCurrency(resumen.ingresos || 0)}</h2>
                             </div>
                             <div className="w-12 h-12 rounded-xl bg-[#F3E1C8] flex items-center justify-center">
                                 <Calculator className="w-6 h-6 text-[#8A5A2B]" />
                             </div>
                         </div>
                         <div className="mt-2">
-                            <span className="text-xs text-[#5A3D2B]/60">Ingresos - Gastos</span>
+                            <span className="text-xs text-[#5A3D2B]/60">Total acumulado</span>
                         </div>
                     </div>
 
@@ -379,14 +275,14 @@ export default function Contador() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-white/60 text-sm font-medium">Caja actual</p>
-                                <h2 className="text-3xl font-bold mt-1">{formatCurrency(resumen.cajaActual)}</h2>
+                                <h2 className="text-3xl font-bold mt-1">{formatCurrency(resumen.cajaActual || 0)}</h2>
                             </div>
                             <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
                                 <Wallet className="w-6 h-6 text-[#C9A96E]" />
                             </div>
                         </div>
                         <div className="mt-2">
-                            <span className="text-xs text-white/40">Disponible en caja</span>
+                            <span className="text-xs text-white/40">Monto inicial + ventas</span>
                         </div>
                     </div>
                 </div>
@@ -493,8 +389,8 @@ export default function Contador() {
                                             <td className="px-4 py-3 font-medium">{r.caja}</td>
                                             <td className="px-4 py-3">{r.empleado}</td>
                                             <td className="px-4 py-3">{r.turno}</td>
-                                            <td className="px-4 py-3">{formatCurrency(r.montoInicial)}</td>
-                                            <td className="px-4 py-3">{r.montoFinal !== null ? formatCurrency(r.montoFinal) : '-'}</td>
+                                            <td className="px-4 py-3">{formatCurrency(r.monto_inicial)}</td>
+                                            <td className="px-4 py-3">{r.monto_final !== null ? formatCurrency(r.monto_final) : '-'}</td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                                                     r.estado === 'Abierta' 
@@ -536,40 +432,19 @@ export default function Contador() {
                     </div>
                 </div>
 
-                {/* ===== FLUJO FINANCIERO (Ingresos y Gastos) ===== */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    
-                    {/* Ingresos del día */}
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8]">
-                        <h2 className="text-xl font-bold text-[#2D1B1A] mb-5">📈 Ingresos del día</h2>
-                        <div className="space-y-3">
-                            {ingresosDetalle.map((item, index) => (
-                                <div key={index} className="flex justify-between items-center border-b border-[#F3E1C8] pb-3 last:border-0 last:pb-0">
-                                    <span className="text-[#5A3D2B]">{item.concepto}</span>
-                                    <span className="font-semibold text-green-600">{formatCurrency(item.monto)}</span>
-                                </div>
-                            ))}
-                            <div className="flex justify-between items-center pt-3 border-t-2 border-[#F3E1C8]">
-                                <span className="font-bold text-[#2D1B1A]">Total ingresos</span>
-                                <span className="font-bold text-green-700">{formatCurrency(totalIngresosDetalle)}</span>
+                {/* ===== INGRESOS DEL DÍA ===== */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8]">
+                    <h2 className="text-xl font-bold text-[#2D1B1A] mb-5">📈 Ingresos del día</h2>
+                    <div className="space-y-3">
+                        {ingresosDetalle.map((item: any, index: number) => (
+                            <div key={index} className="flex justify-between items-center border-b border-[#F3E1C8] pb-3 last:border-0 last:pb-0">
+                                <span className="text-[#5A3D2B]">{item.concepto}</span>
+                                <span className="font-semibold text-green-600">{formatCurrency(item.monto || 0)}</span>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Gastos del día */}
-                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8]">
-                        <h2 className="text-xl font-bold text-[#2D1B1A] mb-5">📉 Gastos del día</h2>
-                        <div className="space-y-3">
-                            {gastosDetalle.map((item, index) => (
-                                <div key={index} className="flex justify-between items-center border-b border-[#F3E1C8] pb-3 last:border-0 last:pb-0">
-                                    <span className="text-[#5A3D2B]">{item.concepto}</span>
-                                    <span className="font-semibold text-red-600">{formatCurrency(item.monto)}</span>
-                                </div>
-                            ))}
-                            <div className="flex justify-between items-center pt-3 border-t-2 border-[#F3E1C8]">
-                                <span className="font-bold text-[#2D1B1A]">Total gastos</span>
-                                <span className="font-bold text-red-700">{formatCurrency(totalGastosDetalle)}</span>
-                            </div>
+                        ))}
+                        <div className="flex justify-between items-center pt-3 border-t-2 border-[#F3E1C8]">
+                            <span className="font-bold text-[#2D1B1A]">Total ingresos</span>
+                            <span className="font-bold text-green-700">{formatCurrency(totalIngresosDetalle)}</span>
                         </div>
                     </div>
                 </div>
@@ -586,31 +461,39 @@ export default function Contador() {
                                 <tr className="border-b border-[#F3E1C8] bg-[#FBF3E7]/50">
                                     <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Tipo</th>
                                     <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Descripción</th>
+                                    <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Cliente</th>
                                     <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Monto</th>
                                     <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Hora</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {movimientos.map((mov) => (
-                                    <tr key={mov.id} className="border-b border-[#FBF3E7] hover:bg-[#FBF3E7]/50 transition">
-                                        <td className="py-3 px-4 text-sm">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                                                mov.tipo === 'ingreso' 
-                                                    ? 'bg-green-100 text-green-700' 
-                                                    : 'bg-red-100 text-red-700'
-                                            }`}>
-                                                {mov.tipo === 'ingreso' ? 'Ingreso' : 'Gasto'}
-                                            </span>
-                                        </td>
-                                        <td className="py-3 px-4 text-sm font-medium text-[#2D1B1A]">{mov.descripcion}</td>
-                                        <td className={`py-3 px-4 text-sm font-semibold ${
-                                            mov.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'
-                                        }`}>
-                                            {mov.tipo === 'ingreso' ? '+' : '-'} {formatCurrency(mov.monto)}
-                                        </td>
-                                        <td className="py-3 px-4 text-sm text-[#5A3D2B]">{mov.hora}</td>
+                                {movimientos.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="text-center text-gray-400 py-8">No hay movimientos recientes</td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    movimientos.map((mov: any) => (
+                                        <tr key={mov.id} className="border-b border-[#FBF3E7] hover:bg-[#FBF3E7]/50 transition">
+                                            <td className="py-3 px-4 text-sm">
+                                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                                                    mov.tipo === 'ingreso' 
+                                                        ? 'bg-green-100 text-green-700' 
+                                                        : 'bg-red-100 text-red-700'
+                                                }`}>
+                                                    {mov.tipo === 'ingreso' ? 'Ingreso' : 'Gasto'}
+                                                </span>
+                                            </td>
+                                            <td className="py-3 px-4 text-sm font-medium text-[#2D1B1A]">{mov.descripcion}</td>
+                                            <td className="py-3 px-4 text-sm text-[#5A3D2B]">{mov.cliente || 'Anónimo'}</td>
+                                            <td className={`py-3 px-4 text-sm font-semibold ${
+                                                mov.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'
+                                            }`}>
+                                                {mov.tipo === 'ingreso' ? '+' : '-'} {formatCurrency(mov.monto)}
+                                            </td>
+                                            <td className="py-3 px-4 text-sm text-[#5A3D2B]">{mov.hora}</td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -619,14 +502,14 @@ export default function Contador() {
                 {/* ===== ACCIONES ===== */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <button
-                        onClick={cajaActual ? abrirModalCierre : abrirModalApertura}
+                        onClick={cajaActiva ? abrirModalCierre : abrirModalApertura}
                         className={`p-4 rounded-2xl shadow-md transition flex items-center justify-center gap-2 font-semibold ${
-                            cajaActual 
+                            cajaActiva 
                                 ? 'bg-red-600 hover:bg-red-700 text-white' 
                                 : 'bg-[#C9A96E] hover:bg-[#B8975D] text-white'
                         }`}
                     >
-                        {cajaActual ? (
+                        {cajaActiva ? (
                             <>
                                 <CheckCircle className="w-5 h-5" />
                                 Cerrar caja
@@ -756,7 +639,7 @@ export default function Contador() {
                                     </div>
                                     <div>
                                         <label className="text-xs text-gray-500">Monto Inicial</label>
-                                        <p className="font-semibold text-[#C9A96E]">{formatCurrency(registroSeleccionado.montoInicial)}</p>
+                                        <p className="font-semibold text-[#C9A96E]">{formatCurrency(registroSeleccionado.monto_inicial)}</p>
                                     </div>
                                 </div>
 
@@ -834,12 +717,12 @@ export default function Contador() {
                                     <div><p className="text-xs text-gray-400">Estado</p><span className={`px-3 py-0.5 rounded-full text-xs font-bold ${
                                         registroSeleccionado.estado === 'Abierta' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                     }`}>{registroSeleccionado.estado}</span></div>
-                                    <div><p className="text-xs text-gray-400">Monto Inicial</p><p className="font-semibold text-[#C9A96E]">{formatCurrency(registroSeleccionado.montoInicial)}</p></div>
-                                    <div><p className="text-xs text-gray-400">Monto Final</p><p className="font-semibold">{registroSeleccionado.montoFinal !== null ? formatCurrency(registroSeleccionado.montoFinal) : '-'}</p></div>
-                                    <div><p className="text-xs text-gray-400">Ventas del Día</p><p className="font-semibold">{registroSeleccionado.ventasDia !== null ? formatCurrency(registroSeleccionado.ventasDia) : '-'}</p></div>
-                                    <div><p className="text-xs text-gray-400">Fecha Apertura</p><p className="font-semibold text-sm">{new Date(registroSeleccionado.fechaApertura).toLocaleString()}</p></div>
-                                    {registroSeleccionado.fechaCierre && (
-                                        <div className="col-span-2"><p className="text-xs text-gray-400">Fecha Cierre</p><p className="font-semibold text-sm">{new Date(registroSeleccionado.fechaCierre).toLocaleString()}</p></div>
+                                    <div><p className="text-xs text-gray-400">Monto Inicial</p><p className="font-semibold text-[#C9A96E]">{formatCurrency(registroSeleccionado.monto_inicial)}</p></div>
+                                    <div><p className="text-xs text-gray-400">Monto Final</p><p className="font-semibold">{registroSeleccionado.monto_final !== null ? formatCurrency(registroSeleccionado.monto_final) : '-'}</p></div>
+                                    <div><p className="text-xs text-gray-400">Ventas del Día</p><p className="font-semibold">{registroSeleccionado.ventas_dia !== null ? formatCurrency(registroSeleccionado.ventas_dia) : '-'}</p></div>
+                                    <div><p className="text-xs text-gray-400">Fecha Apertura</p><p className="font-semibold text-sm">{new Date(registroSeleccionado.fecha_apertura).toLocaleString()}</p></div>
+                                    {registroSeleccionado.fecha_cierre && (
+                                        <div className="col-span-2"><p className="text-xs text-gray-400">Fecha Cierre</p><p className="font-semibold text-sm">{new Date(registroSeleccionado.fecha_cierre).toLocaleString()}</p></div>
                                     )}
                                     <div className="col-span-2"><p className="text-xs text-gray-400">Observaciones</p><p className="font-semibold">{registroSeleccionado.observaciones || '-'}</p></div>
                                 </div>

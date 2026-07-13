@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { 
     Search, 
@@ -121,14 +121,43 @@ export default function Caja() {
     };
 
     // Realizar pedido
-    const realizarPedido = () => {
-        if (carrito.length === 0) {
-            alert('Agrega productos al pedido');
-            return;
-        }
-        alert(`✅ Pedido realizado con éxito\nTotal: S/ ${total.toFixed(2)}\nCliente: ${cliente || 'Anónimo'}\nMesa: ${mesa || 'No asignada'}`);
-        limpiarCarrito();
+ const realizarPedido = () => {
+    if (carrito.length === 0) {
+        alert('Agrega productos al pedido');
+        return;
+    }
+
+    // Datos del pedido
+    const pedidoData = {
+        cliente: cliente || 'Anónimo',
+        mesa: mesa || null,
+        tipo: tipoPedido,
+        metodoPago: metodoPago,
+        productos: carrito.map(item => ({
+            id: item.id,
+            nombre: item.nombre,
+            cantidad: item.cantidad,
+            precio: item.precio,
+            subtotal: item.precio * item.cantidad
+        })),
+        subtotal: subtotal,
+        igv: igv,
+        total: total,
+        fecha: new Date().toISOString()
     };
+
+    // Enviar al backend
+    router.post('/caja/registrar', pedidoData, {
+        onSuccess: () => {
+            alert(`✅ Pedido realizado con éxito\nTotal: S/ ${total.toFixed(2)}`);
+            limpiarCarrito();
+            router.reload();
+        },
+        onError: (errors) => {
+            alert('Error al registrar pedido: ' + Object.values(errors).join(' '));
+        }
+    });
+};
 
     return (
         <>
@@ -420,4 +449,4 @@ export default function Caja() {
             </div>
         </>
     );
-}
+}   

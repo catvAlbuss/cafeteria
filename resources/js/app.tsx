@@ -11,27 +11,34 @@ import axios from 'axios';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
-const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+// Solo ejecutar en el cliente (navegador)
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    
+    if (csrfToken) {
+        axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
+        axios.defaults.withCredentials = true;
+    }
 
-if (csrfToken) {
-    axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
-    axios.defaults.withCredentials = true;
+    initializeTheme();
 }
 
+// Cargar todas las páginas eager
 const pages = import.meta.glob('./pages/**/*.tsx', { eager: true }) as Record<string, { default: any }>;
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     resolve: (name) => {
-        const page = pages[`./pages/${name}.tsx`];
-        if (!page) {
-            // Fallback a resolvePageComponent si no encuentra
-            return resolvePageComponent(
-                `./pages/${name}.tsx`,
-                import.meta.glob('./pages/**/*.tsx')
-            );
+        // Buscar la página en el objeto pages
+        const pageKey = `./pages/${name}.tsx`;
+        const page = pages[pageKey];
+        
+        if (page) {
+            return page.default;
         }
-        return page.default;
+        
+        // Fallback si no encuentra
+        throw new Error(`Page not found: ${name}`);
     },
     layout: (name) => {
         switch (true) {
@@ -59,5 +66,3 @@ createInertiaApp({
         color: '#4B5563',
     },
 });
-
-initializeTheme();

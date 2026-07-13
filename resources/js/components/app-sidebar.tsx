@@ -80,12 +80,7 @@ export function AppSidebar() {
             icon: Coffee,
         },
         
-        //  INVENTARIO - TÍTULO SEPARADOR
-        {
-            title: 'Inventario',
-            href: '#',
-            icon: Package,
-        },
+     
         {
             title: 'Producción',
             href: '/produccion',
@@ -101,13 +96,8 @@ export function AppSidebar() {
             href: '/mermas',
             icon: Package,
         },
-        {
-            title: 'Etiquetas',
-            href: '/etiquetas',
-            icon: Package,
-        },
-        
-     
+       
+
         {
             title: 'Clientes',
             href: '/clientes',

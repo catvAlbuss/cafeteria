@@ -23,7 +23,7 @@ import {
     Beef,
     Apple,
     Wheat,
-    
+
 
 } from 'lucide-react';
 
@@ -91,7 +91,7 @@ export default function Mermas() {
 
     // 🎨 Configuración de motivos
     const getMotivoConfig = (motivo: string) => {
-        switch(motivo) {
+        switch (motivo) {
             case 'caducado': return { bg: 'bg-red-100', text: 'text-red-700', label: 'Caducado', icon: XCircle };
             case 'quemado': return { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Quemado', icon: AlertTriangle };
             case 'mal_estado': return { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Mal estado', icon: AlertTriangle };
@@ -140,7 +140,7 @@ export default function Mermas() {
         <>
             <Head title="Mermas - Dolce Cafe" />
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-6 bg-[#FBF3E7]">
-                
+
                 {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
@@ -277,13 +277,13 @@ export default function Mermas() {
                             <input
                                 type="text"
                                 placeholder="Buscar producto..."
-                                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#2D1B1A] placeholder-gray-400 bg-white"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
                             />
                         </div>
                         <select
-                            className="border border-gray-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
+                            className="border border-gray-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#2D1B1A] bg-white"
                             value={filtroMotivo}
                             onChange={(e) => setFiltroMotivo(e.target.value)}
                         >
@@ -296,13 +296,13 @@ export default function Mermas() {
                         </select>
                         <input
                             type="date"
-                            className="border border-gray-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
+                            className="border border-gray-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#2D1B1A] bg-white"
                             value={fechaInicio}
                             onChange={(e) => setFechaInicio(e.target.value)}
                         />
                         <input
                             type="date"
-                            className="border border-gray-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
+                            className="border border-gray-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#2D1B1A] bg-white"
                             value={fechaFin}
                             onChange={(e) => setFechaFin(e.target.value)}
                         />
@@ -313,7 +313,7 @@ export default function Mermas() {
                                 setFechaInicio('');
                                 setFechaFin('');
                             }}
-                            className="bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white rounded-xl text-sm font-semibold transition"
+                            className="bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white rounded-xl text-sm font-semibold transition py-2"
                         >
                             Limpiar filtros
                         </button>
