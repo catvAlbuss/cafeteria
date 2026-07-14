@@ -13,7 +13,8 @@ import {
     Tag,
     X,
     Image as ImageIcon,
-    ChefHat
+    ChefHat,
+    Check
 } from 'lucide-react';
 
 interface Plato {
@@ -26,22 +27,23 @@ interface Plato {
     vendidos: number;
     imagen: string;
     emoji: string;
+    disponible: boolean; 
 }
 
 export default function Platos() {
-    // 📋 Recibir platos desde el controlador
+    //  Recibir platos desde el controlador
     const { platos: platosIniciales = [] } = usePage<{ platos: Plato[] }>().props;
-    
-    // 📋 Estado - usar datos del controlador
+
+    //  Estado - usar datos del controlador
     const [platos, setPlatos] = useState<Plato[]>(platosIniciales);
-    
-    // 📋 Estado del modal
+
+    //  Estado del modal
     const [modalAbierto, setModalAbierto] = useState(false);
     const [modalVerAbierto, setModalVerAbierto] = useState(false);
     const [platoSeleccionado, setPlatoSeleccionado] = useState<Plato | null>(null);
     const [esEdicion, setEsEdicion] = useState(false);
 
-    // 📋 Estado del formulario
+    //  Estado del formulario
     const [formulario, setFormulario] = useState({
         id: '',
         nombre: '',
@@ -50,17 +52,18 @@ export default function Platos() {
         precio: 0,
         stock: 0,
         imagen: '',
-        emoji: '🍽️'
+
     });
     const [modalEtiquetaAbierto, setModalEtiquetaAbierto] = useState(false);
     const [etiquetaActual, setEtiquetaActual] = useState<Plato | null>(null);
+    const [previewImagen, setPreviewImagen] = useState<string>('');
 
-    // 📋 Filtros
+    //  Filtros
     const [filtroCategoria, setFiltroCategoria] = useState('');
     const [filtroEstado, setFiltroEstado] = useState('');
     const [ordenPor, setOrdenPor] = useState('');
 
-    // 📊 Filtrar y ordenar platos
+    //  Filtrar y ordenar platos
     const platosFiltrados = platos
         .filter(p => {
             const catOk = !filtroCategoria || p.categoria === filtroCategoria;
@@ -74,7 +77,7 @@ export default function Platos() {
             return 0;
         });
 
-    // 📊 Resumen
+    //  Resumen
     const resumen = {
         activos: platos.filter(p => p.stock > 0).length,
         agotados: platos.filter(p => p.stock === 0).length,
@@ -82,11 +85,11 @@ export default function Platos() {
         stockTotal: platos.reduce((sum, p) => sum + p.stock, 0),
     };
 
-    // 📊 Top productos
+    // Top productos
     const topProductos = [...platos].sort((a, b) => b.vendidos - a.vendidos).slice(0, 4);
     const maxVendidos = topProductos.length ? topProductos[0].vendidos : 1;
 
-    // 📊 Top categorías
+    //  Top categorías
     const categoriasTotales: Record<string, number> = {};
     platos.forEach(p => {
         categoriasTotales[p.categoria] = (categoriasTotales[p.categoria] || 0) + p.vendidos;
@@ -94,7 +97,7 @@ export default function Platos() {
     const topCategorias = Object.entries(categoriasTotales).sort((a, b) => b[1] - a[1]);
     const maxCategoriaVentas = topCategorias.length ? topCategorias[0][1] : 1;
 
-    // 📋 Funciones CRUD
+    //  Funciones CRUD
     const abrirNuevo = () => {
         setEsEdicion(false);
         setFormulario({
@@ -105,18 +108,20 @@ export default function Platos() {
             precio: 0,
             stock: 0,
             imagen: '',
-            emoji: '🍽️'
+
         });
+        setPreviewImagen('');
         setModalAbierto(true);
     };
 
     const abrirEditar = (plato: Plato) => {
         setEsEdicion(true);
         setFormulario({ ...plato });
+        setPreviewImagen(plato.imagen || '');
         setModalAbierto(true);
     };
 
-    // ✅ Guardar plato (crear/editar) con Inertia
+    //  Guardar plato (crear/editar) con Inertia
     const guardarPlato = () => {
         if (!formulario.nombre || formulario.precio < 0 || formulario.stock < 0) {
             alert('Complete todos los campos correctamente.');
@@ -124,29 +129,66 @@ export default function Platos() {
         }
 
         const url = esEdicion ? `/platos/${formulario.id}` : '/platos';
-        const method = esEdicion ? 'put' : 'post';
-
-        router[method](url, formulario, {
+        const opciones = {
+            preserveScroll: true,
             onSuccess: () => {
                 setModalAbierto(false);
-                router.reload(); // Recargar para ver cambios
+                router.reload({ only: ['platos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
             },
-            onError: (errors) => {
+            onError: (errors: Record<string, string>) => {
                 alert('Error al guardar: ' + Object.values(errors).join(' '));
             }
-        });
+        } as Parameters<typeof router.post>[2];
+
+        if (esEdicion) {
+            router.put(url, formulario, opciones);
+        } else {
+            router.post(url, formulario, opciones);
+        }
     };
 
-    // ✅ Eliminar plato con Inertia
+    //  Eliminar plato con Inertia
     const eliminarPlato = (id: string) => {
         if (!confirm('¿Seguro que deseas eliminar este plato?')) return;
-        
+
+        const platosAnteriores = platos;
+        // Actualización optimista: desaparece de inmediato de la grilla
+        setPlatos(prev => prev.filter(p => p.id !== id));
+
         router.delete(`/platos/${id}`, {
+            preserveScroll: true,
             onSuccess: () => {
-                router.reload();
+                router.reload({ only: ['platos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
             },
             onError: (errors) => {
+                setPlatos(platosAnteriores); // revertir si falla
                 alert('Error al eliminar: ' + Object.values(errors).join(' '));
+            }
+        } as Parameters<typeof router.delete>[1]);
+    };
+    //  Cambiar disponibilidad del plato
+    const toggleDisponibilidad = (id: string) => {
+        const plato = platos.find(p => p.id === id);
+        if (!plato) return;
+
+        // Actualización optimista
+        setPlatos(prev => prev.map(p =>
+            p.id === id ? { ...p, disponible: !p.disponible } : p
+        ));
+
+        router.patch(`/platos/${id}/disponibilidad`, {
+            disponible: !plato.disponible
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                router.reload({ only: ['platos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
+            },
+            onError: (errors) => {
+                // Revertir si falla
+                setPlatos(prev => prev.map(p =>
+                    p.id === id ? { ...p, disponible: plato.disponible } : p
+                ));
+                alert('Error al cambiar disponibilidad: ' + Object.values(errors).join(' '));
             }
         });
     };
@@ -156,20 +198,26 @@ export default function Platos() {
         setModalVerAbierto(true);
     };
 
-    // 📋 Formatear moneda
-    const formatCurrency = (amount: number): string => {
-        return `S/ ${amount.toFixed(2)}`;
+    // Formatear moneda
+    const formatCurrency = (amount: number | string): string => {
+        const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+        if (isNaN(num)) return 'S/ 0.00';
+        return `S/ ${num.toFixed(2)}`;
     };
+
+    useEffect(() => {
+        setPlatos(platosIniciales);
+    }, [platosIniciales]);
 
     return (
         <>
             <Head title="Platos - Dolce Cafe" />
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-6 bg-[#FBF3E7]">
-                
+
                 {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-[#2D1B1A]">🍽️ Platos</h1>
+                        <h1 className="text-3xl font-bold text-[#2D1B1A]">Platos</h1>
                         <p className="text-[#5A3D2B] text-sm mt-1">Gestión del menú de la cafetería</p>
                     </div>
                     <button
@@ -243,8 +291,8 @@ export default function Platos() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {platosFiltrados.map((plato) => {
                         const estado = plato.stock > 0 ? 'Disponible' : 'Agotado';
-                        const estadoClase = plato.stock > 0 
-                            ? 'bg-green-100 text-green-700' 
+                        const estadoClase = plato.stock > 0
+                            ? 'bg-green-100 text-green-700'
                             : 'bg-red-100 text-red-600';
 
                         return (
@@ -309,6 +357,28 @@ export default function Platos() {
                                                 <Trash2 className="w-3 h-3" /> Eliminar
                                             </button>
                                         </div>
+
+                                        {/* 👇 AGREGAR ESTE BOTÓN DE DISPONIBILIDAD */}
+                                        <button
+                                            onClick={() => toggleDisponibilidad(plato.id)}
+                                            className={`w-full py-1.5 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 ${plato.disponible
+                                                ? 'bg-green-100 hover:bg-green-200 text-green-700'
+                                                : 'bg-red-100 hover:bg-red-200 text-red-700'
+                                                }`}
+                                        >
+                                            {plato.disponible ? (
+                                                <>
+                                                    <Check className="w-3 h-3" />
+                                                    Disponible
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <X className="w-3 h-3" />
+                                                    No disponible
+                                                </>
+                                            )}
+                                        </button>
+
                                         <button
                                             onClick={() => {
                                                 setEtiquetaActual(plato);
@@ -370,7 +440,7 @@ export default function Platos() {
                                         <span className="text-xs text-gray-400">{p.vendidos} vendidos</span>
                                     </div>
                                     <div className="w-full bg-gray-100 rounded-full h-2">
-                                        <div 
+                                        <div
                                             className="bg-[#C9A96E] h-2 rounded-full"
                                             style={{ width: `${(p.vendidos / maxVendidos * 100).toFixed(0)}%` }}
                                         />
@@ -393,7 +463,7 @@ export default function Platos() {
                                         <span className="text-xs text-gray-400">{ventas} vendidos</span>
                                     </div>
                                     <div className="w-full bg-gray-100 rounded-full h-2">
-                                        <div 
+                                        <div
                                             className="bg-[#C9A96E] h-2 rounded-full"
                                             style={{ width: `${(ventas / maxCategoriaVentas * 100).toFixed(0)}%` }}
                                         />
@@ -405,119 +475,264 @@ export default function Platos() {
                 </div>
 
                 {/* ============================================================ */}
-                {/* MODAL: Nuevo/Editar Plato */}
+                {/* MODAL: Nuevo/Editar Plato - REDISEÑADO */}
                 {/* ============================================================ */}
                 {modalAbierto && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                        <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                            <div className="flex justify-between items-center p-6 border-b border-[#F3E1C8]">
-                                <h2 className="text-2xl font-bold text-[#2D1B1A]">
-                                    {esEdicion ? 'Editar Plato' : 'Nuevo Plato'}
-                                </h2>
+                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300">
+
+                            {/* HEADER con gradiente */}
+                            <div className="bg-gradient-to-r from-[#2D1B1A] to-[#4A2C2A] px-6 py-5 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-[#C9A96E] rounded-xl flex items-center justify-center shadow-lg">
+                                        <Plus className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-white">
+                                            {esEdicion ? '✏️ Editar Plato' : '✨ Nuevo Plato'}
+                                        </h2>
+                                        <p className="text-gray-300 text-xs">
+                                            {esEdicion ? 'Actualiza la información del plato' : 'Agrega un nuevo plato al menú'}
+                                        </p>
+                                    </div>
+                                </div>
                                 <button
                                     onClick={() => setModalAbierto(false)}
-                                    className="text-3xl text-gray-400 hover:text-red-500 transition"
+                                    className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition text-white/60 hover:text-white"
                                 >
-                                    ×
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
 
-                            <div className="p-6 space-y-4">
-                                <div>
-                                    <label className="text-sm text-gray-500 font-medium">Nombre</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
-                                        value={formulario.nombre}
-                                        onChange={(e) => setFormulario({ ...formulario, nombre: e.target.value })}
-                                        placeholder="Ej: Cappuccino"
-                                    />
-                                </div>
+                            {/* BODY con scroll */}
+                            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    {/* Columna Izquierda */}
+                                    <div className="space-y-4">
+                                        {/* Nombre */}
+                                        <div>
+                                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
+                                                Nombre del plato
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                                    value={formulario.nombre}
+                                                    onChange={(e) => setFormulario({ ...formulario, nombre: e.target.value })}
+                                                    placeholder="Ej: Cappuccino"
+                                                />
+                                            </div>
+                                        </div>
 
-                                <div>
-                                    <label className="text-sm text-gray-500 font-medium">Categoría</label>
-                                    <select
-                                        className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
-                                        value={formulario.categoria}
-                                        onChange={(e) => setFormulario({ ...formulario, categoria: e.target.value })}
-                                    >
-                                        <option value="Bebidas">Bebidas</option>
-                                        <option value="Postres">Postres</option>
-                                        <option value="Sandwiches">Sandwiches</option>
-                                        <option value="Desayunos">Desayunos</option>
-                                    </select>
-                                </div>
+                                        {/* Categoría */}
+                                        <div>
+                                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
+                                                Categoría
+                                            </label>
+                                            <select
+                                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white appearance-none"
+                                                value={formulario.categoria}
+                                                onChange={(e) => setFormulario({ ...formulario, categoria: e.target.value })}
+                                            >
+                                                <option value="Bebidas">☕ Bebidas</option>
+                                                <option value="Postres">🍰 Postres</option>
+                                                <option value="Sandwiches">🥪 Sandwiches</option>
+                                                <option value="Desayunos">🍳 Desayunos</option>
+                                            </select>
+                                        </div>
 
-                                <div>
-                                    <label className="text-sm text-gray-500 font-medium">Descripción</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
-                                        value={formulario.descripcion}
-                                        onChange={(e) => setFormulario({ ...formulario, descripcion: e.target.value })}
-                                        placeholder="Breve descripción del plato"
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-sm text-gray-500 font-medium">Precio (S/)</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
-                                            value={formulario.precio}
-                                            onChange={(e) => setFormulario({ ...formulario, precio: parseFloat(e.target.value) || 0 })}
-                                            placeholder="0.00"
-                                        />
+                                        {/* Descripción */}
+                                        <div>
+                                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
+                                                Descripción
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                                value={formulario.descripcion}
+                                                onChange={(e) => setFormulario({ ...formulario, descripcion: e.target.value })}
+                                                placeholder="Breve descripción del plato"
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-sm text-gray-500 font-medium">Stock</label>
-                                        <input
-                                            type="number"
-                                            className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
-                                            value={formulario.stock}
-                                            onChange={(e) => setFormulario({ ...formulario, stock: parseInt(e.target.value) || 0 })}
-                                            placeholder="0"
-                                        />
+
+                                    {/* Columna Derecha */}
+                                    <div className="space-y-4">
+                                        {/* Precio y Stock */}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
+                                                    Precio (S/)
+                                                </label>
+                                                <div className="relative">
+                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#C9A96E] font-bold">S/</span>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        className="w-full border-2 border-gray-200 rounded-xl pl-10 pr-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                                        value={formulario.precio === 0 ? '' : formulario.precio}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value.replace(/[^0-9.]/g, '');
+                                                            // Permitir solo un punto decimal
+                                                            const parts = value.split('.');
+                                                            if (parts.length > 2) return;
+                                                            // Limitar a 2 decimales
+                                                            if (parts[1] && parts[1].length > 2) return;
+                                                            setFormulario({
+                                                                ...formulario,
+                                                                precio: value === '' ? 0 : parseFloat(value)
+                                                            });
+                                                        }}
+                                                        onBlur={() => {
+                                                            // Formatear al perder el foco
+                                                            if (formulario.precio > 0) {
+                                                                setFormulario({
+                                                                    ...formulario,
+                                                                    precio: parseFloat(formulario.precio.toFixed(2))
+                                                                });
+                                                            }
+                                                        }}
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
+                                                    Stock
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                                    value={formulario.stock}
+                                                    onChange={(e) => setFormulario({ ...formulario, stock: parseInt(e.target.value) || 0 })}
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Imagen - Pegar con Ctrl+V */}
+                                        <div>
+                                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
+                                                Imagen
+                                            </label>
+
+                                            <div className="relative">
+                                                <div
+                                                    className={`w-full border-2 border-dashed rounded-xl p-6 text-center transition cursor-pointer ${previewImagen || formulario.imagen
+                                                        ? 'border-[#C9A96E] bg-[#FBF7F0]'
+                                                        : 'border-gray-300 bg-gray-50 hover:border-[#C9A96E] hover:bg-[#FBF7F0]'
+                                                        }`}
+                                                    onPaste={(e) => {
+                                                        const items = e.clipboardData?.items;
+                                                        if (!items) return;
+
+                                                        for (const item of items) {
+                                                            if (item.type.startsWith('image/')) {
+                                                                const file = item.getAsFile();
+                                                                if (file) {
+                                                                    const reader = new FileReader();
+                                                                    reader.onloadend = () => {
+                                                                        const base64 = reader.result as string;
+                                                                        setPreviewImagen(base64);
+                                                                        setFormulario({ ...formulario, imagen: base64 });
+                                                                    };
+                                                                    reader.readAsDataURL(file);
+                                                                }
+                                                                break;
+                                                            }
+                                                        }
+                                                    }}
+                                                    onClick={() => {
+                                                        // Si no hay imagen, abrir selector de archivos
+                                                        if (!previewImagen && !formulario.imagen) {
+                                                            document.getElementById('fileInput')?.click();
+                                                        }
+                                                    }}
+                                                >
+                                                    {previewImagen || formulario.imagen ? (
+                                                        <div className="flex items-center gap-4">
+                                                            <img
+                                                                src={previewImagen || formulario.imagen}
+                                                                alt="Vista previa"
+                                                                className="w-20 h-20 rounded-lg object-cover border-2 border-[#C9A96E]"
+                                                            />
+                                                            <div className="text-left flex-1">
+                                                                <p className="text-sm font-medium text-[#2D1B1A]">
+                                                                    Imagen cargada ✅
+                                                                </p>
+                                                                <p className="text-xs text-gray-400">
+                                                                    Haz clic para cambiar o presiona Ctrl+V para pegar otra
+                                                                </p>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setPreviewImagen('');
+                                                                    setFormulario({ ...formulario, imagen: '' });
+                                                                }}
+                                                                className="text-red-500 hover:text-red-700 p-1"
+                                                            >
+                                                                <X className="w-5 h-5" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            <div className="text-4xl mb-2">🖼️</div>
+                                                            <p className="text-sm font-medium text-[#2D1B1A]">
+                                                                Presiona <kbd className="px-2 py-0.5 bg-gray-200 rounded text-xs font-bold">Ctrl + V</kbd> para pegar una imagen
+                                                            </p>
+                                                            <p className="text-xs text-gray-400 mt-1">
+                                                                O haz clic para seleccionar un archivo
+                                                            </p>
+                                                            <p className="text-[10px] text-gray-300 mt-2">
+                                                                JPG, PNG, WEBP · Max 2MB
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Input file oculto para seleccionar archivo */}
+                                                <input
+                                                    id="fileInput"
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) {
+                                                            const reader = new FileReader();
+                                                            reader.onloadend = () => {
+                                                                const base64 = reader.result as string;
+                                                                setPreviewImagen(base64);
+                                                                setFormulario({ ...formulario, imagen: base64 });
+                                                            };
+                                                            reader.readAsDataURL(file);
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="text-sm text-gray-500 font-medium">URL de imagen</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
-                                        value={formulario.imagen}
-                                        onChange={(e) => setFormulario({ ...formulario, imagen: e.target.value })}
-                                        placeholder="https://ejemplo.com/imagen.jpg"
-                                    />
-                                </div>
 
-                                <div className="flex items-center gap-3 pt-2">
-                                    <span className="text-sm text-gray-500">Emoji:</span>
-                                    <input
-                                        type="text"
-                                        className="w-16 border border-gray-200 rounded-xl p-2 text-center text-2xl focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
-                                        value={formulario.emoji}
-                                        onChange={(e) => setFormulario({ ...formulario, emoji: e.target.value || '🍽️' })}
-                                        maxLength={2}
-                                    />
-                                    <span className="text-xs text-gray-400">(opcional, si no hay imagen)</span>
-                                </div>
                             </div>
 
-                            <div className="border-t border-[#F3E1C8] p-6 flex justify-end gap-3">
+                            {/* FOOTER con botones */}
+                            <div className="border-t border-gray-200 px-6 py-4 bg-gray-50/50 flex justify-end gap-3">
                                 <button
                                     onClick={() => setModalAbierto(false)}
-                                    className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-xl font-semibold transition"
+                                    className="px-6 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-100 font-semibold text-sm transition"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     onClick={guardarPlato}
-                                    className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl font-semibold transition"
+                                    className="px-6 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-semibold text-sm transition flex items-center gap-2 shadow-md hover:shadow-lg"
                                 >
+                                    <Check className="w-4 h-4" />
                                     Guardar
                                 </button>
                             </div>
@@ -569,9 +784,8 @@ export default function Platos() {
                                     </div>
                                     <div>
                                         <p className="text-xs text-gray-400">Estado</p>
-                                        <span className={`inline-block px-3 py-0.5 rounded-full text-xs font-bold ${
-                                            platoSeleccionado.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-                                        }`}>
+                                        <span className={`inline-block px-3 py-0.5 rounded-full text-xs font-bold ${platoSeleccionado.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                                            }`}>
                                             {platoSeleccionado.stock > 0 ? 'Disponible' : 'Agotado'}
                                         </span>
                                     </div>

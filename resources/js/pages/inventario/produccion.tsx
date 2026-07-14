@@ -12,6 +12,7 @@ import {
     ArrowRight,
     BarChart3,
     Bell,
+    Bike,
     ChevronRight
 } from 'lucide-react';
 
@@ -36,6 +37,8 @@ interface Pedido {
     hora_pedido: string;
     hora_entrega: string | null;
     created_at: string;
+    tipo_origen?: 'mesa' | 'delivery';
+    tomado?: boolean;
 }
 
 export default function Produccion() {
@@ -54,13 +57,13 @@ export default function Produccion() {
     //  Configuración de estados
     const getEstadoConfig = (estado: string) => {
         switch (estado) {
-            case 'pendiente': return { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Pendiente', icon: '🟠' };
-            case 'preparando': return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Preparando', icon: '🔵' };
-            case 'listo': return { bg: 'bg-green-100', text: 'text-green-600', label: 'Listo', icon: '🟢' };
-            case 'entregado': return { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Entregado', icon: '⚪' };
-            case 'pagado': return { bg: 'bg-purple-100', text: 'text-purple-600', label: 'Pagado', icon: '🟣' };
-            case 'cancelado': return { bg: 'bg-red-100', text: 'text-red-600', label: 'Cancelado', icon: '🔴' };
-            default: return { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Desconocido', icon: '⚪' };
+            case 'pendiente': return { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pendiente', icon: Clock };
+            case 'preparando': return { bg: 'bg-orange-100', text: 'text-orange-700', label: 'En cocina', icon: Clock };
+            case 'listo_para_entregar': return { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Listo para enviar', icon: CheckCircle };
+            case 'en_ruta': return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'En ruta', icon: Bike };
+            case 'entregado': return { bg: 'bg-green-100', text: 'text-green-700', label: 'Entregado', icon: CheckCircle };
+            case 'cancelado': return { bg: 'bg-red-100', text: 'text-red-700', label: 'Cancelado', icon: XCircle };
+            default: return { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Desconocido', icon: XCircle };
         }
     };
 
@@ -79,26 +82,63 @@ export default function Produccion() {
     };
 
     // Cambiar estado de un pedido (conectado al controlador)
-    const cambiarEstado = (id: number, nuevoEstado: string) => {
-        //  Buscar el pedido para obtener la mesa_id
-        const pedido = pedidos.find(p => p.id === id);
 
-        router.patch(`/pedidos/${id}`, {
-            estado: nuevoEstado,
-        }, {
+    const cambiarEstado = (pedido: any, nuevoEstado: Pedido['estado']) => {
+        if (!pedido || !pedido.id) {
+            console.error('❌ Pedido sin ID:', pedido);
+            alert('Error: Pedido sin identificar');
+            return;
+        }
+
+        const esDelivery = pedido.tipo_origen === 'delivery';
+
+        // ✅ Para delivery, si el nuevo estado es 'listo'
+        if (esDelivery && nuevoEstado === 'listo') {
+            router.patch(`/delivery/${pedido.id}/listo`, {}, {
+                onSuccess: () => {
+                    // ✅ ACTUALIZAR ESTADO LOCAL - REMOVER EL PEDIDO DE LA LISTA
+                    setPedidos(prev => prev.filter(p => p.id !== pedido.id));
+                    router.reload();
+                },
+                onError: (errors) => {
+                    console.log('❌ Error:', errors);
+                    alert('Error al marcar delivery como listo: ' + Object.values(errors).join(' '));
+                }
+            });
+            return;
+        }
+
+        // ✅ Para delivery, cambiar a 'preparando'
+        if (esDelivery && nuevoEstado === 'preparando') {
+            router.patch(`/delivery/${pedido.id}/cocina`, {}, {
+                onSuccess: () => {
+                    setPedidos(prev => prev.map(p =>
+                        p.id === pedido.id ? { ...p, estado: nuevoEstado } : p
+                    ));
+                    router.reload();
+                },
+                onError: (errors) => {
+                    console.log('❌ Error:', errors);
+                    alert('Error al enviar delivery a cocina: ' + Object.values(errors).join(' '));
+                }
+            });
+            return;
+        }
+
+        // ✅ Para pedidos de mesa (no delivery)
+        router.patch(`/pedidos/${pedido.id}`, { estado: nuevoEstado }, {
             onSuccess: () => {
-                // Actualizar el estado local
-                setPedidos(pedidos.map(pedido =>
-                    pedido.id === id ? { ...pedido, estado: nuevoEstado as Pedido['estado'] } : pedido
-                ));
-
-                //  Si el pedido se marca como LISTO, notificar a la mesa
-                if (nuevoEstado === 'listo' && pedido?.mesa_id) {
+                // ✅ ACTUALIZAR ESTADO LOCAL - REMOVER SI ES 'listo'
+                if (nuevoEstado === 'listo') {
+                    setPedidos(prev => prev.filter(p => p.id !== pedido.id));
+                } else {
+                    setPedidos(prev => prev.map(p =>
+                        p.id === pedido.id ? { ...p, estado: nuevoEstado } : p
+                    ));
+                }
+                if (nuevoEstado === 'listo' && pedido.mesa_id) {
                     router.post(`/mesas/${pedido.mesa_id}/pedido-listo`, {}, {
-                        onSuccess: () => {
-                            // Recargar para actualizar el indicador en Mesas
-                            router.reload();
-                        }
+                        onSuccess: () => router.reload()
                     });
                 }
             },
@@ -109,7 +149,7 @@ export default function Produccion() {
     };
 
     //  Pedidos pendientes para notificaciones
-    const pedidosPendientes = pedidos.filter(p => p.estado === 'pendiente' || p.estado === 'preparando');
+    const pedidosPendientes = pedidos.filter(p => p.estado === 'preparando');
     const pendientes = pedidosPendientes.length;
 
     // Cerrar panel de notificaciones
@@ -127,23 +167,36 @@ export default function Produccion() {
     // Obtener pedidos por área (clasificación por productos)
     const pedidosPorArea = (area: string) => {
         return pedidosFiltrados.filter(p => {
+
+            if (p.tipo_origen === 'delivery' && !p.tomado) {
+                return false;
+            }
+
+
+            if (p.tipo_origen === 'delivery' && p.tomado) {
+                return area === 'cocina';
+            }
+
+
+            if (!p.productos || p.productos.length === 0) return false;
+
             const tieneCocina = p.productos.some(prod =>
-                ['Croissant', 'Sandwich', 'Waffles', 'Pan'].some(nombre =>
+                ['Croissant', 'Sandwich', 'Waffles', 'Pan', 'Hamburguesa', 'Pollo'].some(nombre =>
                     prod.nombre.includes(nombre)
                 )
             );
             const tieneBar = p.productos.some(prod =>
-                ['Cappuccino', 'Latte', 'Frappé', 'Café', 'Matcha', 'Jugo'].some(nombre =>
+                ['Cappuccino', 'Latte', 'Frappé', 'Café', 'Matcha', 'Jugo', 'Chocolate', 'Té'].some(nombre =>
                     prod.nombre.includes(nombre)
                 )
             );
             const tieneHorno = p.productos.some(prod =>
-                ['Croissant', 'Muffin', 'Pan'].some(nombre =>
+                ['Croissant', 'Muffin', 'Pan', 'Bagel'].some(nombre =>
                     prod.nombre.includes(nombre)
                 )
             );
             const tienePostres = p.productos.some(prod =>
-                ['Cheesecake', 'Tiramisú', 'Brownie', 'Donut'].some(nombre =>
+                ['Cheesecake', 'Tiramisú', 'Brownie', 'Donut', 'Torta', 'Alfajor'].some(nombre =>
                     prod.nombre.includes(nombre)
                 )
             );
@@ -208,7 +261,10 @@ export default function Produccion() {
                                             pedidosPendientes.map((pedido) => (
                                                 <div
                                                     key={pedido.id}
-                                                    className="p-3 rounded-xl hover:bg-orange-50 transition border border-gray-100 mb-2 last:mb-0 hover:border-orange-200"
+                                                    className={`p-3 rounded-xl transition border mb-2 last:mb-0 ${pedido.estado === 'preparando'
+                                                        ? 'bg-blue-100 border-blue-400'
+                                                        : 'bg-white border-gray-100 hover:bg-orange-50 hover:border-orange-200'
+                                                        }`}
                                                 >
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex-1 min-w-0">
@@ -221,19 +277,28 @@ export default function Produccion() {
                                                                 </span>
                                                             </div>
                                                             <p className="text-sm font-medium text-[#2D1B1A] mt-1">
-                                                                🪑 Mesa {pedido.mesa?.numero || 'No asignada'} - {pedido.cliente}
+                                                                {pedido.tipo_origen === 'delivery' ? '🚚 Delivery' : `🪑 Mesa ${pedido.mesa?.numero || 'No asignada'}`} - {pedido.cliente}
                                                             </p>
                                                             <p className="text-xs text-gray-500 truncate">
-                                                                {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}
+                                                                {pedido.productos && pedido.productos.length > 0
+                                                                    ? pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')
+                                                                    : 'Cargando productos...'}
                                                             </p>
                                                         </div>
                                                         <button
                                                             onClick={() => {
-                                                                cambiarEstado(pedido.id, 'preparando');
+                                                                const ubicacion = pedido.tipo_origen === 'delivery' ? '🚚 Delivery' : `Mesa ${pedido.mesa?.numero || 'No asignada'}`;
+                                                                const confirmar = confirm(` Tomar pedido #${pedido.numero}\n\n${ubicacion}\nCliente: ${pedido.cliente}\nProductos: ${pedido.productos?.length || 0} items\n\n¿Confirmas que lo prepararás?`);
+                                                                if (confirmar) {
+                                                                    // ✅ Marcar como tomado para que aparezca en la categoría
+                                                                    setPedidos(prev => prev.map(p =>
+                                                                        p.id === pedido.id ? { ...p, tomado: true } : p
+                                                                    ));
+                                                                }
                                                             }}
-                                                            className="ml-2 px-3 py-1.5 bg-[#C9A96E] hover:bg-[#B8975D] text-white rounded-lg text-xs font-semibold transition whitespace-nowrap flex items-center gap-1"
+                                                            className="ml-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold transition whitespace-nowrap flex items-center gap-1"
                                                         >
-                                                            Tomar <ChevronRight className="w-3 h-3" />
+                                                            ⚡ Tomar
                                                         </button>
                                                     </div>
                                                 </div>
@@ -345,12 +410,31 @@ export default function Produccion() {
                             {pedidosPorArea('cocina').map((pedido) => {
                                 const estado = getEstadoConfig(pedido.estado);
                                 return (
-                                    <div key={pedido.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow-sm transition">
+                                    <div
+                                        key={pedido.id}
+                                        className={`flex items-center justify-between border-2 rounded-xl p-3 hover:shadow-sm transition ${pedido.estado === 'preparando' ? 'bg-blue-100 border-blue-600' :
+                                            pedido.estado === 'listo' ? 'bg-green-100 border-green-500' :
+                                                pedido.estado === 'pendiente' ? 'bg-orange-50 border-orange-300' :
+                                                    'bg-white border-gray-200'
+                                            }`}
+                                    >
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-xl">🍽️</div>
+                                            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-xl">
+                                                {pedido.tipo_origen === 'delivery' ? '🚚' : '🍽️'}
+                                            </div>
                                             <div>
-                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.numero} - {pedido.cliente}</h4>
-                                                <p className="text-gray-500 text-xs">Mesa {pedido.mesa?.numero || '-'} · {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}</p>
+                                                <h4 className="font-bold text-sm text-[#2D1B1A]">
+                                                    {pedido.numero} - {pedido.cliente}
+                                                    {pedido.tipo_origen === 'delivery' && (
+                                                        <span className="text-xs font-normal text-blue-600 ml-1">🚚 Delivery</span>
+                                                    )}
+                                                </h4>
+                                                <p className="text-gray-500 text-xs">
+                                                    {pedido.tipo_origen === 'delivery'
+                                                        ? '🚚 Pedido a domicilio'
+                                                        : `🪑 Mesa ${pedido.mesa?.numero || '-'}`
+                                                    } · {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}
+                                                </p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -359,7 +443,7 @@ export default function Produccion() {
                                             </span>
                                             {pedido.estado === 'pendiente' && (
                                                 <button
-                                                    onClick={() => cambiarEstado(pedido.id, 'preparando')}
+                                                    onClick={() => cambiarEstado(pedido, 'preparando')}
                                                     className="text-blue-500 hover:text-blue-700 text-xs font-medium"
                                                 >
                                                     Prep.
@@ -367,7 +451,16 @@ export default function Produccion() {
                                             )}
                                             {pedido.estado === 'preparando' && (
                                                 <button
-                                                    onClick={() => cambiarEstado(pedido.id, 'listo')}
+                                                    onClick={() => {
+                                                        const esDelivery = pedido.tipo_origen === 'delivery';
+                                                        const mensaje = esDelivery
+                                                            ? `✅ Marcar como listo\n\n🚚 Delivery - ${pedido.cliente}\nProductos: ${pedido.productos?.length || 0} items\n\n¿Ya está listo para entregar?`
+                                                            : `✅ Marcar como listo\n\nMesa: ${pedido.mesa?.numero || 'No asignada'}\nCliente: ${pedido.cliente}\n\n¿Ya está listo para entregar?`;
+
+                                                        if (confirm(mensaje)) {
+                                                            cambiarEstado(pedido, 'listo');
+                                                        }
+                                                    }}
                                                     className="text-green-500 hover:text-green-700 text-xs font-medium"
                                                 >
                                                     Listo
@@ -412,7 +505,14 @@ export default function Produccion() {
                             {pedidosPorArea('bar').map((pedido) => {
                                 const estado = getEstadoConfig(pedido.estado);
                                 return (
-                                    <div key={pedido.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow-sm transition">
+                                    <div
+                                        key={pedido.id}
+                                        className={`flex items-center justify-between border-2 rounded-xl p-3 hover:shadow-sm transition ${pedido.estado === 'preparando' ? 'border-blue-600 bg-blue-50' :
+                                            pedido.estado === 'listo' ? 'border-green-500 bg-green-50' :
+                                                pedido.estado === 'pendiente' ? 'border-orange-300 bg-orange-50' :
+                                                    'border-gray-200 bg-white'
+                                            }`}
+                                    >
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl">☕</div>
                                             <div>
@@ -426,7 +526,16 @@ export default function Produccion() {
                                             </span>
                                             {pedido.estado === 'pendiente' && (
                                                 <button
-                                                    onClick={() => cambiarEstado(pedido.id, 'preparando')}
+                                                    onClick={() => {
+                                                        const esDelivery = pedido.tipo_origen === 'delivery';
+                                                        const mensaje = esDelivery
+                                                            ? `👨‍🍳 Tomar pedido\n\n🚚 Delivery - ${pedido.cliente}\nProductos: ${pedido.productos?.length || 0} items\n\n¿Confirmas que lo prepararás?`
+                                                            : `👨‍🍳 Tomar pedido\n\nMesa: ${pedido.mesa?.numero || 'No asignada'}\nCliente: ${pedido.cliente}\nProductos: ${pedido.productos?.length || 0} items\n\n¿Confirmas que lo prepararás?`;
+
+                                                        if (confirm(mensaje)) {
+                                                            cambiarEstado(pedido, 'preparando');
+                                                        }
+                                                    }}
                                                     className="text-blue-500 hover:text-blue-700 text-xs font-medium"
                                                 >
                                                     Prep.
@@ -434,7 +543,7 @@ export default function Produccion() {
                                             )}
                                             {pedido.estado === 'preparando' && (
                                                 <button
-                                                    onClick={() => cambiarEstado(pedido.id, 'listo')}
+                                                    onClick={() => cambiarEstado(pedido, 'listo')}
                                                     className="text-green-500 hover:text-green-700 text-xs font-medium"
                                                 >
                                                     Listo
@@ -493,7 +602,7 @@ export default function Produccion() {
                                             </span>
                                             {pedido.estado === 'pendiente' && (
                                                 <button
-                                                    onClick={() => cambiarEstado(pedido.id, 'preparando')}
+                                                    onClick={() => cambiarEstado(pedido, 'preparando')}
                                                     className="text-blue-500 hover:text-blue-700 text-xs font-medium"
                                                 >
                                                     Iniciar
@@ -501,7 +610,7 @@ export default function Produccion() {
                                             )}
                                             {pedido.estado === 'preparando' && (
                                                 <button
-                                                    onClick={() => cambiarEstado(pedido.id, 'listo')}
+                                                    onClick={() => cambiarEstado(pedido, 'listo')}
                                                     className="text-green-500 hover:text-green-700 text-xs font-medium"
                                                 >
                                                     Listo
@@ -564,7 +673,7 @@ export default function Produccion() {
                                             </span>
                                             {pedido.estado === 'pendiente' && (
                                                 <button
-                                                    onClick={() => cambiarEstado(pedido.id, 'preparando')}
+                                                    onClick={() => cambiarEstado(pedido, 'preparando')}
                                                     className="text-blue-500 hover:text-blue-700 text-xs font-medium"
                                                 >
                                                     Prep.
@@ -572,7 +681,7 @@ export default function Produccion() {
                                             )}
                                             {pedido.estado === 'preparando' && (
                                                 <button
-                                                    onClick={() => cambiarEstado(pedido.id, 'listo')}
+                                                    onClick={() => cambiarEstado(pedido, 'listo')}
                                                     className="text-green-500 hover:text-green-700 text-xs font-medium"
                                                 >
                                                     Listo

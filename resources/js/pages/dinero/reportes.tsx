@@ -1,8 +1,8 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { 
-    Download, 
-    FileSpreadsheet, 
+import {
+    Download,
+    FileSpreadsheet,
     Printer,
     TrendingUp,
     TrendingDown,
@@ -24,6 +24,13 @@ interface VentaDiaria {
     gastos: number;
     ganancia: number;
 }
+interface VentaDetalle {
+    fecha: string;
+    mesa: string;
+    producto: string;
+    total: number;
+    metodo_pago: string;
+}
 
 interface ProductoVendido {
     nombre: string;
@@ -37,42 +44,66 @@ interface MetodoPago {
     porcentaje?: number;
 }
 
+interface TicketMesa {
+    mesa: string;
+    tickets: number;
+}
+
 export default function Reportes() {
-    const [fechaInicio, setFechaInicio] = useState('');
-    const [fechaFin, setFechaFin] = useState('');
+    // Recibir datos del backend
+    const { props } = usePage();
+    const {
+        resumen: resumenData = {
+            ventasDia: 0,
+            ventasCambio: 0,
+            clientes: 0,
+            clientesNuevos: 0,
+            deliverys: 0,
+            deliverysEnRuta: 0,
+            gananciaNeta: 0,
+            gananciaCambio: 0,
+            ticketsHoy: 0,
+            mesasOcupadas: 0,
+            mesasLibres: 0,
+            totalMesas: 0,
+            totalCobradoHoy: 0,
+            cajaAbierta: false,
+            cajaEmpleado: null,
+        },
+        ventasDiarias: ventasDiariasData = [],
+        ventasDelDiaDetalle: ventasDelDiaDetalleData = [],
+        productosMasVendidos: productosMasVendidosData = [],
+        metodosPago: metodosPagoData = [],
+        totales: totalesData = {
+            totalVentas: 0,
+            totalTickets: 0,
+            totalGastos: 0,
+            totalGanancia: 0,
+            ticketPromedio: 0,
+            margenGanancia: 0,
+        },
+        ventasPorTipo: ventasPorTipoData = [],
+        ticketsPorMesa: ticketsPorMesaData = [],
+        estadoMesas: estadoMesasData = { total: 0, ocupadas: 0, libres: 0 },
+        fechas: fechasData = { inicio: '', fin: '' },
+        error = null,
+    } = props as any;
 
-    const resumen = {
-        ventasDia: 4820,
-        ventasCambio: 12,
-        clientes: 128,
-        clientesNuevos: 8,
-        deliverys: 36,
-        deliverysEnRuta: 7,
-        gananciaNeta: 1540,
-        gananciaCambio: 15,
-    };
+    const [fechaInicio, setFechaInicio] = useState(fechasData.inicio || '');
+    const [fechaFin, setFechaFin] = useState(fechasData.fin || '');
 
-    const ventasDiarias: VentaDiaria[] = [
-        { fecha: '23/06/2026', tickets: 128, ventas: 4820, gastos: 1240, ganancia: 3580 },
-        { fecha: '22/06/2026', tickets: 115, ventas: 4120, gastos: 1050, ganancia: 3070 },
-        { fecha: '21/06/2026', tickets: 106, ventas: 3890, gastos: 980, ganancia: 2910 },
-        { fecha: '20/06/2026', tickets: 98, ventas: 3560, gastos: 920, ganancia: 2640 },
-        { fecha: '19/06/2026', tickets: 87, ventas: 3210, gastos: 850, ganancia: 2360 },
+    // Usar datos del backend o datos por defecto
+    const resumen = resumenData;
+    const ventasDiarias: VentaDiaria[] = ventasDiariasData.length > 0 ? ventasDiariasData : [
+        { fecha: 'Sin datos', tickets: 0, ventas: 0, gastos: 0, ganancia: 0 }
     ];
-
-    const productosMasVendidos: ProductoVendido[] = [
-        { nombre: 'Café Americano', cantidad: 56, icono: '☕' },
-        { nombre: 'Cappuccino', cantidad: 44, icono: '☕' },
-        { nombre: 'Cheesecake', cantidad: 31, icono: '🍰' },
-        { nombre: 'Latte', cantidad: 28, icono: '☕' },
-        { nombre: 'Croissant', cantidad: 22, icono: '🥐' },
+    const productosMasVendidos = productosMasVendidosData.length > 0 ? productosMasVendidosData : [
+        { nombre: 'Sin datos', cantidad: 0, icono: '📊' }
     ];
-
-    const metodosPago: MetodoPago[] = [
-        { metodo: 'Efectivo', total: 2100, porcentaje: 44 },
-        { metodo: 'Tarjeta', total: 1820, porcentaje: 38 },
-        { metodo: 'Yape / Plin', total: 900, porcentaje: 18 },
+    const metodosPago = metodosPagoData.length > 0 ? metodosPagoData : [
+        { metodo: 'Sin datos', total: 0, porcentaje: 0 }
     ];
+    const totales = totalesData;
 
     const formatCurrency = (amount: number): string => {
         return `S/ ${amount.toLocaleString('es-PE')}`;
@@ -82,19 +113,20 @@ export default function Reportes() {
         return num.toLocaleString('es-PE');
     };
 
-    const totalVentas = ventasDiarias.reduce((sum, v) => sum + v.ventas, 0);
-    const totalGastos = ventasDiarias.reduce((sum, v) => sum + v.gastos, 0);
-    const totalGanancia = ventasDiarias.reduce((sum, v) => sum + v.ganancia, 0);
+    const totalVentas = ventasDiarias.reduce((sum: number, v) => sum + v.ventas, 0);
+    const totalGastos = ventasDiarias.reduce((sum: number, v) => sum + v.gastos, 0);
+    const totalGanancia = ventasDiarias.reduce((sum: number, v) => sum + v.ganancia, 0);
+    const totalTickets = ventasDiarias.reduce((sum: number, v) => sum + v.tickets, 0);
 
     return (
         <>
             <Head title="Reportes - Dolce Cafe" />
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-3xl p-6 bg-[#FBF3E7]">
-                
+
                 {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-[#2D1B1A]"> Reportes Generales</h1>
+                        <h1 className="text-3xl font-bold text-[#2D1B1A]">📊 Reportes Generales</h1>
                         <p className="text-[#5A3D2B] text-sm mt-1">Análisis de ventas, clientes y rendimiento</p>
                     </div>
                     <div className="flex flex-wrap gap-3">
@@ -137,7 +169,7 @@ export default function Reportes() {
 
                 {/* ===== TARJETAS DE RESUMEN ===== */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-                    
+
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8] hover:shadow-md transition">
                         <div className="flex items-center justify-between">
                             <div>
@@ -158,16 +190,16 @@ export default function Reportes() {
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8] hover:shadow-md transition">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-[#5A3D2B] font-medium">Clientes atendidos</p>
-                                <h2 className="text-3xl font-bold text-[#2D1B1A] mt-1">{formatNumber(resumen.clientes)}</h2>
+                                <p className="text-sm text-[#5A3D2B] font-medium">Tickets de hoy</p>
+                                <h2 className="text-3xl font-bold text-[#2D1B1A] mt-1">{formatNumber(resumen.ticketsHoy || 0)}</h2>
                             </div>
                             <div className="w-12 h-12 rounded-xl bg-[#F3E1C8] flex items-center justify-center">
-                                <Users className="w-6 h-6 text-[#8A5A2B]" />
+                                <Coffee className="w-6 h-6 text-[#8A5A2B]" />
                             </div>
                         </div>
                         <div className="flex items-center gap-1 mt-3">
-                            <span className="text-sm text-green-600 font-medium">+{resumen.clientesNuevos} nuevos</span>
-                            <span className="text-sm text-[#5A3D2B]/60">hoy</span>
+                            <span className="text-sm text-[#8A5A2B] font-medium">{resumen.mesasOcupadas || 0} mesas ocupadas</span>
+                            <span className="text-sm text-[#5A3D2B]/60">de {resumen.totalMesas || 0}</span>
                         </div>
                     </div>
 
@@ -182,7 +214,7 @@ export default function Reportes() {
                             </div>
                         </div>
                         <div className="flex items-center gap-1 mt-3">
-                            <span className="text-sm text-[#8A5A2B] font-medium">{resumen.deliverysEnRuta} en ruta</span>
+                            <span className="text-sm text-[#8A5A2B] font-medium">{resumen.deliverysEnRuta || 0} en ruta</span>
                             <span className="text-sm text-[#5A3D2B]/60">ahora</span>
                         </div>
                     </div>
@@ -190,17 +222,20 @@ export default function Reportes() {
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8] hover:shadow-md transition">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-[#5A3D2B] font-medium">Ganancia neta</p>
-                                <h2 className="text-3xl font-bold text-[#2D1B1A] mt-1">{formatCurrency(resumen.gananciaNeta)}</h2>
+                                <p className="text-sm text-[#5A3D2B] font-medium">Total cobrado hoy</p>
+                                <h2 className="text-3xl font-bold text-[#2D1B1A] mt-1">{formatCurrency(resumen.totalCobradoHoy || 0)}</h2>
                             </div>
                             <div className="w-12 h-12 rounded-xl bg-[#F3E1C8] flex items-center justify-center">
-                                <TrendingUp className="w-6 h-6 text-[#8A5A2B]" />
+                                <CreditCard className="w-6 h-6 text-[#8A5A2B]" />
                             </div>
                         </div>
                         <div className="flex items-center gap-1 mt-3">
-                            <TrendingUp className="w-4 h-4 text-green-600" />
-                            <span className="text-sm text-green-600 font-medium">+{resumen.gananciaCambio}%</span>
-                            <span className="text-sm text-[#5A3D2B]/60">este mes</span>
+                            <span className={`text-sm font-medium ${resumen.cajaAbierta ? 'text-green-600' : 'text-red-600'}`}>
+                                {resumen.cajaAbierta ? '✅ Caja abierta' : '❌ Caja cerrada'}
+                            </span>
+                            {resumen.cajaEmpleado && (
+                                <span className="text-sm text-[#5A3D2B]/60">· {resumen.cajaEmpleado}</span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -210,9 +245,12 @@ export default function Reportes() {
                     <div className="flex flex-wrap justify-between items-center mb-5">
                         <h2 className="text-xl font-bold text-[#2D1B1A]">📋 Resumen de Ventas</h2>
                         <div className="flex items-center gap-4 text-sm">
-                            <span className="text-[#5A3D2B]">Total: <span className="font-semibold text-[#2D1B1A]">{formatCurrency(totalVentas)}</span></span>
-                            <span className="text-[#5A3D2B]">Gastos: <span className="font-semibold text-red-600">{formatCurrency(totalGastos)}</span></span>
-                            <span className="text-[#5A3D2B]">Ganancia: <span className="font-semibold text-green-600">{formatCurrency(totalGanancia)}</span></span>
+                            <span className="text-[#5A3D2B]">
+                                Total del día: <span className="font-semibold text-[#2D1B1A]">{formatCurrency(resumen.ventasDia || 0)}</span>
+                            </span>
+                            <span className="text-[#5A3D2B]">
+                                Tickets: <span className="font-semibold text-[#2D1B1A]">{ventasDelDiaDetalleData.length}</span>
+                            </span>
                         </div>
                     </div>
                     <div className="overflow-x-auto">
@@ -220,37 +258,34 @@ export default function Reportes() {
                             <thead>
                                 <tr className="border-b border-[#F3E1C8] bg-[#FBF3E7]/50">
                                     <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Fecha</th>
-                                    <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Tickets</th>
-                                    <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Ventas</th>
-                                    <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Gastos</th>
-                                    <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Ganancia</th>
-                                    <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Rendimiento</th>
+                                    <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Nro. Mesa</th>
+                                    <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Producto</th>
+                                    <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Total</th>
+                                    <th className="text-left py-3 px-4 text-xs font-medium text-[#5A3D2B] uppercase tracking-wider">Método de Pago</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {ventasDiarias.map((venta, index) => {
-                                    const rendimiento = ((venta.ganancia / venta.ventas) * 100);
-                                    return (
+                                {ventasDelDiaDetalleData.length > 0 ? (
+                                    ventasDelDiaDetalleData.map((venta: VentaDetalle, index: number) => (
                                         <tr key={index} className="border-b border-[#FBF3E7] hover:bg-[#FBF3E7]/50 transition">
                                             <td className="py-3 px-4 text-sm font-medium text-[#2D1B1A]">{venta.fecha}</td>
-                                            <td className="py-3 px-4 text-sm text-[#5A3D2B]">{formatNumber(venta.tickets)}</td>
-                                            <td className="py-3 px-4 text-sm font-medium text-[#2D1B1A]">{formatCurrency(venta.ventas)}</td>
-                                            <td className="py-3 px-4 text-sm text-red-600">{formatCurrency(venta.gastos)}</td>
-                                            <td className="py-3 px-4 text-sm font-semibold text-green-600">{formatCurrency(venta.ganancia)}</td>
+                                            <td className="py-3 px-4 text-sm text-[#5A3D2B]">{venta.mesa}</td>
+                                            <td className="py-3 px-4 text-sm text-[#5A3D2B]">{venta.producto}</td>
+                                            <td className="py-3 px-4 text-sm font-semibold text-[#2D1B1A]">{formatCurrency(venta.total)}</td>
                                             <td className="py-3 px-4 text-sm">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-16 h-1.5 bg-[#F3E1C8] rounded-full overflow-hidden">
-                                                        <div 
-                                                            className="h-full bg-[#C9A96E] rounded-full" 
-                                                            style={{ width: `${Math.min(rendimiento, 100)}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-xs font-medium text-[#5A3D2B]">{rendimiento.toFixed(0)}%</span>
-                                                </div>
+                                                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#F3E1C8] text-[#8A5A2B]">
+                                                    {venta.metodo_pago}
+                                                </span>
                                             </td>
                                         </tr>
-                                    );
-                                })}
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={5} className="text-center py-8 text-gray-400 text-sm">
+                                            Sin ventas registradas hoy
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -258,14 +293,14 @@ export default function Reportes() {
 
                 {/* ===== DOS COLUMNAS ===== */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    
+
                     {/* Productos más vendidos */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8]">
                         <h2 className="text-xl font-bold text-[#2D1B1A] mb-5">🏆 Productos más vendidos</h2>
                         <div className="space-y-3">
-                            {productosMasVendidos.map((producto, index) => {
+                            {productosMasVendidos.map((producto: ProductoVendido, index: number) => {
                                 const maxVentas = productosMasVendidos[0]?.cantidad || 1;
-                                const porcentaje = (producto.cantidad / maxVentas) * 100;
+                                const porcentaje = maxVentas > 0 ? (producto.cantidad / maxVentas) * 100 : 0;
                                 return (
                                     <div key={index} className="flex items-center gap-3">
                                         <span className="text-2xl">{producto.icono || '☕'}</span>
@@ -275,7 +310,7 @@ export default function Reportes() {
                                                 <span className="text-[#C9A96E] font-semibold">{producto.cantidad}</span>
                                             </div>
                                             <div className="w-full h-1.5 bg-[#F3E1C8] rounded-full overflow-hidden">
-                                                <div 
+                                                <div
                                                     className="h-full bg-[#C9A96E] rounded-full transition-all duration-500"
                                                     style={{ width: `${porcentaje}%` }}
                                                 />
@@ -291,7 +326,7 @@ export default function Reportes() {
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8]">
                         <h2 className="text-xl font-bold text-[#2D1B1A] mb-5">💳 Métodos de pago</h2>
                         <div className="space-y-4">
-                            {metodosPago.map((metodo, index) => (
+                            {metodosPago.map((metodo: MetodoPago, index: number) => (
                                 <div key={index}>
                                     <div className="flex justify-between text-sm mb-1">
                                         <span className="font-medium text-[#2D1B1A]">{metodo.metodo}</span>
@@ -299,12 +334,12 @@ export default function Reportes() {
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <div className="flex-1 h-2 bg-[#F3E1C8] rounded-full overflow-hidden">
-                                            <div 
+                                            <div
                                                 className="h-full bg-[#C9A96E] rounded-full transition-all duration-500"
-                                                style={{ width: `${metodo.porcentaje}%` }}
+                                                style={{ width: `${metodo.porcentaje || 0}%` }}
                                             />
                                         </div>
-                                        <span className="text-xs font-medium text-[#5A3D2B]">{metodo.porcentaje}%</span>
+                                        <span className="text-xs font-medium text-[#5A3D2B]">{metodo.porcentaje || 0}%</span>
                                     </div>
                                 </div>
                             ))}
@@ -312,7 +347,7 @@ export default function Reportes() {
                         <div className="mt-4 pt-4 border-t border-[#F3E1C8]">
                             <div className="flex justify-between text-sm">
                                 <span className="text-[#5A3D2B]">Total ingresos</span>
-                                <span className="font-bold text-[#2D1B1A]">{formatCurrency(metodosPago.reduce((sum, m) => sum + m.total, 0))}</span>
+                                <span className="font-bold text-[#2D1B1A]">{formatCurrency(metodosPago.reduce((sum: number, m: MetodoPago) => sum + m.total, 0))}</span>
                             </div>
                         </div>
                     </div>
@@ -322,20 +357,36 @@ export default function Reportes() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-[#2D1B1A] rounded-2xl p-5 text-white">
                         <p className="text-white/60 text-sm">Ventas totales</p>
-                        <p className="text-3xl font-bold mt-1">{formatCurrency(totalVentas)}</p>
-                        <p className="text-white/40 text-xs mt-1">Últimos 5 días</p>
+                        <p className="text-3xl font-bold mt-1">{formatCurrency(totales.totalVentas || 0)}</p>
+                        <p className="text-white/40 text-xs mt-1">Período seleccionado</p>
                     </div>
                     <div className="bg-[#C9A96E] rounded-2xl p-5 text-[#2D1B1A]">
                         <p className="text-[#2D1B1A]/60 text-sm">Ticket promedio</p>
-                        <p className="text-3xl font-bold mt-1">{formatCurrency(totalVentas / ventasDiarias.reduce((sum, v) => sum + v.tickets, 0))}</p>
+                        <p className="text-3xl font-bold mt-1">{formatCurrency(totales.ticketPromedio || 0)}</p>
                         <p className="text-[#2D1B1A]/40 text-xs mt-1">Por pedido</p>
                     </div>
                     <div className="bg-green-700 rounded-2xl p-5 text-white">
                         <p className="text-white/60 text-sm">Ganancia total</p>
-                        <p className="text-3xl font-bold mt-1">{formatCurrency(totalGanancia)}</p>
-                        <p className="text-white/40 text-xs mt-1">Margen: {((totalGanancia / totalVentas) * 100).toFixed(1)}%</p>
+                        <p className="text-3xl font-bold mt-1">{formatCurrency(totales.totalGanancia || 0)}</p>
+                        <p className="text-white/40 text-xs mt-1">Margen: {totales.margenGanancia || 0}%</p>
                     </div>
                 </div>
+
+                {/* ===== TICKETS POR MESA ===== */}
+                {ticketsPorMesaData.length > 0 && (
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8]">
+                        <h2 className="text-xl font-bold text-[#2D1B1A] mb-5">🪑 Tickets por Mesa</h2>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            {ticketsPorMesaData.map((item: TicketMesa, index: number) => (
+                                <div key={index} className="bg-[#FBF7F0] rounded-xl p-3 text-center border border-[#F3E1C8]">
+                                    <p className="text-xs text-[#8D6B53] font-medium">Mesa {item.mesa}</p>
+                                    <p className="text-2xl font-bold text-[#2D1B1A]">{item.tickets}</p>
+                                    <p className="text-[10px] text-[#8D6B53]">tickets</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     );

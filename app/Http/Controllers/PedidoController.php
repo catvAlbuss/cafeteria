@@ -6,32 +6,78 @@ use App\Models\Pedido;
 use App\Models\Mesa;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Models\Plato; 
+use App\Models\Delivery;
 
 class PedidoController extends Controller
 {
-    //  Listar todos los pedidos
-    public function index()
+    public function index(Request $request)
     {
-        $pedidos = Pedido::with('mesa')->orderBy('created_at', 'desc')->get();
-        return Inertia::render('pedidos/index', [
-            'pedidos' => $pedidos
-        ]);
-    }
-
-    //  Listar pedidos para producción (pendientes y preparando)
-    public function produccion()
-    {
+        $mesaNumero = $request->query('mesa');
+        $mesaInfo = $mesaNumero ? Mesa::where('numero', $mesaNumero)->first() : null;
+        $platos = Plato::all();
         $pedidos = Pedido::with('mesa')
-            ->whereIn('estado', ['pendiente', 'preparando'])
-            ->orderBy('created_at', 'asc')
+            ->orderBy('created_at', 'desc')
+            ->limit(50) 
             ->get();
-        
-        return Inertia::render('inventario/produccion', [
-            'pedidos' => $pedidos
+
+        return Inertia::render('dinero/ventas', [
+            'platos' => $platos,       
+            'mesas' => Mesa::all(),     
+            'mesaInfo' => $mesaInfo,    
+            'pedidos' => $pedidos,        
         ]);
     }
 
-    //  Listar pedidos para caja (listos)
+public function produccion()
+{
+    // Pedidos de mesas
+    $pedidos = Pedido::with('mesa')
+        ->whereIn('estado', ['pendiente', 'preparando'])
+        ->orderBy('created_at', 'asc')
+        ->get()
+        ->map(function ($pedido) {
+            $pedido->tipo_origen = 'mesa';
+            return $pedido;
+        });
+
+    // Pedidos de delivery
+    $deliveries = Delivery::whereIn('estado_delivery', ['preparando', 'listo_para_entregar'])
+    ->orderBy('created_at', 'asc')
+    ->get()
+    ->map(function ($delivery) {
+        $p = new \stdClass();
+        $p->id = $delivery->id;
+        $p->numero = $delivery->codigo;
+        $p->mesa_id = null;
+        $p->mesa = null;
+        $p->cliente = $delivery->cliente;
+        $p->productos = is_array($delivery->productos)
+            ? $delivery->productos
+            : (json_decode($delivery->productos, true) ?? []);
+        $p->total = $delivery->total;
+        // El tablero de Producción solo entiende pendiente/preparando/listo,
+        // así que "listo_para_entregar" se muestra como "listo" ahí.
+        $p->estado = $delivery->estado_delivery === 'listo_para_entregar' ? 'listo' : $delivery->estado_delivery;
+        $p->tipo = 'delivery';
+        $p->tipo_origen = 'delivery';
+        $p->created_at = $delivery->created_at;
+        $p->hora_pedido = $delivery->created_at;
+        $p->observaciones = null;
+        $p->hora_entrega = null;
+        return $p;
+    });
+
+    // Unir y ordenar
+    $todos = collect($pedidos)->concat($deliveries)
+        ->sortBy('created_at')
+        ->values();
+
+    return Inertia::render('inventario/produccion', [
+        'pedidos' => $todos
+    ]);
+}
+
     public function caja()
     {
         $pedidos = Pedido::with('mesa')
@@ -44,33 +90,43 @@ class PedidoController extends Controller
         ]);
     }
 
-    //  Crear un nuevo pedido (desde Ventas)
     public function store(Request $request)
     {
         $validated = $request->validate([
             'mesa_id' => 'nullable|exists:mesas,id',
+            'mesa' => 'nullable|string',
             'cliente' => 'nullable|string|max:255',
             'productos' => 'required|array',
             'total' => 'required|numeric|min:0',
+            'metodo_pago' => 'nullable|string',
+            'tipo' => 'nullable|string',
+            'estado' => 'nullable|string|in:pendiente,preparando,listo,entregado,pagado,cancelado',
             'observaciones' => 'nullable|string',
         ]);
+
+        $estado = $validated['estado'] ?? 'pendiente';
 
         $pedido = Pedido::create([
             'numero' => Pedido::generarNumero(),
             'mesa_id' => $validated['mesa_id'] ?? null,
+            'mesa' => $validated['mesa'] ?? null,
             'cliente' => $validated['cliente'] ?? 'Anónimo',
             'productos' => $validated['productos'],
             'total' => $validated['total'],
-            'estado' => 'pendiente',
+            'metodo_pago' => $validated['metodo_pago'] ?? null,
+            'tipo' => $validated['tipo'] ?? 'mesa',
+            'estado' => $estado, 
             'observaciones' => $validated['observaciones'] ?? null,
             'hora_pedido' => now(),
         ]);
 
-        // Actualizar estado de la mesa
-        if ($pedido->mesa_id) {
+        if ($estado === 'pendiente' && $pedido->mesa_id) {
             $mesa = Mesa::find($pedido->mesa_id);
             if ($mesa && $mesa->estado !== 'ocupada') {
                 $mesa->estado = 'ocupada';
+                if (!$mesa->mesero) {
+                    $mesa->mesero = auth()->user()->name ?? null;
+                }
                 $mesa->save();
             }
         }
@@ -78,7 +134,6 @@ class PedidoController extends Controller
         return redirect()->back()->with('success', 'Pedido creado correctamente');
     }
 
-    //  Ver detalle de un pedido
     public function show(Pedido $pedido)
     {
         return Inertia::render('pedidos/show', [
@@ -86,7 +141,6 @@ class PedidoController extends Controller
         ]);
     }
 
-    //  Cambiar estado de un pedido
     public function update(Request $request, Pedido $pedido)
     {
         $validated = $request->validate([
@@ -104,7 +158,37 @@ class PedidoController extends Controller
         return redirect()->back()->with('success', 'Estado del pedido actualizado');
     }
 
-    //  Listar pedidos pendientes (para Producción)
+    // ✅ NUEVO: Marcar pedido como listo (para cocina)
+    public function marcarListo($id)
+    {
+        $pedido = Pedido::findOrFail($id);
+        $pedido->estado = 'listo';
+        
+        if ($pedido->tipo === 'delivery') {
+            $pedido->estado_delivery = 'listo_para_entregar';
+        }
+        
+        $pedido->save();
+
+        return redirect()->back()->with('success', 'Pedido marcado como listo');
+    }
+
+    // ✅ NUEVO: Enviar delivery a cocina
+    public function enviarACocina($id)
+    {
+        $pedido = Pedido::findOrFail($id);
+        
+        if ($pedido->tipo === 'delivery' && $pedido->estado === 'pendiente') {
+            $pedido->estado = 'preparando';
+            $pedido->estado_delivery = 'preparando';
+            $pedido->save();
+            
+            return redirect()->back()->with('success', 'Pedido enviado a cocina');
+        }
+        
+        return redirect()->back()->with('error', 'No se puede enviar este pedido a cocina');
+    }
+
     public function pendientes()
     {
         $pedidos = Pedido::with('mesa')
@@ -115,7 +199,6 @@ class PedidoController extends Controller
         return response()->json($pedidos);
     }
 
-    //  Listar pedidos listos para cobrar (para Caja)
     public function listosParaCobrar()
     {
         $pedidos = Pedido::with('mesa')
@@ -126,7 +209,6 @@ class PedidoController extends Controller
         return response()->json($pedidos);
     }
 
-    //  Cobrar un pedido (cambiar a pagado)
     public function cobrar(Request $request, Pedido $pedido)
     {
         $validated = $request->validate([
@@ -137,11 +219,13 @@ class PedidoController extends Controller
         $pedido->estado = 'pagado';
         $pedido->save();
 
-        // Si el pedido tiene mesa, liberarla
         if ($pedido->mesa_id) {
             $mesa = Mesa::find($pedido->mesa_id);
             if ($mesa && $mesa->estado === 'ocupada') {
                 $mesa->estado = 'libre';
+                $mesa->mesero = null;
+                $mesa->cliente = null;
+                $mesa->personas = null;
                 $mesa->save();
             }
         }
@@ -149,7 +233,6 @@ class PedidoController extends Controller
         return redirect()->back()->with('success', 'Pedido cobrado correctamente');
     }
 
-    //  Eliminar pedido
     public function destroy(Pedido $pedido)
     {
         $pedido->delete();
