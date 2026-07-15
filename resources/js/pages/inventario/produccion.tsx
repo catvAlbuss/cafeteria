@@ -1,33 +1,34 @@
+// resources/js/Pages/inventario/produccion.tsx
+
 import { Head, usePage, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { useSedeChannel } from '@/hooks/useSedeChannel';
 import {
     Search,
-    Coffee,
-    UtensilsCrossed,
-    Flame,
-    Cake,
     Clock,
     CheckCircle,
     XCircle,
-    ArrowRight,
-    BarChart3,
     Bell,
-    Bike,
     ChevronRight,
+    Bike,
     Radio,
     Timer,
     Wifi,
+
 } from 'lucide-react';
+import {
+    agruparPedidosPorArea,
+    getEstadisticasPorArea,
+    getAreaConfig,
+    getAreaColor
+} from '@/utils/clasificarPedidos';
+import { toast } from 'sonner';
 
 interface Pedido {
     id: number;
     numero: string;
-    mesa_id: number | null;
-    mesa?: {
-        id: number;
-        numero: string;
-    } | null;
+    mesa_id?: number | null;
+    mesa?: { id?: number; numero: string } | null;
     cliente: string;
     productos: Array<{
         nombre: string;
@@ -36,42 +37,39 @@ interface Pedido {
         subtotal: number;
     }>;
     total: number;
-    estado: 'pendiente' | 'preparando' | 'listo' | 'entregado' | 'pagado' | 'cancelado';
-    observaciones: string | null;
-    hora_pedido: string;
-    hora_entrega: string | null;
-    created_at: string;
+    estado: string;
+    observaciones?: string | null;
+    modificado?: boolean;
+    hora_pedido?: string;
+    hora_entrega?: string | null;
+    created_at?: string;
     tipo_origen?: 'mesa' | 'delivery';
     tomado?: boolean;
+    area?: string;
 }
 
 export default function Produccion() {
-    //  Recibir pedidos desde el controlador
     const { pedidos: pedidosIniciales } = usePage().props as unknown as { pedidos: Pedido[] };
 
-    //  Estado - usar datos del controlador
     const [pedidos, setPedidos] = useState<Pedido[]>(pedidosIniciales || []);
-
     const [busqueda, setBusqueda] = useState('');
     const [filtroEstado, setFiltroEstado] = useState<string>('todas');
-
-    //  Estado de notificaciones
     const [notificacionesAbiertas, setNotificacionesAbiertas] = useState(false);
+    const [pendientes, setPendientes] = useState(0);
 
-    //  Configuración de estados
+    // Configuración de estados
     const getEstadoConfig = (estado: string) => {
         switch (estado) {
             case 'pendiente': return { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pendiente', icon: Clock };
             case 'preparando': return { bg: 'bg-orange-100', text: 'text-orange-700', label: 'En cocina', icon: Clock };
-            case 'listo_para_entregar': return { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Listo para enviar', icon: CheckCircle };
-            case 'en_ruta': return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'En ruta', icon: Bike };
+            case 'listo': return { bg: 'bg-green-100', text: 'text-green-600', label: 'Listo', icon: CheckCircle };
             case 'entregado': return { bg: 'bg-green-100', text: 'text-green-700', label: 'Entregado', icon: CheckCircle };
             case 'cancelado': return { bg: 'bg-red-100', text: 'text-red-700', label: 'Cancelado', icon: XCircle };
             default: return { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Desconocido', icon: XCircle };
         }
     };
 
-    //  Filtrar pedidos
+    // Filtrar pedidos
     const pedidosFiltrados = pedidos.filter(p => {
         const coincideBusqueda = p.cliente.toLowerCase().includes(busqueda.toLowerCase()) ||
             p.numero.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -80,13 +78,31 @@ export default function Produccion() {
         return coincideBusqueda && p.estado === filtroEstado;
     });
 
-    // Contar por estado
-    const contarPorEstado = (estado: string) => {
-        return pedidos.filter(p => p.estado === estado).length;
-    };
+    // Agrupar por área
+    const pedidosAgrupados = agruparPedidosPorArea(pedidosFiltrados);
+    const estadisticas = getEstadisticasPorArea(pedidosFiltrados);
 
-    // Cambiar estado de un pedido (conectado al controlador)
+    // Actualizar contador de pendientes
+    useEffect(() => {
+        const pendientesCount = pedidos.filter(p => p.estado === 'pendiente').length;
+        setPendientes(pendientesCount);
+    }, [pedidos]);
 
+    // Cerrar panel de notificaciones
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.notificaciones-container') && notificacionesAbiertas) {
+                setNotificacionesAbiertas(false);
+            }
+        };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, [notificacionesAbiertas]);
+
+    // ============================================================
+    // CAMBIAR ESTADO - VERSIÓN ORIGINAL (FUNCIONABA)
+    // ============================================================
     const cambiarEstado = (pedido: any, nuevoEstado: Pedido['estado']) => {
         if (!pedido || !pedido.id) {
             console.error('❌ Pedido sin ID:', pedido);
@@ -96,11 +112,10 @@ export default function Produccion() {
 
         const esDelivery = pedido.tipo_origen === 'delivery';
 
-        // ✅ Para delivery, si el nuevo estado es 'listo'
+        // Para delivery, si el nuevo estado es 'listo'
         if (esDelivery && nuevoEstado === 'listo') {
             router.patch(`/delivery/${pedido.id}/listo`, {}, {
                 onSuccess: () => {
-                    // ✅ ACTUALIZAR ESTADO LOCAL - REMOVER EL PEDIDO DE LA LISTA
                     setPedidos(prev => prev.filter(p => p.id !== pedido.id));
                     router.reload();
                 },
@@ -112,7 +127,7 @@ export default function Produccion() {
             return;
         }
 
-        // ✅ Para delivery, cambiar a 'preparando'
+        // Para delivery, cambiar a 'preparando'
         if (esDelivery && nuevoEstado === 'preparando') {
             router.patch(`/delivery/${pedido.id}/cocina`, {}, {
                 onSuccess: () => {
@@ -129,10 +144,9 @@ export default function Produccion() {
             return;
         }
 
-        // ✅ Para pedidos de mesa (no delivery)
+      
         router.patch(`/pedidos/${pedido.id}`, { estado: nuevoEstado }, {
             onSuccess: () => {
-                // ✅ ACTUALIZAR ESTADO LOCAL - REMOVER SI ES 'listo'
                 if (nuevoEstado === 'listo') {
                     setPedidos(prev => prev.filter(p => p.id !== pedido.id));
                 } else {
@@ -140,6 +154,7 @@ export default function Produccion() {
                         p.id === pedido.id ? { ...p, estado: nuevoEstado } : p
                     ));
                 }
+              
                 if (nuevoEstado === 'listo' && pedido.mesa_id) {
                     router.post(`/mesas/${pedido.mesa_id}/pedido-listo`, {}, {
                         onSuccess: () => router.reload()
@@ -148,6 +163,45 @@ export default function Produccion() {
             },
             onError: (errors) => {
                 alert('Error al cambiar estado: ' + Object.values(errors).join(' '));
+            }
+        });
+    };
+
+
+    // ============================================================
+    // TOMAR PEDIDO - NUEVA FUNCIÓN (SOLO PARA LA CAMPANITA)
+    // ============================================================
+    const tomarPedido = (pedido: Pedido) => {
+        if (!pedido || !pedido.id) {
+            toast.error('Error: Pedido sin identificar');
+            return;
+        }
+
+        const confirmar = confirm(
+            `📦 Tomar pedido #${pedido.numero}\n\n` +
+            `Cliente: ${pedido.cliente}\n` +
+            `Productos: ${pedido.productos?.length || 0} items\n\n` +
+            `¿Confirmas que lo prepararás?`
+        );
+
+        if (!confirmar) return;
+
+        router.patch(`/pedidos/${pedido.id}`, { estado: 'preparando' }, {
+            onSuccess: () => {
+                // Actualizar estado local
+                setPedidos(prev => prev.map(p =>
+                    p.id === pedido.id
+                        ? { ...p, estado: 'preparando', tomado: true }
+                        : p
+                ));
+
+                toast.success(`✅ Pedido #${pedido.numero} tomado - En preparación`);
+
+                // Cerrar notificaciones automáticamente
+                setNotificacionesAbiertas(false);
+            },
+            onError: (errors) => {
+                toast.error('Error al tomar pedido: ' + Object.values(errors).join(' '));
             }
         });
     };
@@ -169,12 +223,20 @@ export default function Produccion() {
         },
     });
 
+    // Función para contar pedidos por estado
+    const contarPorEstado = (estado: string) => {
+        return pedidosFiltrados.filter(p => p.estado === estado).length;
+    };
+
     const pedidosParaNotificar = pedidos
         .filter(p => ['pendiente', 'preparando'].includes(p.estado))
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    const pendientes = pedidosParaNotificar.length;
+        .sort((a, b) => {
+            const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return createdA - createdB;
+        });
     const pedidosUrgentes = pedidosParaNotificar.filter(p => {
-        const createdAt = new Date(p.created_at).getTime();
+        const createdAt = p.created_at ? new Date(p.created_at).getTime() : NaN;
         return Number.isFinite(createdAt) && Date.now() - createdAt > 10 * 60 * 1000;
     }).length;
     const eventosLivePreview = [
@@ -182,80 +244,19 @@ export default function Produccion() {
         { label: 'pedido.actualizado', description: 'Sincronizara cambios de estado' },
         { label: 'pedido.listo', description: 'Avisara a salon y caja' },
     ];
-
-    // Cerrar panel de notificaciones
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as HTMLElement;
-            if (!target.closest('.notificaciones-container') && notificacionesAbiertas) {
-                setNotificacionesAbiertas(false);
-            }
-        };
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, [notificacionesAbiertas]);
-
-    // Obtener pedidos por área (clasificación por productos)
-    const pedidosPorArea = (area: string) => {
-        return pedidosFiltrados.filter(p => {
-
-            if (p.tipo_origen === 'delivery' && !p.tomado) {
-                return false;
-            }
-
-
-            if (p.tipo_origen === 'delivery' && p.tomado) {
-                return area === 'cocina';
-            }
-
-
-            if (!p.productos || p.productos.length === 0) return false;
-
-            const tieneCocina = p.productos.some(prod =>
-                ['Croissant', 'Sandwich', 'Waffles', 'Pan', 'Hamburguesa', 'Pollo'].some(nombre =>
-                    prod.nombre.includes(nombre)
-                )
-            );
-            const tieneBar = p.productos.some(prod =>
-                ['Cappuccino', 'Latte', 'Frappé', 'Café', 'Matcha', 'Jugo', 'Chocolate', 'Té'].some(nombre =>
-                    prod.nombre.includes(nombre)
-                )
-            );
-            const tieneHorno = p.productos.some(prod =>
-                ['Croissant', 'Muffin', 'Pan', 'Bagel'].some(nombre =>
-                    prod.nombre.includes(nombre)
-                )
-            );
-            const tienePostres = p.productos.some(prod =>
-                ['Cheesecake', 'Tiramisú', 'Brownie', 'Donut', 'Torta', 'Alfajor'].some(nombre =>
-                    prod.nombre.includes(nombre)
-                )
-            );
-
-            switch (area) {
-                case 'cocina': return tieneCocina && !tieneHorno && !tienePostres;
-                case 'bar': return tieneBar;
-                case 'horno': return tieneHorno;
-                case 'postres': return tienePostres;
-                default: return true;
-            }
-        });
-    };
-
     return (
         <>
             <Head title="Producción" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4 bg-[#FBF7F0]">
 
                 {/* ===== TÍTULO Y CAMPANITA ===== */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-[#2D1B1A]"> Producción</h1>
+                        <h1 className="text-2xl font-bold text-[#2D1B1A]">🏭 Producción</h1>
                         <p className="text-[#5A3D2B] text-sm font-medium">Control de pedidos en cocina, bar, horno y postres</p>
                     </div>
-                    <div className="flex items-center gap-4">
-
-                        {/*  Campanita de notificaciones */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                        {/* Campanita de notificaciones */}
                         <div className="relative notificaciones-container">
                             <button
                                 onClick={() => setNotificacionesAbiertas(!notificacionesAbiertas)}
@@ -289,13 +290,12 @@ export default function Produccion() {
                                                 ✅ No hay pedidos pendientes
                                             </div>
                                         ) : (
-                                            pedidosParaNotificar.map((pedido) => (
+
+                                            pedidos.filter(p => p.estado === 'pendiente').map((pedido) => (
+
                                                 <div
                                                     key={pedido.id}
-                                                    className={`p-3 rounded-xl transition border mb-2 last:mb-0 ${pedido.estado === 'preparando'
-                                                        ? 'bg-blue-100 border-blue-400'
-                                                        : 'bg-white border-gray-100 hover:bg-orange-50 hover:border-orange-200'
-                                                        }`}
+                                                    className="p-3 rounded-xl border bg-orange-50 border-orange-300 mb-2 last:mb-0"
                                                 >
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex-1 min-w-0">
@@ -304,7 +304,7 @@ export default function Produccion() {
                                                                     {pedido.numero}
                                                                 </span>
                                                                 <span className="text-xs text-gray-400">
-                                                                    {new Date(pedido.hora_pedido).toLocaleTimeString()}
+                                                                    {pedido.hora_pedido ? new Date(pedido.hora_pedido).toLocaleTimeString() : 'N/A'}
                                                                 </span>
                                                             </div>
                                                             <p className="text-sm font-medium text-[#2D1B1A] mt-1">
@@ -317,16 +317,7 @@ export default function Produccion() {
                                                             </p>
                                                         </div>
                                                         <button
-                                                            onClick={() => {
-                                                                const ubicacion = pedido.tipo_origen === 'delivery' ? '🚚 Delivery' : `Mesa ${pedido.mesa?.numero || 'No asignada'}`;
-                                                                const confirmar = confirm(` Tomar pedido #${pedido.numero}\n\n${ubicacion}\nCliente: ${pedido.cliente}\nProductos: ${pedido.productos?.length || 0} items\n\n¿Confirmas que lo prepararás?`);
-                                                                if (confirmar) {
-                                                                    // ✅ Marcar como tomado para que aparezca en la categoría
-                                                                    setPedidos(prev => prev.map(p =>
-                                                                        p.id === pedido.id ? { ...p, tomado: true } : p
-                                                                    ));
-                                                                }
-                                                            }}
+                                                            onClick={() => tomarPedido(pedido)}
                                                             className="ml-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold transition whitespace-nowrap flex items-center gap-1"
                                                         >
                                                             ⚡ Tomar
@@ -339,19 +330,19 @@ export default function Produccion() {
 
                                     <div className="p-3 border-t border-gray-100">
                                         <button
-                                            onClick={() => window.location.href = '/produccion'}
+                                            onClick={() => window.location.reload()}
                                             className="w-full text-center text-sm text-[#C9A96E] hover:text-[#B8975D] font-medium transition flex items-center justify-center gap-1"
                                         >
-                                            Ver todos los pedidos <ChevronRight className="w-4 h-4" />
+                                            Actualizar <ChevronRight className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-lg text-sm">🟠 Pendientes: {contarPorEstado('pendiente')}</span>
-                        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm">🔵 Preparando: {contarPorEstado('preparando')}</span>
-                        <span className="px-3 py-1 bg-green-100 text-green-600 rounded-lg text-sm">🟢 Listos: {contarPorEstado('listo')}</span>
+                        <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-lg text-sm">🟠 Pendientes: {estadisticas?.cocina?.pendientes + estadisticas?.bar?.pendientes + estadisticas?.horno?.pendientes + estadisticas?.postres?.pendientes || 0}</span>
+                        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm">🔵 Preparando: {estadisticas?.cocina?.preparando + estadisticas?.bar?.preparando + estadisticas?.horno?.preparando + estadisticas?.postres?.preparando || 0}</span>
+                        <span className="px-3 py-1 bg-green-100 text-green-600 rounded-lg text-sm">🟢 Listos: {estadisticas?.cocina?.listos + estadisticas?.bar?.listos + estadisticas?.horno?.listos + estadisticas?.postres?.listos || 0}</span>
                     </div>
                 </div>
 
@@ -412,7 +403,7 @@ export default function Produccion() {
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                             <input
                                 type="text"
-                                placeholder=" Buscar pedido, cliente o mesa..."
+                                placeholder="🔍 Buscar pedido, cliente o mesa..."
                                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#1A1A1A] placeholder-gray-400"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
@@ -421,37 +412,25 @@ export default function Produccion() {
                         <div className="flex gap-2 flex-wrap">
                             <button
                                 onClick={() => setFiltroEstado('todas')}
-                                className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'todas'
-                                    ? 'bg-[#C9A96E] text-white'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'todas' ? 'bg-[#C9A96E] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                             >
                                 Todas
                             </button>
                             <button
                                 onClick={() => setFiltroEstado('pendiente')}
-                                className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'pendiente'
-                                    ? 'bg-orange-600 text-white'
-                                    : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                                    }`}
+                                className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'pendiente' ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`}
                             >
                                 Pendientes
                             </button>
                             <button
                                 onClick={() => setFiltroEstado('preparando')}
-                                className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'preparando'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                                    }`}
+                                className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'preparando' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
                             >
                                 Preparando
                             </button>
                             <button
                                 onClick={() => setFiltroEstado('listo')}
-                                className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'listo'
-                                    ? 'bg-green-600 text-white'
-                                    : 'bg-green-100 text-green-600 hover:bg-green-200'
-                                    }`}
+                                className={`px-5 py-2 rounded-xl font-semibold transition ${filtroEstado === 'listo' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}
                             >
                                 Listos
                             </button>
@@ -461,325 +440,171 @@ export default function Produccion() {
 
                 {/* Grid de áreas de producción */}
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                    {/* 🍳 COCINA */}
+                    <AreaCard
+                        area="cocina"
+                        pedidos={pedidosAgrupados.cocina || []}
+                        estadisticas={estadisticas.cocina || { total: 0, pendientes: 0, preparando: 0, listos: 0 }}
+                        cambiarEstado={cambiarEstado}
+                    />
 
-                    {/* ========== COCINA ========== */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-[#8D6B53]/10 overflow-hidden">
-                        <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-                            <div>
-                                <h2 className="text-lg font-bold text-gray-800">🍳 Cocina</h2>
-                                <p className="text-gray-500 text-xs">Preparación de alimentos</p>
-                            </div>
-                            <span className="text-xs text-[#C9A96E] font-medium">{pedidosPorArea('cocina').length} pedidos</span>
-                        </div>
+                    {/* ☕ BAR */}
+                    <AreaCard
+                        area="bar"
+                        pedidos={pedidosAgrupados.bar || []}
+                        estadisticas={estadisticas.bar || { total: 0, pendientes: 0, preparando: 0, listos: 0 }}
+                        cambiarEstado={cambiarEstado}
+                    />
 
-                        <div className="p-4 grid grid-cols-3 gap-2 text-center">
-                            <div className="bg-orange-100 rounded-xl py-2">
-                                <p className="text-orange-700 font-bold">{pedidosPorArea('cocina').filter(p => p.estado === 'pendiente').length}</p>
-                                <p className="text-gray-500 text-xs">Pendientes</p>
-                            </div>
-                            <div className="bg-blue-100 rounded-xl py-2">
-                                <p className="text-blue-700 font-bold">{pedidosPorArea('cocina').filter(p => p.estado === 'preparando').length}</p>
-                                <p className="text-gray-500 text-xs">Preparando</p>
-                            </div>
-                            <div className="bg-green-100 rounded-xl py-2">
-                                <p className="text-green-600 font-bold">{pedidosPorArea('cocina').filter(p => p.estado === 'listo').length}</p>
-                                <p className="text-gray-500 text-xs">Listos</p>
-                            </div>
-                        </div>
+                    {/* 🔥 HORNO */}
+                    <AreaCard
+                        area="horno"
+                        pedidos={pedidosAgrupados.horno || []}
+                        estadisticas={estadisticas.horno || { total: 0, pendientes: 0, preparando: 0, listos: 0 }}
+                        cambiarEstado={cambiarEstado}
+                    />
 
-                        <div className="p-4 space-y-3 max-h-[350px] overflow-y-auto">
-                            {pedidosPorArea('cocina').map((pedido) => {
-                                const estado = getEstadoConfig(pedido.estado);
-                                return (
-                                    <div
-                                        key={pedido.id}
-                                        className={`flex items-center justify-between border-2 rounded-xl p-3 hover:shadow-sm transition ${pedido.estado === 'preparando' ? 'bg-blue-100 border-blue-600' :
-                                            pedido.estado === 'listo' ? 'bg-green-100 border-green-500' :
-                                                pedido.estado === 'pendiente' ? 'bg-orange-50 border-orange-300' :
-                                                    'bg-white border-gray-200'
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-xl">
-                                                {pedido.tipo_origen === 'delivery' ? '🚚' : '🍽️'}
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold text-sm text-[#2D1B1A]">
-                                                    {pedido.numero} - {pedido.cliente}
-                                                    {pedido.tipo_origen === 'delivery' && (
-                                                        <span className="text-xs font-normal text-blue-600 ml-1">🚚 Delivery</span>
-                                                    )}
-                                                </h4>
-                                                <p className="text-gray-500 text-xs">
-                                                    {pedido.tipo_origen === 'delivery'
-                                                        ? '🚚 Pedido a domicilio'
-                                                        : `🪑 Mesa ${pedido.mesa?.numero || '-'}`
-                                                    } · {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${estado.bg} ${estado.text}`}>
-                                                {estado.label}
-                                            </span>
-                                            {pedido.estado === 'pendiente' && (
-                                                <button
-                                                    onClick={() => cambiarEstado(pedido, 'preparando')}
-                                                    className="text-blue-500 hover:text-blue-700 text-xs font-medium"
-                                                >
-                                                    Prep.
-                                                </button>
-                                            )}
-                                            {pedido.estado === 'preparando' && (
-                                                <button
-                                                    onClick={() => {
-                                                        const esDelivery = pedido.tipo_origen === 'delivery';
-                                                        const mensaje = esDelivery
-                                                            ? `✅ Marcar como listo\n\n🚚 Delivery - ${pedido.cliente}\nProductos: ${pedido.productos?.length || 0} items\n\n¿Ya está listo para entregar?`
-                                                            : `✅ Marcar como listo\n\nMesa: ${pedido.mesa?.numero || 'No asignada'}\nCliente: ${pedido.cliente}\n\n¿Ya está listo para entregar?`;
-
-                                                        if (confirm(mensaje)) {
-                                                            cambiarEstado(pedido, 'listo');
-                                                        }
-                                                    }}
-                                                    className="text-green-500 hover:text-green-700 text-xs font-medium"
-                                                >
-                                                    Listo
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {pedidosPorArea('cocina').length === 0 && (
-                                <p className="text-center text-gray-400 text-sm py-4">No hay pedidos en cocina</p>
-                            )}
-                        </div>
+                    {/* 🍰 POSTRES (ocupa todo el ancho) */}
+                    <div className="xl:col-span-3">
+                        <AreaCard
+                            area="postres"
+                            pedidos={pedidosAgrupados.postres || []}
+                            estadisticas={estadisticas.postres || { total: 0, pendientes: 0, preparando: 0, listos: 0 }}
+                            cambiarEstado={cambiarEstado}
+                            expandido
+                        />
                     </div>
-
-                    {/* ========== BAR ========== */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-[#8D6B53]/10 overflow-hidden">
-                        <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-                            <div>
-                                <h2 className="text-lg font-bold text-gray-800">☕ Bar</h2>
-                                <p className="text-gray-500 text-xs">Bebidas y café</p>
-                            </div>
-                            <span className="text-xs text-[#C9A96E] font-medium">{pedidosPorArea('bar').length} pedidos</span>
-                        </div>
-
-                        <div className="p-4 grid grid-cols-3 gap-2 text-center">
-                            <div className="bg-orange-100 rounded-xl py-2">
-                                <p className="text-orange-700 font-bold">{pedidosPorArea('bar').filter(p => p.estado === 'pendiente').length}</p>
-                                <p className="text-gray-500 text-xs">Pendientes</p>
-                            </div>
-                            <div className="bg-blue-100 rounded-xl py-2">
-                                <p className="text-blue-700 font-bold">{pedidosPorArea('bar').filter(p => p.estado === 'preparando').length}</p>
-                                <p className="text-gray-500 text-xs">Preparando</p>
-                            </div>
-                            <div className="bg-green-100 rounded-xl py-2">
-                                <p className="text-green-600 font-bold">{pedidosPorArea('bar').filter(p => p.estado === 'listo').length}</p>
-                                <p className="text-gray-500 text-xs">Listos</p>
-                            </div>
-                        </div>
-
-                        <div className="p-4 space-y-3 max-h-[350px] overflow-y-auto">
-                            {pedidosPorArea('bar').map((pedido) => {
-                                const estado = getEstadoConfig(pedido.estado);
-                                return (
-                                    <div
-                                        key={pedido.id}
-                                        className={`flex items-center justify-between border-2 rounded-xl p-3 hover:shadow-sm transition ${pedido.estado === 'preparando' ? 'border-blue-600 bg-blue-50' :
-                                            pedido.estado === 'listo' ? 'border-green-500 bg-green-50' :
-                                                pedido.estado === 'pendiente' ? 'border-orange-300 bg-orange-50' :
-                                                    'border-gray-200 bg-white'
-                                            }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-xl">☕</div>
-                                            <div>
-                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.numero} - {pedido.cliente}</h4>
-                                                <p className="text-gray-500 text-xs">Mesa {pedido.mesa?.numero || '-'} · {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${estado.bg} ${estado.text}`}>
-                                                {estado.label}
-                                            </span>
-                                            {pedido.estado === 'pendiente' && (
-                                                <button
-                                                    onClick={() => {
-                                                        const esDelivery = pedido.tipo_origen === 'delivery';
-                                                        const mensaje = esDelivery
-                                                            ? `👨‍🍳 Tomar pedido\n\n🚚 Delivery - ${pedido.cliente}\nProductos: ${pedido.productos?.length || 0} items\n\n¿Confirmas que lo prepararás?`
-                                                            : `👨‍🍳 Tomar pedido\n\nMesa: ${pedido.mesa?.numero || 'No asignada'}\nCliente: ${pedido.cliente}\nProductos: ${pedido.productos?.length || 0} items\n\n¿Confirmas que lo prepararás?`;
-
-                                                        if (confirm(mensaje)) {
-                                                            cambiarEstado(pedido, 'preparando');
-                                                        }
-                                                    }}
-                                                    className="text-blue-500 hover:text-blue-700 text-xs font-medium"
-                                                >
-                                                    Prep.
-                                                </button>
-                                            )}
-                                            {pedido.estado === 'preparando' && (
-                                                <button
-                                                    onClick={() => cambiarEstado(pedido, 'listo')}
-                                                    className="text-green-500 hover:text-green-700 text-xs font-medium"
-                                                >
-                                                    Listo
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {pedidosPorArea('bar').length === 0 && (
-                                <p className="text-center text-gray-400 text-sm py-4">No hay pedidos en bar</p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ========== HORNO ========== */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-[#8D6B53]/10 overflow-hidden">
-                        <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-                            <div>
-                                <h2 className="text-lg font-bold text-gray-800">🔥 Horno</h2>
-                                <p className="text-gray-500 text-xs">Panadería y pastelería</p>
-                            </div>
-                            <span className="text-xs text-[#C9A96E] font-medium">{pedidosPorArea('horno').length} lotes</span>
-                        </div>
-
-                        <div className="p-4 grid grid-cols-3 gap-2 text-center">
-                            <div className="bg-orange-100 rounded-xl py-2">
-                                <p className="text-orange-700 font-bold">{pedidosPorArea('horno').filter(p => p.estado === 'pendiente').length}</p>
-                                <p className="text-gray-500 text-xs">Pendientes</p>
-                            </div>
-                            <div className="bg-blue-100 rounded-xl py-2">
-                                <p className="text-blue-700 font-bold">{pedidosPorArea('horno').filter(p => p.estado === 'preparando').length}</p>
-                                <p className="text-gray-500 text-xs">Horneando</p>
-                            </div>
-                            <div className="bg-green-100 rounded-xl py-2">
-                                <p className="text-green-600 font-bold">{pedidosPorArea('horno').filter(p => p.estado === 'listo').length}</p>
-                                <p className="text-gray-500 text-xs">Listos</p>
-                            </div>
-                        </div>
-
-                        <div className="p-4 space-y-3 max-h-[350px] overflow-y-auto">
-                            {pedidosPorArea('horno').map((pedido) => {
-                                const estado = getEstadoConfig(pedido.estado);
-                                return (
-                                    <div key={pedido.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow-sm transition">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-xl">🔥</div>
-                                            <div>
-                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.numero} - {pedido.cliente}</h4>
-                                                <p className="text-gray-500 text-xs">{pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${estado.bg} ${estado.text}`}>
-                                                {estado.label}
-                                            </span>
-                                            {pedido.estado === 'pendiente' && (
-                                                <button
-                                                    onClick={() => cambiarEstado(pedido, 'preparando')}
-                                                    className="text-blue-500 hover:text-blue-700 text-xs font-medium"
-                                                >
-                                                    Iniciar
-                                                </button>
-                                            )}
-                                            {pedido.estado === 'preparando' && (
-                                                <button
-                                                    onClick={() => cambiarEstado(pedido, 'listo')}
-                                                    className="text-green-500 hover:text-green-700 text-xs font-medium"
-                                                >
-                                                    Listo
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {pedidosPorArea('horno').length === 0 && (
-                                <p className="text-center text-gray-400 text-sm py-4">No hay lotes en horno</p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ========== POSTRES ========== */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-[#8D6B53]/10 overflow-hidden xl:col-span-3">
-                        <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-                            <div>
-                                <h2 className="text-lg font-bold text-gray-800">🍰 Postres</h2>
-                                <p className="text-gray-500 text-xs">Preparación y decoración</p>
-                            </div>
-                            <span className="text-xs text-[#C9A96E] font-medium">{pedidosPorArea('postres').length} pedidos</span>
-                        </div>
-
-                        <div className="p-4 grid grid-cols-4 gap-2 text-center">
-                            <div className="bg-orange-100 rounded-xl py-2">
-                                <p className="text-orange-700 font-bold">{pedidosPorArea('postres').filter(p => p.estado === 'pendiente').length}</p>
-                                <p className="text-gray-500 text-xs">Pendientes</p>
-                            </div>
-                            <div className="bg-blue-100 rounded-xl py-2">
-                                <p className="text-blue-700 font-bold">{pedidosPorArea('postres').filter(p => p.estado === 'preparando').length}</p>
-                                <p className="text-gray-500 text-xs">Decorando</p>
-                            </div>
-                            <div className="bg-green-100 rounded-xl py-2">
-                                <p className="text-green-600 font-bold">{pedidosPorArea('postres').filter(p => p.estado === 'listo').length}</p>
-                                <p className="text-gray-500 text-xs">Listos</p>
-                            </div>
-                            <div className="bg-purple-100 rounded-xl py-2">
-                                <p className="text-purple-700 font-bold">{pedidosPorArea('postres').length}</p>
-                                <p className="text-gray-500 text-xs">Total</p>
-                            </div>
-                        </div>
-
-                        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto">
-                            {pedidosPorArea('postres').map((pedido) => {
-                                const estado = getEstadoConfig(pedido.estado);
-                                return (
-                                    <div key={pedido.id} className="flex items-center justify-between border rounded-xl p-3 hover:shadow-sm transition">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-pink-100 flex items-center justify-center text-xl">🍰</div>
-                                            <div>
-                                                <h4 className="font-bold text-sm text-[#2D1B1A]">{pedido.numero} - {pedido.cliente}</h4>
-                                                <p className="text-gray-500 text-xs">Mesa {pedido.mesa?.numero || '-'} · {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${estado.bg} ${estado.text}`}>
-                                                {estado.label}
-                                            </span>
-                                            {pedido.estado === 'pendiente' && (
-                                                <button
-                                                    onClick={() => cambiarEstado(pedido, 'preparando')}
-                                                    className="text-blue-500 hover:text-blue-700 text-xs font-medium"
-                                                >
-                                                    Prep.
-                                                </button>
-                                            )}
-                                            {pedido.estado === 'preparando' && (
-                                                <button
-                                                    onClick={() => cambiarEstado(pedido, 'listo')}
-                                                    className="text-green-500 hover:text-green-700 text-xs font-medium"
-                                                >
-                                                    Listo
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {pedidosPorArea('postres').length === 0 && (
-                                <p className="text-center text-gray-400 text-sm py-4 col-span-2">No hay pedidos de postres</p>
-                            )}
-                        </div>
-                    </div>
-
                 </div>
             </div>
         </>
     );
 }
+
+
+// ============================================================
+// COMPONENTE: Área Card
+// ============================================================
+function AreaCard({
+    area,
+    pedidos,
+    estadisticas,
+    cambiarEstado,
+    expandido = false
+}: {
+    area: string;
+    pedidos: Pedido[];
+    estadisticas: any;
+    cambiarEstado: (pedido: Pedido, estado: any) => void;
+    expandido?: boolean;
+}) {
+    const config = getAreaConfig(area);
+    const colores = getAreaColor(area);
+    const getEstadoConfig = (estado: string) => {
+        switch (estado) {
+            case 'pendiente': return { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pendiente' };
+            case 'preparando': return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Preparando' };
+            case 'listo': return { bg: 'bg-green-100', text: 'text-green-600', label: 'Listo' };
+            default: return { bg: 'bg-gray-100', text: 'text-gray-700', label: estado };
+        }
+    };
+
+    return (
+        <div className="bg-white rounded-2xl shadow-sm border border-[#8D6B53]/10 overflow-hidden">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+                <div>
+                    <h2 className="text-lg font-bold text-gray-800">{config.icono} {config.nombre}</h2>
+                    <p className="text-gray-500 text-xs">
+                        {area === 'cocina' ? 'Preparación de alimentos' :
+                            area === 'bar' ? 'Bebidas y café' :
+                                area === 'horno' ? 'Panadería y pastelería' :
+                                    'Preparación y decoración'}
+                    </p>
+                </div>
+                <span className="text-xs text-[#C9A96E] font-medium">{pedidos.length} pedidos</span>
+            </div>
+
+            {/* Estadísticas */}
+            <div className="p-4 grid grid-cols-3 gap-2 text-center">
+                <div className="bg-orange-100 rounded-xl py-2">
+                    <p className="text-orange-700 font-bold">{estadisticas?.pendientes || 0}</p>
+                    <p className="text-gray-500 text-xs">Pendientes</p>
+                </div>
+                <div className="bg-blue-100 rounded-xl py-2">
+                    <p className="text-blue-700 font-bold">{estadisticas?.preparando || 0}</p>
+                    <p className="text-gray-500 text-xs">Preparando</p>
+                </div>
+                <div className="bg-green-100 rounded-xl py-2">
+                    <p className="text-green-600 font-bold">{estadisticas?.listos || 0}</p>
+                    <p className="text-gray-500 text-xs">Listos</p>
+                </div>
+            </div>
+
+            {/* Lista de pedidos */}
+            <div className={`p-4 space-y-3 ${expandido ? 'grid grid-cols-1 md:grid-cols-2 gap-3' : ''} max-h-[350px] overflow-y-auto`}>
+                {pedidos.length === 0 ? (
+                    <p className={`text-center text-gray-400 text-sm py-4 ${expandido ? 'col-span-2' : ''}`}>
+                        No hay pedidos en {config.nombre.toLowerCase()}
+                    </p>
+                ) : (
+                    pedidos.map((pedido) => {
+                        const estado = getEstadoConfig(pedido.estado);
+                        return (
+                            <div
+                                key={pedido.id}
+                                className={`flex items-center justify-between border-2 rounded-xl p-3 hover:shadow-sm transition ${pedido.estado === 'preparando' ? 'border-blue-600 bg-blue-50' :
+                                    pedido.estado === 'listo' ? 'border-green-500 bg-green-50' :
+                                        pedido.estado === 'pendiente' ? 'border-orange-300 bg-orange-50' :
+                                            'border-gray-200 bg-white'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-xl flex-shrink-0">
+                                        {pedido.tipo_origen === 'delivery' ? '🚚' : '🍽️'}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="font-bold text-sm text-[#2D1B1A] truncate">
+                                            {pedido.numero} - {pedido.cliente}
+                                            {pedido.tipo_origen === 'delivery' && (
+                                                <span className="text-xs font-normal text-blue-600 ml-1">🚚 Delivery</span>
+                                            )}
+                                        </h4>
+                                        <p className="text-gray-500 text-xs truncate">
+                                            {pedido.tipo_origen === 'delivery' ? '🚚 Pedido a domicilio' : `🪑 Mesa ${pedido.mesa?.numero || '-'}`} ·
+                                            {pedido.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(' · ')}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${estado.bg} ${estado.text}`}>
+                                        {estado.label}
+                                    </span>
+                                    {pedido.estado === 'pendiente' && (
+                                        <button
+                                            onClick={() => cambiarEstado(pedido, 'preparando')}
+                                            className="text-blue-500 hover:text-blue-700 text-xs font-medium"
+                                        >
+                                            Prep.
+                                        </button>
+                                    )}
+                                    {pedido.estado === 'preparando' && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm(`✅ Marcar pedido #${pedido.numero} como listo?`)) {
+                                                    cambiarEstado(pedido, 'listo');
+                                                }
+                                            }}
+                                            className="text-green-500 hover:text-green-700 text-xs font-medium"
+                                        >
+                                            Listo
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+    );
+}
+

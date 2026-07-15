@@ -277,10 +277,18 @@ function TarjetaPedido({ pedido, mesaNumero, mesero, onClose }: TarjetaPedidoPro
                 </div>
 
                 {/* Footer */}
-                <div className="px-5 py-4 border-t border-gray-200">
+                <div className="px-5 py-4 border-t border-gray-200 flex gap-2">
+                    <button
+                        onClick={() => {
+                            window.location.href = `/ventas?mesa=${mesaNumero}`;
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-medium text-sm transition"
+                    >
+                        ✏️ Editar pedido
+                    </button>
                     <button
                         onClick={onClose}
-                        className="w-full py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-medium text-sm transition"
+                        className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition"
                     >
                         Cerrar
                     </button>
@@ -554,7 +562,7 @@ export default function MesasDistribucion() {
 
     const cambiarEstado = (id: number, nuevoEstado: string) => {
         const mesasAnteriores = mesas;
-       
+
         setMesas(prev => prev.map(m =>
             m.id === id ? { ...m, estado: nuevoEstado as Mesa['estado'] } : m
         ));
@@ -570,11 +578,8 @@ export default function MesasDistribucion() {
     };
 
     const abrirModalCobro = (mesa: Mesa) => {
-
-        const pedidoActivo = pedidos.find(p => p.mesa_id === mesa.id);
-
-
-        setPedidoCobro(pedidoActivo || null);
+        const pedidosDeLaMesa = pedidos.filter(p => p.mesa_id === mesa.id);
+        setPedidoCobro(pedidosDeLaMesa);
         setMesaCobro(mesa);
         setModalCobroAbierto(true);
     };

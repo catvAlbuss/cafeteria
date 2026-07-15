@@ -19,5 +19,9 @@ class Plato extends Model
         'vendidos',
         'imagen',
         'disponible',
+
+        'modificado',
+        
+
     ];
 }

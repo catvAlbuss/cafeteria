@@ -365,7 +365,7 @@ export default function Platos() {
                                             </button>
                                         </div>
 
-                                        {/* 👇 AGREGAR ESTE BOTÓN DE DISPONIBILIDAD */}
+                                        {/*  AGREGAR ESTE BOTÓN DE DISPONIBILIDAD */}
                                         <button
                                             onClick={() => toggleDisponibilidad(plato.id)}
                                             className={`w-full py-1.5 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 ${plato.disponible

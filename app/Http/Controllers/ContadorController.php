@@ -55,28 +55,30 @@ class ContadorController extends Controller
         ];
 
         // 5. Movimientos recientes (últimos 10 pedidos)
-        $movimientos = Pedido::where('estado', '!=', 'cancelado')
-            ->orderBy('created_at', 'desc')
-            ->limit(10)
-            ->get()
-            ->map(function ($pedido) {
-                $descripcion = match ($pedido->tipo) {
-                    'delivery' => 'Delivery',
-                    'caja' => 'Venta en caja',
-                    'mesa' => 'Pedido mesa',
-                    default => 'Venta'
-                };
+// 5. Movimientos recientes (últimos 10 pedidos)
+$movimientos = Pedido::where('estado', '!=', 'cancelado')
+    ->limit(10)
+    ->get()
+    ->sortByDesc('created_at') 
+    ->values()
+    ->map(function ($pedido) {
+        $descripcion = match ($pedido->tipo) {
+            'delivery' => 'Delivery',
+            'caja' => 'Venta en caja',
+            'mesa' => 'Pedido mesa',
+            default => 'Venta'
+        };
 
-                return [
-                    'id' => $pedido->id,
-                    'tipo' => 'ingreso',
-                    'descripcion' => $descripcion,
-                    'monto' => $pedido->total,
-                    'cliente' => $pedido->cliente ?? 'Anónimo',
-                    'hora' => $pedido->created_at->format('h:i A'),
-                ];
-            })
-            ->toArray();
+        return [
+            'id' => $pedido->id,
+            'tipo' => 'ingreso',
+            'descripcion' => $descripcion,
+            'monto' => $pedido->total,
+            'cliente' => $pedido->cliente ?? 'Anónimo',
+            'hora' => $pedido->created_at->format('h:i A'),
+        ];
+    })
+    ->toArray();
 
         // 6. Historial de cajas
         $cajas = Caja::with('empleadoUser')->orderBy('created_at', 'desc')->get();

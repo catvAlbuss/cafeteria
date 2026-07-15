@@ -21,11 +21,14 @@ class Pedido extends Model
         'productos',
         'total',
         'estado',
+        'area',
         'observaciones',
         'hora_pedido',
         'hora_entrega',
         'caja_id',
         'metodo_pago',
+
+
         'subtotal',
         'igv',
         // Campos de delivery
@@ -34,12 +37,14 @@ class Pedido extends Model
         'direccion',
         'repartidor',
         'estado_delivery',
+
     ];
 
     protected $casts = [
         'productos' => 'array',
         'hora_pedido' => 'datetime',
         'hora_entrega' => 'datetime',
+        'total' => 'decimal:2',
     ];
 
     /**
