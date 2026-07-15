@@ -2,26 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MesaActualizada;
+use App\Events\PedidoActualizado;
 use App\Models\Mesa;
+use App\Models\Pedido;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use App\Models\Pedido;
 
 class MesaController extends Controller
 {
     //  Listar todas las mesas
     public function index()
     {
-        $mesas = Mesa::orderBy('numero')->get();
+        $mesas = Mesa::with('meseroUser')->orderBy('numero')->get()->values();
 
         //  Antes solo traía 'listo' y 'entregado' — eso dejaba fuera los pedidos
         //  que todavía están en cocina (pendiente/preparando), y por eso "Ver Pedido"
         //  y el cobro no los veían. Ahora trae TODO lo que no esté ya cerrado.
-        $pedidos = Pedido::whereNotIn('estado', ['pagado', 'cancelado'])->get();
+        $pedidos = Pedido::whereNotIn('estado', ['pagado', 'cancelado'])->get()->values();
 
         return Inertia::render('restaurante/mesas', [
-            'mesas' => $mesas,
-            'pedidos' => $pedidos
+            'mesas' => $mesas->values()->all(),
+            'pedidos' => $pedidos->values()->all(),
         ]);
     }
 
@@ -35,6 +37,7 @@ class MesaController extends Controller
         ]);
 
         $mesa = Mesa::create($validated);
+
         return redirect()->back()->with('success', 'Mesa creada correctamente');
     }
 
@@ -44,17 +47,27 @@ class MesaController extends Controller
             'estado' => 'required|in:libre,pendiente,ocupada,reserva,listo_cobrar',
             'cliente' => 'nullable|string',
             'personas' => 'nullable|integer|min:1',
-            'mesero' => 'nullable|string',
+            'user_id' => 'nullable|integer|exists:users,id',
         ]);
 
+        if (! empty($validated['user_id']) && ! auth()->user()->currentTeam->members()->where('users.id', $validated['user_id'])->exists()) {
+            return redirect()->back()->with('error', 'El empleado no pertenece a esta sede.');
+        }
+
+        if ($validated['estado'] === 'ocupada' && empty($validated['user_id']) && ! $mesa->user_id) {
+            $validated['user_id'] = auth()->id();
+        }
+
         if ($validated['estado'] === 'libre') {
-            $validated['mesero'] = null;
+            $validated['user_id'] = null;
             $validated['cliente'] = null;
             $validated['personas'] = null;
             $validated['pedido_listo'] = false;
         }
 
         $mesa->update($validated);
+        broadcast(new MesaActualizada($mesa));
+
         return redirect()->back()->with('success', 'Estado de mesa actualizado');
     }
 
@@ -62,7 +75,7 @@ class MesaController extends Controller
     public function show(Mesa $mesa)
     {
         return Inertia::render('restaurante/mesa-detalle', [
-            'mesa' => $mesa
+            'mesa' => $mesa,
         ]);
     }
 
@@ -70,6 +83,7 @@ class MesaController extends Controller
     public function destroy(Mesa $mesa)
     {
         $mesa->delete();
+
         return redirect()->back()->with('success', 'Mesa eliminada correctamente');
     }
 
@@ -78,6 +92,8 @@ class MesaController extends Controller
     {
         $mesa->pedido_listo = true;
         $mesa->save();
+        broadcast(new MesaActualizada($mesa));
+
         return redirect()->back()->with('success', 'Pedido listo para entregar');
     }
 
@@ -87,15 +103,18 @@ class MesaController extends Controller
         $mesa->pedido_listo = false;
         $mesa->estado = 'ocupada';
         $mesa->save();
+        broadcast(new MesaActualizada($mesa));
 
         //  Antes esto no pasaba: los pedidos quedaban en "listo" para siempre,
         //  nunca llegaban a "entregado" aunque el mesero ya los hubiera servido.
-        Pedido::where('mesa_id', $mesa->id)
+        $pedidosEntregados = Pedido::where('mesa_id', $mesa->id)
             ->where('estado', 'listo')
-            ->update([
-                'estado' => 'entregado',
-                'hora_entrega' => now(),
-            ]);
+            ->get();
+
+        foreach ($pedidosEntregados as $pedidoEntregado) {
+            $pedidoEntregado->update(['estado' => 'entregado', 'hora_entrega' => now()]);
+            broadcast(new PedidoActualizado($pedidoEntregado));
+        }
 
         return redirect()->back()->with('success', 'Pedido entregado');
     }
@@ -119,14 +138,16 @@ class MesaController extends Controller
         foreach ($pedidos as $pedido) {
             $pedido->estado = 'pagado';
             $pedido->save();
+            broadcast(new PedidoActualizado($pedido));
         }
 
         $mesa->estado = 'libre';
-        $mesa->mesero = null;
+        $mesa->user_id = null;
         $mesa->cliente = null;
         $mesa->personas = null;
         $mesa->pedido_listo = false;
         $mesa->save();
+        broadcast(new MesaActualizada($mesa));
 
         return redirect()->back()->with('success', 'Cuenta cobrada correctamente');
     }
@@ -136,10 +157,11 @@ class MesaController extends Controller
     {
         $mesa->update([
             'estado' => 'ocupada',
-            'mesero' => auth()->user()->name,
+            'user_id' => auth()->id(),
         ]);
+        broadcast(new MesaActualizada($mesa));
 
-        return redirect()->back()->with('success', 'Mesa asignada a ' . auth()->user()->name);
+        return redirect()->back()->with('success', 'Mesa asignada a '.auth()->user()->name);
     }
 
     //  Transferir una silla de una mesa a otra (drag & drop)
@@ -162,7 +184,7 @@ class MesaController extends Controller
         }
 
         // Si excede la capacidad y no viene confirmado, avisamos sin mover nada
-        if (!($validated['forzar'] ?? false) && ($destino->sillas + 1) > $destino->capacidad) {
+        if (! ($validated['forzar'] ?? false) && ($destino->sillas + 1) > $destino->capacidad) {
             return redirect()->back()->with('aviso_capacidad', [
                 'mesero_origen_id' => $origen->id,
                 'mesa_destino_id' => $destino->id,
@@ -172,6 +194,8 @@ class MesaController extends Controller
 
         $origen->decrement('sillas');
         $destino->increment('sillas');
+        broadcast(new MesaActualizada($origen->fresh()));
+        broadcast(new MesaActualizada($destino->fresh()));
 
         return redirect()->back()->with('success', 'Silla movida correctamente');
     }
@@ -180,7 +204,7 @@ class MesaController extends Controller
     {
         $mesa = Mesa::where('numero', $numero)->first();
 
-        if (!$mesa) {
+        if (! $mesa) {
             return response()->json(['error' => 'Mesa no encontrada'], 404);
         }
 

@@ -194,13 +194,11 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
             </header>
 
             {/* ===== BREADCRUMBS ===== */}
-            {breadcrumbs.length > 1 && (
-                <div className="flex w-full border-b border-sidebar-border/70 bg-white/80">
-                    <div className="mx-auto flex h-12 w-full items-center justify-start px-6 text-neutral-500">
-                        <Breadcrumbs breadcrumbs={breadcrumbs} />
-                    </div>
+            <div className="flex w-full border-b border-sidebar-border/70 bg-white/80">
+                <div className="mx-auto flex min-h-12 w-full items-center justify-start px-6 py-2 text-neutral-500">
+                    <Breadcrumbs breadcrumbs={breadcrumbs} />
                 </div>
-            )}
+            </div>
         </>
     );
 }

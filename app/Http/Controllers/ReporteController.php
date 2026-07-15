@@ -2,14 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Pedido;
 use App\Models\Caja;
 use App\Models\Mesa;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Illuminate\Support\Facades\DB;
+use App\Models\Pedido;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 
 class ReporteController extends Controller
 {
@@ -19,237 +20,247 @@ class ReporteController extends Controller
             $fechaInicio = $request->input('fecha_inicio', now()->startOfMonth()->toDateString());
             $fechaFin = $request->input('fecha_fin', now()->toDateString());
 
-            // ============================================================
-            // 1️⃣ DATOS DE VENTAS (SOLO PAGADOS)
-            // ============================================================
+            $cacheKey = 'reportes.dashboard.'.auth()->user()->current_team_id.".{$fechaInicio}.{$fechaFin}";
 
-            $ventasDia = Pedido::whereDate('created_at', today())
-                ->where('estado', 'pagado')
-                ->sum('total');
+            $data = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($fechaInicio, $fechaFin) {
 
-            $ventasAyer = Pedido::whereDate('created_at', today()->subDay())
-                ->where('estado', 'pagado')
-                ->sum('total');
+                // ============================================================
+                // 1️⃣ DATOS DE VENTAS (SOLO PAGADOS)
+                // ============================================================
 
-            $clientesHoy = Pedido::whereDate('created_at', today())
-                ->where('estado', 'pagado')
-                ->count();
+                $ventasDia = Pedido::whereDate('created_at', today())
+                    ->where('estado', 'pagado')
+                    ->sum('total');
 
-            $deliverysHoy = Pedido::whereDate('created_at', today())
-                ->where('tipo', 'delivery')
-                ->where('estado', 'pagado')
-                ->count();
+                $ventasAyer = Pedido::whereDate('created_at', today()->subDay())
+                    ->where('estado', 'pagado')
+                    ->sum('total');
 
-            $deliverysEnRuta = Pedido::whereDate('created_at', today())
-                ->where('tipo', 'delivery')
-                ->where('estado', 'pagado')
-                ->count();
+                $clientesHoy = Pedido::whereDate('created_at', today())
+                    ->where('estado', 'pagado')
+                    ->count();
 
-            // Ventas por tipo
-            $ventasPorTipo = Pedido::whereBetween('created_at', [
-                Carbon::parse($fechaInicio)->startOfDay(),
-                Carbon::parse($fechaFin)->endOfDay()
-            ])
-            ->where('estado', 'pagado')
-            ->select('tipo', DB::raw('COUNT(*) as cantidad'), DB::raw('SUM(total) as total'))
-            ->groupBy('tipo')
-            ->get()
-            ->map(function ($item) {
+                $deliverysHoy = Pedido::whereDate('created_at', today())
+                    ->where('tipo', 'delivery')
+                    ->where('estado', 'pagado')
+                    ->count();
+
+                $deliverysEnRuta = Pedido::whereDate('created_at', today())
+                    ->where('tipo', 'delivery')
+                    ->where('estado', 'pagado')
+                    ->count();
+
+                // Ventas por tipo
+                $ventasPorTipo = Pedido::whereBetween('created_at', [
+                    Carbon::parse($fechaInicio)->startOfDay(),
+                    Carbon::parse($fechaFin)->endOfDay(),
+                ])
+                    ->where('estado', 'pagado')
+                    ->select('tipo', DB::raw('COUNT(*) as cantidad'), DB::raw('SUM(total) as total'))
+                    ->groupBy('tipo')
+                    ->get()
+                    ->map(function ($item) {
+                        return [
+                            'tipo' => $item->tipo ?? 'No especificado',
+                            'cantidad' => $item->cantidad,
+                            'total' => $item->total,
+                        ];
+                    });
+
+                // Mesas
+                $totalMesas = Mesa::count();
+                $mesasOcupadas = Mesa::where('estado', 'ocupada')->count();
+                $mesasLibres = Mesa::where('estado', 'libre')->count();
+
+                // Tickets
+                $ticketsHoy = Pedido::whereDate('created_at', today())
+                    ->where('tipo', 'mesa')
+                    ->where('estado', 'pagado')
+                    ->count();
+
+                $ticketsPorMesa = Pedido::whereBetween('created_at', [now()->subDays(7), now()])
+                    ->where('tipo', 'mesa')
+                    ->where('estado', 'pagado')
+                    ->select('mesa_id', DB::raw('COUNT(*) as tickets'))
+                    ->groupBy('mesa_id')
+                    ->with('mesa')
+                    ->get()
+                    ->map(function ($item) {
+                        return [
+                            'mesa' => $item->mesa ? $item->mesa->numero : 'N/A',
+                            'tickets' => $item->tickets,
+                        ];
+                    });
+
+                // Total cobrado hoy
+                $totalCobradoHoy = Pedido::whereDate('created_at', today())
+                    ->where('estado', 'pagado')
+                    ->sum('total');
+
+                // Estado de caja
+                $cajaActual = Caja::with('empleadoUser')->where('estado', 'Abierta')->first();
+
+                // ============================================================
+                // 2️⃣ RESUMEN
+                // ============================================================
+
+                $resumen = [
+                    'ventasDia' => $ventasDia,
+                    'ventasCambio' => $ventasAyer > 0 ? round((($ventasDia - $ventasAyer) / $ventasAyer) * 100) : 0,
+                    'clientes' => $clientesHoy,
+                    'clientesNuevos' => 0,
+                    'deliverys' => $deliverysHoy,
+                    'deliverysEnRuta' => $deliverysEnRuta,
+                    'gananciaNeta' => $ventasDia,
+                    'gananciaCambio' => 0,
+                    'ticketsHoy' => $ticketsHoy,
+                    'mesasOcupadas' => $mesasOcupadas,
+                    'mesasLibres' => $mesasLibres,
+                    'totalMesas' => $totalMesas,
+                    'totalCobradoHoy' => $totalCobradoHoy,
+                    'cajaAbierta' => $cajaActual !== null,
+                    'cajaEmpleado' => $cajaActual ? $cajaActual->empleado : null,
+                ];
+
+                // ============================================================
+                // 3️⃣ VENTAS DIARIAS (últimos 30 días)
+                // ============================================================
+
+                $ventasDiarias = Pedido::whereBetween('created_at', [now()->subDays(30), now()])
+                    ->where('estado', 'pagado')
+                    ->select(
+                        DB::raw('DATE(created_at) as fecha'),
+                        DB::raw('COUNT(*) as tickets'),
+                        DB::raw('SUM(total) as ventas')
+                    )
+                    ->groupBy(DB::raw('DATE(created_at)'))
+                    ->orderBy('fecha', 'asc')
+                    ->get()
+                    ->map(function ($item) {
+                        $venta = $item->ventas ?? 0;
+
+                        return [
+                            'fecha' => Carbon::parse($item->fecha)->format('d/m/Y'),
+                            'tickets' => $item->tickets ?? 0,
+                            'ventas' => $venta,
+                            'gastos' => round($venta * 0.25, 2),
+                            'ganancia' => round($venta * 0.75, 2),
+                        ];
+                    });
+
+                // ============================================================
+                // 4️⃣ PRODUCTOS MÁS VENDIDOS
+                // ============================================================
+
+                $productosMasVendidos = $this->getProductosMasVendidos();
+
+                // ============================================================
+                // 5️⃣ TOTALES GENERALES
+                // ============================================================
+
+                $totalVentas = Pedido::where('estado', 'pagado')->sum('total');
+                $totalTickets = Pedido::where('estado', 'pagado')->count();
+
+                $totales = [
+                    'totalVentas' => $totalVentas,
+                    'totalTickets' => $totalTickets,
+                    'totalGastos' => round($totalVentas * 0.25, 2),
+                    'totalGanancia' => round($totalVentas * 0.75, 2),
+                    'ticketPromedio' => $totalTickets > 0 ? $totalVentas / $totalTickets : 0,
+                    'margenGanancia' => $totalVentas > 0 ? round(($totalVentas * 0.75 / $totalVentas) * 100, 1) : 0,
+                ];
+
+                // ============================================================
+                // 6 VENTAS DEL DÍA - DETALLE (fecha, mesa, producto, total, método de pago)
+                // ============================================================
+
+                $mesasMap = Mesa::pluck('numero', 'id'); // [id => numero]
+
+                $ventasDelDiaDetalle = Pedido::whereDate('created_at', today())
+                    ->where('estado', 'pagado')
+                    ->orderByDesc('created_at')
+                    ->get()
+                    ->map(function ($pedido) use ($mesasMap) {
+                        $items = is_string($pedido->productos) ? json_decode($pedido->productos, true) : $pedido->productos;
+                        $productoTexto = collect($items ?? [])
+                            ->map(fn ($p) => ($p['cantidad'] ?? 1).'x '.($p['nombre'] ?? 'Producto'))
+                            ->implode(', ');
+
+                        $numeroMesa = $pedido->mesa_id && isset($mesasMap[$pedido->mesa_id])
+                            ? $mesasMap[$pedido->mesa_id]
+                            : ($pedido->tipo === 'delivery' ? 'Delivery' : 'N/A');
+
+                        return [
+                            'fecha' => $pedido->created_at->format('d/m/Y H:i'),
+                            'mesa' => $numeroMesa,
+                            'producto' => $productoTexto,
+                            'total' => $pedido->total,
+                            'metodo_pago' => $pedido->metodo_pago ? ucfirst($pedido->metodo_pago) : 'N/A',
+                        ];
+                    });
+                // ============================================================
+                // 7 MÉTODOS DE PAGO
+                // ============================================================
+
+                $metodosPago = Pedido::whereDate('created_at', today())
+                    ->where('estado', 'pagado')
+                    ->whereNotNull('metodo_pago')
+                    ->select('metodo_pago', DB::raw('SUM(total) as total'), DB::raw('COUNT(*) as cantidad'))
+                    ->groupBy('metodo_pago')
+                    ->get()
+                    ->map(function ($item) {
+                        $mapa = [
+                            'efectivo' => 'Efectivo',
+                            'tarjeta' => 'Tarjeta',
+                            'yape' => 'Yape / Plin',
+                        ];
+
+                        return [
+                            'metodo' => $mapa[$item->metodo_pago] ?? $item->metodo_pago,
+                            'total' => $item->total,
+                            'cantidad' => $item->cantidad,
+                        ];
+                    });
+
+                // ============================================================
+                // 8 MÉTODOS DE PAGO CON PORCENTAJES
+                // ============================================================
+
+                $metodosPagoConPorcentaje = $metodosPago->map(function ($item) use ($totalCobradoHoy) {
+                    $item['porcentaje'] = $totalCobradoHoy > 0 ? round(($item['total'] / $totalCobradoHoy) * 100) : 0;
+
+                    return $item;
+                });
+
+                // ============================================================
+                // 9  DATOS DEL REPORTE (cacheados 5 min)
+                // ============================================================
+
                 return [
-                    'tipo' => $item->tipo ?? 'No especificado',
-                    'cantidad' => $item->cantidad,
-                    'total' => $item->total,
+                    'resumen' => $resumen,
+                    'ventasDiarias' => $ventasDiarias,
+                    'ventasDelDiaDetalle' => $ventasDelDiaDetalle,
+                    'productosMasVendidos' => $productosMasVendidos,
+                    'metodosPago' => $metodosPagoConPorcentaje,
+                    'totales' => $totales,
+                    'ventasPorTipo' => $ventasPorTipo,
+                    'ticketsPorMesa' => $ticketsPorMesa,
+                    'estadoMesas' => [
+                        'total' => $totalMesas,
+                        'ocupadas' => $mesasOcupadas,
+                        'libres' => $mesasLibres,
+                    ],
+                    'fechas' => [
+                        'inicio' => $fechaInicio,
+                        'fin' => $fechaFin,
+                    ],
                 ];
             });
 
-            // Mesas
-            $totalMesas = Mesa::count();
-            $mesasOcupadas = Mesa::where('estado', 'ocupada')->count();
-            $mesasLibres = Mesa::where('estado', 'libre')->count();
-
-            // Tickets
-            $ticketsHoy = Pedido::whereDate('created_at', today())
-                ->where('tipo', 'mesa')
-                ->where('estado', 'pagado')
-                ->count();
-
-            $ticketsPorMesa = Pedido::whereBetween('created_at', [now()->subDays(7), now()])
-                ->where('tipo', 'mesa')
-                ->where('estado', 'pagado')
-                ->select('mesa_id', DB::raw('COUNT(*) as tickets'))
-                ->groupBy('mesa_id')
-                ->with('mesa')
-                ->get()
-                ->map(function ($item) {
-                    return [
-                        'mesa' => $item->mesa ? $item->mesa->numero : 'N/A',
-                        'tickets' => $item->tickets,
-                    ];
-                });
-
-            // Total cobrado hoy
-            $totalCobradoHoy = Pedido::whereDate('created_at', today())
-                ->where('estado', 'pagado')
-                ->sum('total');
-
-            // Estado de caja
-            $cajaActual = Caja::where('estado', 'Abierta')->first();
-
-            // ============================================================
-            // 2️⃣ RESUMEN
-            // ============================================================
-
-            $resumen = [
-                'ventasDia' => $ventasDia,
-                'ventasCambio' => $ventasAyer > 0 ? round((($ventasDia - $ventasAyer) / $ventasAyer) * 100) : 0,
-                'clientes' => $clientesHoy,
-                'clientesNuevos' => 0,
-                'deliverys' => $deliverysHoy,
-                'deliverysEnRuta' => $deliverysEnRuta,
-                'gananciaNeta' => $ventasDia,
-                'gananciaCambio' => 0,
-                'ticketsHoy' => $ticketsHoy,
-                'mesasOcupadas' => $mesasOcupadas,
-                'mesasLibres' => $mesasLibres,
-                'totalMesas' => $totalMesas,
-                'totalCobradoHoy' => $totalCobradoHoy,
-                'cajaAbierta' => $cajaActual !== null,
-                'cajaEmpleado' => $cajaActual ? $cajaActual->empleado : null,
-            ];
-
-            // ============================================================
-            // 3️⃣ VENTAS DIARIAS (últimos 30 días)
-            // ============================================================
-
-            $ventasDiarias = Pedido::whereBetween('created_at', [now()->subDays(30), now()])
-                ->where('estado', 'pagado')
-                ->select(
-                    DB::raw('DATE(created_at) as fecha'),
-                    DB::raw('COUNT(*) as tickets'),
-                    DB::raw('SUM(total) as ventas')
-                )
-                ->groupBy(DB::raw('DATE(created_at)'))
-                ->orderBy('fecha', 'asc')
-                ->get()
-                ->map(function ($item) {
-                    $venta = $item->ventas ?? 0;
-                    return [
-                        'fecha' => Carbon::parse($item->fecha)->format('d/m/Y'),
-                        'tickets' => $item->tickets ?? 0,
-                        'ventas' => $venta,
-                        'gastos' => round($venta * 0.25, 2),
-                        'ganancia' => round($venta * 0.75, 2),
-                    ];
-                });
-
-            // ============================================================
-            // 4️⃣ PRODUCTOS MÁS VENDIDOS
-            // ============================================================
-
-            $productosMasVendidos = $this->getProductosMasVendidos();
-
-            // ============================================================
-            // 5️⃣ TOTALES GENERALES
-            // ============================================================
-
-            $totalVentas = Pedido::where('estado', 'pagado')->sum('total');
-            $totalTickets = Pedido::where('estado', 'pagado')->count();
-
-            $totales = [
-                'totalVentas' => $totalVentas,
-                'totalTickets' => $totalTickets,
-                'totalGastos' => round($totalVentas * 0.25, 2),
-                'totalGanancia' => round($totalVentas * 0.75, 2),
-                'ticketPromedio' => $totalTickets > 0 ? $totalVentas / $totalTickets : 0,
-                'margenGanancia' => $totalVentas > 0 ? round(($totalVentas * 0.75 / $totalVentas) * 100, 1) : 0,
-            ];
-
-// ============================================================
-// 6 VENTAS DEL DÍA - DETALLE (fecha, mesa, producto, total, método de pago)
-// ============================================================
-
-$mesasMap = Mesa::pluck('numero', 'id'); // [id => numero]
-
-$ventasDelDiaDetalle = Pedido::whereDate('created_at', today())
-    ->where('estado', 'pagado')
-    ->orderByDesc('created_at')
-    ->get()
-    ->map(function ($pedido) use ($mesasMap) {
-        $items = is_string($pedido->productos) ? json_decode($pedido->productos, true) : $pedido->productos;
-        $productoTexto = collect($items ?? [])
-            ->map(fn($p) => ($p['cantidad'] ?? 1) . 'x ' . ($p['nombre'] ?? 'Producto'))
-            ->implode(', ');
-
-        $numeroMesa = $pedido->mesa_id && isset($mesasMap[$pedido->mesa_id])
-            ? $mesasMap[$pedido->mesa_id]
-            : ($pedido->tipo === 'delivery' ? 'Delivery' : 'N/A');
-
-        return [
-            'fecha' => $pedido->created_at->format('d/m/Y H:i'),
-            'mesa' => $numeroMesa,
-            'producto' => $productoTexto,
-            'total' => $pedido->total,
-            'metodo_pago' => $pedido->metodo_pago ? ucfirst($pedido->metodo_pago) : 'N/A',
-        ];
-    });
-            // ============================================================
-            // 7 MÉTODOS DE PAGO
-            // ============================================================
-
-            $metodosPago = Pedido::whereDate('created_at', today())
-                ->where('estado', 'pagado')
-                ->whereNotNull('metodo_pago')
-                ->select('metodo_pago', DB::raw('SUM(total) as total'), DB::raw('COUNT(*) as cantidad'))
-                ->groupBy('metodo_pago')
-                ->get()
-                ->map(function ($item) {
-                    $mapa = [
-                        'efectivo' => 'Efectivo',
-                        'tarjeta' => 'Tarjeta',
-                        'yape' => 'Yape / Plin',
-                    ];
-                    return [
-                        'metodo' => $mapa[$item->metodo_pago] ?? $item->metodo_pago,
-                        'total' => $item->total,
-                        'cantidad' => $item->cantidad,
-                    ];
-                });
-
-            // ============================================================
-            // 8 MÉTODOS DE PAGO CON PORCENTAJES
-            // ============================================================
-
-            $metodosPagoConPorcentaje = $metodosPago->map(function ($item) use ($totalCobradoHoy) {
-                $item['porcentaje'] = $totalCobradoHoy > 0 ? round(($item['total'] / $totalCobradoHoy) * 100) : 0;
-                return $item;
-            });
-
-            // ============================================================
-            // 9  RETORNAR VISTA
-            // ============================================================
-
-            return Inertia::render('dinero/reportes', [
-                'resumen' => $resumen,
-                'ventasDiarias' => $ventasDiarias,
-                'ventasDelDiaDetalle' => $ventasDelDiaDetalle,
-                'productosMasVendidos' => $productosMasVendidos,
-                'metodosPago' => $metodosPagoConPorcentaje,
-                'totales' => $totales,
-                'ventasPorTipo' => $ventasPorTipo,
-                'ticketsPorMesa' => $ticketsPorMesa,
-                'estadoMesas' => [
-                    'total' => $totalMesas,
-                    'ocupadas' => $mesasOcupadas,
-                    'libres' => $mesasLibres,
-                ],
-                'fechas' => [
-                    'inicio' => $fechaInicio,
-                    'fin' => $fechaFin,
-                ],
-            ]);
+            return Inertia::render('dinero/reportes', $data);
 
         } catch (\Exception $e) {
-            Log::error('Error en Reportes: ' . $e->getMessage());
+            Log::error('Error en Reportes: '.$e->getMessage());
             Log::error($e->getTraceAsString());
 
             return Inertia::render('dinero/reportes', [
@@ -341,6 +352,7 @@ $ventasDelDiaDetalle = Pedido::whereDate('created_at', today())
                 return $icono;
             }
         }
+
         return '🍽️';
     }
 }

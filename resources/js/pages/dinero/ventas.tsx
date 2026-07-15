@@ -67,7 +67,7 @@ useEffect(() => {
             nombre: p.nombre,
             precio: typeof p.precio === 'string' ? parseFloat(p.precio) : p.precio,
             categoria: p.categoria || '',
-            imagen: p.imagen || '/img/productos/placeholder.jpg',
+            imagen: p.imagen || '/img/productos/placeholder.jpeg',
             stock: typeof p.stock === 'string' ? parseInt(p.stock) : p.stock,
             disponible: p.disponible === 1 || p.disponible === true,
         }));
@@ -326,7 +326,7 @@ useEffect(() => {
                                                 alt={producto.nombre}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                                                 onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = '/img/productos/placeholder.jpg';
+                                                    (e.target as HTMLImageElement).src = '/img/productos/placeholder.jpeg';
                                                 }}
                                             />
                                         </div>
@@ -385,7 +385,7 @@ useEffect(() => {
                                                 alt={item.nombre}
                                                 className="w-10 h-10 rounded-lg object-cover"
                                                 onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = '/img/productos/placeholder.jpg';
+                                                    (e.target as HTMLImageElement).src = '/img/productos/placeholder.jpeg';
                                                 }}
                                             />
                                             <div>

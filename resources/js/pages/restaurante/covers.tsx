@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import {
     Calendar,
@@ -38,106 +38,17 @@ interface Cover {
     categoria?: string;
 }
 
+const toArray = <T,>(value: T[] | { data?: T[] } | Record<string, T> | null | undefined): T[] => {
+    if (Array.isArray(value)) return value;
+    if (value && Array.isArray((value as { data?: T[] }).data)) return (value as { data: T[] }).data;
+    if (value && typeof value === 'object') return Object.values(value as Record<string, T>);
+    return [];
+};
+
 export default function Covers() {
     //  Datos de ejemplo
-    const [covers, setCovers] = useState<Cover[]>([
-        {
-            id: 1,
-            titulo: '🌹 San Valentín',
-            descripcion: 'Cena romántica con descuento especial en postres',
-            tipo: 'evento',
-            estado: 'activo',
-            imagen: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=600&auto=format&fit=crop',
-            fechaInicio: '14/02/2025',
-            fechaFin: '14/02/2025',
-            clicks: 245,
-            categoria: 'Amor'
-        },
-        {
-            id: 2,
-            titulo: '🎄 Navidad',
-            descripcion: 'Menú navideño especial con descuento del 20%',
-            tipo: 'festividad',
-            estado: 'programado',
-            imagen: 'https://images.unsplash.com/photo-1543589077-47d81606c1bf?w=600&auto=format&fit=crop',
-            fechaInicio: '24/12/2025',
-            fechaFin: '25/12/2025',
-            clicks: 180,
-            categoria: 'Festivo'
-        },
-        {
-            id: 3,
-            titulo: '☕ 2x1 en Cafés',
-            descripcion: 'Promoción de café + sandwich en horario mañana',
-            tipo: 'promocion',
-            estado: 'activo',
-            imagen: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&auto=format&fit=crop',
-            fechaInicio: '01/06/2025',
-            fechaFin: '30/06/2025',
-            clicks: 420,
-            categoria: 'Bebidas'
-        },
-        {
-            id: 4,
-            titulo: '🎂 Día de la Madre',
-            descripcion: 'Postre gratis para mamás en su día especial',
-            tipo: 'evento',
-            estado: 'activo',
-            imagen: 'https://images.unsplash.com/photo-1519512888835-9552de66e773?w=600&auto=format&fit=crop',
-            fechaInicio: '10/05/2025',
-            fechaFin: '10/05/2025',
-            clicks: 310,
-            categoria: 'Familiar'
-        },
-        {
-            id: 5,
-            titulo: '🍂 Otoño',
-            descripcion: 'Bebidas calientes con sabores de temporada',
-            tipo: 'temporada',
-            estado: 'programado',
-            imagen: 'https://images.unsplash.com/photo-1548883354-8a3f88b2e252?w=600&auto=format&fit=crop',
-            fechaInicio: '01/09/2025',
-            fechaFin: '30/11/2025',
-            clicks: 95,
-            categoria: 'Temporada'
-        },
-        {
-            id: 6,
-            titulo: '🎉 Happy Hour',
-            descripcion: '2x1 en bebidas seleccionadas de 5pm a 7pm',
-            tipo: 'promocion',
-            estado: 'finalizado',
-            imagen: 'https://images.unsplash.com/photo-1520333789090-1afc82db536a?w=600&auto=format&fit=crop',
-            fechaInicio: '01/05/2025',
-            fechaFin: '31/05/2025',
-            clicks: 560,
-            categoria: 'Bebidas'
-        },
-        {
-            id: 7,
-            titulo: '🌸 Primavera',
-            descripcion: 'Nuevos cócteles con frutas de temporada',
-            tipo: 'temporada',
-            estado: 'activo',
-            imagen: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&auto=format&fit=crop',
-            fechaInicio: '01/10/2025',
-            fechaFin: '30/11/2025',
-            clicks: 210,
-            categoria: 'Temporada'
-        },
-        {
-            id: 8,
-            titulo: '🎃 Halloween',
-            descripcion: 'Edición especial de postres terroríficos',
-            tipo: 'festividad',
-            estado: 'programado',
-            imagen: 'https://images.unsplash.com/photo-1587672466970-6610a3b0bb0a?w=600&auto=format&fit=crop',
-            fechaInicio: '31/10/2025',
-            fechaFin: '31/10/2025',
-            clicks: 67,
-            categoria: 'Festivo'
-        },
-    ]);
+    const { covers: coversIniciales = [] } = usePage<{ covers?: Cover[] | { data?: Cover[] } | Record<string, Cover> }>().props;
+    const [covers] = useState<Cover[]>(() => toArray<Cover>(coversIniciales));
 
     //  Estado de filtros
     const [filtroTipo, setFiltroTipo] = useState('');
@@ -321,7 +232,7 @@ export default function Covers() {
                                         alt={cover.titulo}
                                         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                                         onError={(e) => {
-                                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/600x300/F3E1C8/8A5A2B?text=Dolce+Cafe';
+                                            (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300"><rect width="600" height="300" fill="%23F3E1C8"/><text x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%238A5A2B" font-family="Arial" font-size="32" font-weight="700">Dolce Cafe</text></svg>';
                                         }}
                                     />
                                     <div className="absolute top-3 right-3">
