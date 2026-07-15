@@ -17,7 +17,7 @@ return new class extends Migration
             $table->integer('stock')->default(0);
             $table->integer('vendidos')->default(0);
             $table->string('imagen')->nullable();
-            $table->boolean('disponible')->default(true)->after('stock'); 
+            $table->boolean('disponible')->default(true);
             $table->timestamps();
         });
     }

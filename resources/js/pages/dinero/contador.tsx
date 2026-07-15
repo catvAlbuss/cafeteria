@@ -1,5 +1,6 @@
 import { Head, usePage, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
+import { useSedeChannel } from '@/hooks/useSedeChannel';
 import {
     Calculator,
     TrendingUp,
@@ -33,14 +34,16 @@ interface RegistroCaja {
 
 export default function Contador() {
     // 📊 Recibir datos del backend
-    const { 
-        cajas = [], 
-        cajaActual = null, 
-        resumen = { ingresos: 0, cajaActual: 0 }, 
-        movimientos = [], 
+    const {
+        cajas = [],
+        cajaActual = null,
+        resumen = { ingresos: 0, cajaActual: 0 },
+        movimientos = [],
         ingresosDetalle = [],
-        estadisticas = { totalPedidosHoy: 0, totalCajasAbiertas: 0, totalCajasCerradas: 0 }
+        estadisticas = { totalPedidosHoy: 0, totalCajasAbiertas: 0, totalCajasCerradas: 0 },
+        auth,
     } = usePage().props as any;
+    const empleadoActual = auth?.user?.name ?? 'Usuario actual';
 
     // Estados
     const [registros, setRegistros] = useState<RegistroCaja[]>(cajas);
@@ -54,7 +57,6 @@ export default function Contador() {
 
     // Formularios
     const [formApertura, setFormApertura] = useState({
-        empleado: '',
         caja: 'Caja 01',
         turno: 'Mañana' as 'Mañana' | 'Tarde' | 'Noche',
         montoInicial: 0,
@@ -77,6 +79,13 @@ export default function Contador() {
         setRegistros(cajas);
         setCajaActiva(cajaActual);
     }, [cajas, cajaActual]);
+
+    // Tiempo real: si otro terminal abre/cierra una caja, refrescamos el estado
+    useSedeChannel('caja', {
+        'caja.actualizada': () => {
+            router.reload({ only: ['cajas', 'cajaActual', 'estadisticas'] });
+        },
+    });
 
     // Formatear moneda - Maneja strings y números
     const formatCurrency = (amount: number | string): string => {
@@ -113,12 +122,12 @@ export default function Contador() {
 
     // Funciones
     const abrirModalApertura = () => {
-        setFormApertura({ empleado: '', caja: 'Caja 01', turno: 'Mañana', montoInicial: 0 });
+        setFormApertura({ caja: 'Caja 01', turno: 'Mañana', montoInicial: 0 });
         setModalAperturaAbierto(true);
     };
 
     const guardarApertura = () => {
-        if (!formApertura.empleado || formApertura.montoInicial < 0) {
+        if (formApertura.montoInicial < 0) {
             alert('Complete todos los campos correctamente.');
             return;
         }
@@ -549,13 +558,9 @@ export default function Contador() {
                             <div className="p-6 space-y-4">
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Empleado</label>
-                                    <input
-                                        type="text"
-                                        className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
-                                        value={formApertura.empleado}
-                                        onChange={(e) => setFormApertura({ ...formApertura, empleado: e.target.value })}
-                                        placeholder="Nombre del empleado"
-                                    />
+                                    <p className="mt-1 w-full border border-gray-200 rounded-xl p-3 bg-gray-50 text-[#2D1B1A] font-medium">
+                                        {empleadoActual}
+                                    </p>
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Caja</label>

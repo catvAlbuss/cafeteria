@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Events;
+
+use App\Models\Pedido;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
+
+class PedidoListo implements ShouldBroadcast
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
+    public function __construct(public Pedido $pedido) {}
+
+    /**
+     * @return array<int, PrivateChannel>
+     */
+    public function broadcastOn(): array
+    {
+        return [new PrivateChannel("sede.{$this->pedido->team_id}.salon")];
+    }
+
+    public function broadcastAs(): string
+    {
+        return 'pedido.listo';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function broadcastWith(): array
+    {
+        return [
+            'id' => $this->pedido->id,
+            'numero' => $this->pedido->numero,
+            'mesa_id' => $this->pedido->mesa_id,
+        ];
+    }
+}

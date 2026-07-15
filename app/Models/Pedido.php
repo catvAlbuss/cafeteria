@@ -2,16 +2,22 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToTeam;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Pedido extends Model
 {
+    use BelongsToTeam;
+
     protected $fillable = [
+        'team_id',
+        'user_id',
         'numero',
         'mesa_id',
-        'mesa',        
+        'mesa',
         'cliente',
-        'tipo',        
+        'tipo',
         'productos',
         'total',
         'estado',
@@ -20,7 +26,9 @@ class Pedido extends Model
         'hora_entrega',
         'caja_id',
         'metodo_pago',
-        // 🚚 Campos de delivery
+        'subtotal',
+        'igv',
+        // Campos de delivery
         'codigo',
         'telefono',
         'direccion',
@@ -34,23 +42,38 @@ class Pedido extends Model
         'hora_entrega' => 'datetime',
     ];
 
-    // Relación con mesa
-    public function mesa()
+    /**
+     * Get the mesa for this pedido.
+     */
+    public function mesa(): BelongsTo
     {
         return $this->belongsTo(Mesa::class);
     }
 
-    // Relación con caja
-    public function caja()
+    /**
+     * Get the caja for this pedido.
+     */
+    public function caja(): BelongsTo
     {
         return $this->belongsTo(Caja::class);
     }
 
-    // Generar número de pedido automático
-    public static function generarNumero()
+    /**
+     * Get the user (empleado) who created this pedido.
+     */
+    public function empleado(): BelongsTo
     {
-        $ultimo = self::orderBy('id', 'desc')->first();
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Generate an automatic order number.
+     */
+    public static function generarNumero(): string
+    {
+        $ultimo = self::withoutGlobalScopes()->orderBy('id', 'desc')->first();
         $numero = $ultimo ? intval(substr($ultimo->numero, 1)) + 1 : 1;
-        return '#' . str_pad($numero, 4, '0', STR_PAD_LEFT);
+
+        return '#'.str_pad($numero, 4, '0', STR_PAD_LEFT);
     }
 }

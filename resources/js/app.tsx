@@ -21,6 +21,9 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     }
 
     initializeTheme();
+
+    // Inicializa Laravel Echo (Reverb) para los canales en tiempo real
+    import('@/echo');
 }
 
 // Cargar todas las páginas eager
