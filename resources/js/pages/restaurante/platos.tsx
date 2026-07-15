@@ -30,12 +30,19 @@ interface Plato {
     disponible: boolean; 
 }
 
+const toArray = <T,>(value: T[] | { data?: T[] } | Record<string, T> | null | undefined): T[] => {
+    if (Array.isArray(value)) return value;
+    if (value && Array.isArray((value as { data?: T[] }).data)) return (value as { data: T[] }).data;
+    if (value && typeof value === 'object') return Object.values(value as Record<string, T>);
+    return [];
+};
+
 export default function Platos() {
     //  Recibir platos desde el controlador
-    const { platos: platosIniciales = [] } = usePage<{ platos: Plato[] }>().props;
+    const { platos: platosIniciales = [] } = usePage<{ platos: Plato[] | { data?: Plato[] } | Record<string, Plato> }>().props;
 
     //  Estado - usar datos del controlador
-    const [platos, setPlatos] = useState<Plato[]>(platosIniciales);
+    const [platos, setPlatos] = useState<Plato[]>(() => toArray<Plato>(platosIniciales));
 
     //  Estado del modal
     const [modalAbierto, setModalAbierto] = useState(false);
@@ -206,7 +213,7 @@ export default function Platos() {
     };
 
     useEffect(() => {
-        setPlatos(platosIniciales);
+        setPlatos(toArray<Plato>(platosIniciales));
     }, [platosIniciales]);
 
     return (

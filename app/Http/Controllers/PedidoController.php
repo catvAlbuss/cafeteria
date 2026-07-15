@@ -2,97 +2,90 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Pedido;
+use App\Events\MesaActualizada;
+use App\Events\PedidoActualizado;
+use App\Events\PedidoCreado;
+use App\Events\PedidoListo;
+use App\Models\Delivery;
 use App\Models\Mesa;
+use App\Models\Pedido;
+use App\Models\Plato;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use App\Models\Plato;
-use App\Models\Delivery;
 
 class PedidoController extends Controller
 {
-public function index(Request $request)
-{
-    $mesaId = $request->query('mesa_id');
-    $mesaNumero = $request->query('mesa');
+    public function index(Request $request)
+    {
+        $mesaNumero = $request->query('mesa');
+        $mesaInfo = $mesaNumero ? Mesa::with('meseroUser')->where('numero', $mesaNumero)->first() : null;
+        $platos = Plato::all();
+        $pedidos = Pedido::with('mesa')
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get();
 
-    $mesaInfo = $mesaId
-        ? Mesa::find($mesaId)
-        : ($mesaNumero ? Mesa::where('numero', $mesaNumero)->first() : null);
+        return Inertia::render('dinero/ventas', [
+            'platos' => $platos,
+            'mesas' => Mesa::all(),
+            'mesaInfo' => $mesaInfo,
+            'pedidos' => $pedidos,
+        ]);
+    }
 
-    $platos = Plato::all();
-
-   
-    $pedidosActivos = $mesaInfo
-        ? Pedido::where('mesa_id', $mesaInfo->id)
-            ->whereNotIn('estado', ['pagado', 'cancelado'])
-            ->limit(50)  
+    public function produccion()
+    {
+        // Pedidos de mesas
+        $pedidos = Pedido::with('mesa')
+            ->whereIn('estado', ['pendiente', 'preparando'])
+            ->orderBy('created_at', 'asc')
             ->get()
-            ->sortByDesc('created_at') 
-        : collect();
+            ->map(function ($pedido) {
+                $pedido->tipo_origen = 'mesa';
 
-  
-    $pedidos = Pedido::with('mesa')
-        ->limit(50) 
-        ->get()
-        ->sortByDesc('created_at'); 
+                return $pedido;
+            });
 
-    return Inertia::render('dinero/ventas', [
-        'platos' => $platos,
-        'mesas' => Mesa::all(),
-        'mesaInfo' => $mesaInfo,
-        'pedidos' => $pedidos,
-        'pedidosActivos' => $pedidosActivos,
-    ]);
-}
-public function produccion()
-{
-   
-    $pedidos = Pedido::with('mesa')
-        ->whereIn('estado', ['pendiente', 'preparando'])
-     
-        ->limit(100) 
-        ->get()
-        ->sortBy('created_at')
-        ->map(function ($pedido) {
-            $pedido->tipo_origen = 'mesa';
-            return $pedido;
-        });
 
-    // Pedidos de delivery
-    $deliveries = Delivery::whereIn('estado_delivery', ['preparando', 'listo_para_entregar'])
-        ->orderBy('created_at', 'asc')
-        ->get()
-        ->map(function ($delivery) {
-            $p = new \stdClass();
-            $p->id = $delivery->id;
-            $p->numero = $delivery->codigo;
-            $p->mesa_id = null;
-            $p->mesa = null;
-            $p->cliente = $delivery->cliente;
-            $p->productos = is_array($delivery->productos)
-                ? $delivery->productos
-                : (json_decode($delivery->productos, true) ?? []);
-            $p->total = $delivery->total;
-            $p->estado = $delivery->estado_delivery === 'listo_para_entregar' ? 'listo' : $delivery->estado_delivery;
-            $p->tipo = 'delivery';
-            $p->tipo_origen = 'delivery';
-            $p->created_at = $delivery->created_at;
-            $p->hora_pedido = $delivery->created_at;
-            $p->observaciones = null;
-            $p->hora_entrega = null;
-            return $p;
-        });
+        // Pedidos de delivery
+        $deliveries = Delivery::whereIn('estado_delivery', ['preparando', 'listo_para_entregar'])
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function ($delivery) {
+                $p = new \stdClass;
+                $p->id = $delivery->id;
+                $p->numero = $delivery->codigo;
+                $p->mesa_id = null;
+                $p->mesa = null;
+                $p->cliente = $delivery->cliente;
+                $p->productos = is_array($delivery->productos)
+                    ? $delivery->productos
+                    : (json_decode($delivery->productos, true) ?? []);
+                $p->total = $delivery->total;
+                // El tablero de Producción solo entiende pendiente/preparando/listo,
+                // así que "listo_para_entregar" se muestra como "listo" ahí.
+                $p->estado = $delivery->estado_delivery === 'listo_para_entregar' ? 'listo' : $delivery->estado_delivery;
+                $p->tipo = 'delivery';
+                $p->tipo_origen = 'delivery';
+                $p->created_at = $delivery->created_at;
+                $p->hora_pedido = $delivery->created_at;
+                $p->observaciones = null;
+                $p->hora_entrega = null;
 
-    // Unir y ordenar
-    $todos = collect($pedidos)->concat($deliveries)
-        ->sortBy('created_at')
-        ->values();
+                return $p;
+            });
 
-    return Inertia::render('inventario/produccion', [
-        'pedidos' => $todos
-    ]);
-}
+        // Unir y ordenar
+        $todos = collect($pedidos)->concat($deliveries)
+            ->sortBy('created_at')
+            ->values();
+
+        return Inertia::render('inventario/produccion', [
+            'pedidos' => $todos,
+        ]);
+    }
+
+
     public function caja()
     {
         $pedidos = Pedido::with('mesa')
@@ -101,7 +94,7 @@ public function produccion()
             ->get();
 
         return Inertia::render('dinero/caja', [
-            'pedidos' => $pedidos
+            'pedidos' => $pedidos,
         ]);
     }
 
@@ -118,9 +111,15 @@ public function produccion()
             'estado' => 'nullable|string|in:pendiente,preparando,listo,entregado,pagado,cancelado',
             'area' => 'nullable|string|in:cocina,bar,horno,postres', 
             'observaciones' => 'nullable|string',
+            'user_id' => 'nullable|integer|exists:users,id',
         ]);
 
+        if (! empty($validated['user_id']) && ! auth()->user()->currentTeam->members()->where('users.id', $validated['user_id'])->exists()) {
+            return redirect()->back()->with('error', 'El empleado no pertenece a esta sede.');
+        }
+
         $estado = $validated['estado'] ?? 'pendiente';
+        $userId = $validated['user_id'] ?? auth()->id();
 
         $pedido = Pedido::create([
             'numero' => Pedido::generarNumero(),
@@ -132,21 +131,27 @@ public function produccion()
             'metodo_pago' => $validated['metodo_pago'] ?? null,
             'tipo' => $validated['tipo'] ?? 'mesa',
             'estado' => $estado,
+
             'area' => $validated['area'] ?? 'cocina',
+
             'observaciones' => $validated['observaciones'] ?? null,
             'hora_pedido' => now(),
+            'user_id' => $userId,
         ]);
 
         if ($estado === 'pendiente' && $pedido->mesa_id) {
             $mesa = Mesa::find($pedido->mesa_id);
             if ($mesa && $mesa->estado !== 'ocupada') {
                 $mesa->estado = 'ocupada';
-                if (!$mesa->mesero) {
-                    $mesa->mesero = auth()->user()->name ?? null;
+                if (! $mesa->user_id) {
+                    $mesa->user_id = $userId;
                 }
                 $mesa->save();
+                broadcast(new MesaActualizada($mesa));
             }
         }
+
+        broadcast(new PedidoCreado($pedido));
 
         return redirect()->back()->with('success', 'Pedido creado correctamente');
     }
@@ -154,7 +159,7 @@ public function produccion()
     public function show(Pedido $pedido)
     {
         return Inertia::render('pedidos/show', [
-            'pedido' => $pedido->load('mesa')
+            'pedido' => $pedido->load('mesa'),
         ]);
     }
 
@@ -189,6 +194,7 @@ public function produccion()
                 'estado' => 'required|in:pendiente,preparando,listo,entregado,pagado,cancelado',
             ]);
 
+
             $pedido->estado = $validated['estado'];
 
             if ($validated['estado'] === 'entregado') {
@@ -201,6 +207,15 @@ public function produccion()
         }
 
         return redirect()->back()->with('error', 'No se realizaron cambios');
+
+        broadcast(new PedidoActualizado($pedido));
+
+        if ($validated['estado'] === 'listo') {
+            broadcast(new PedidoListo($pedido));
+        }
+
+        return redirect()->back()->with('success', 'Estado del pedido actualizado');
+
     }
 
     // 🗑️ NUEVO: Cancelar un pedido activo (desde el modal de edición en Ventas)
@@ -228,6 +243,9 @@ public function produccion()
 
         $pedido->save();
 
+        broadcast(new PedidoActualizado($pedido));
+        broadcast(new PedidoListo($pedido));
+
         return redirect()->back()->with('success', 'Pedido marcado como listo');
     }
     //  Enviar delivery a cocina
@@ -239,6 +257,11 @@ public function produccion()
             $pedido->estado = 'preparando';
             $pedido->estado_delivery = 'preparando';
             $pedido->save();
+
+
+
+            broadcast(new PedidoActualizado($pedido));
+
 
             return redirect()->back()->with('success', 'Pedido enviado a cocina');
         }
@@ -276,14 +299,17 @@ public function produccion()
         $pedido->estado = 'pagado';
         $pedido->save();
 
+        broadcast(new PedidoActualizado($pedido));
+
         if ($pedido->mesa_id) {
             $mesa = Mesa::find($pedido->mesa_id);
             if ($mesa && $mesa->estado === 'ocupada') {
                 $mesa->estado = 'libre';
-                $mesa->mesero = null;
+                $mesa->user_id = null;
                 $mesa->cliente = null;
                 $mesa->personas = null;
                 $mesa->save();
+                broadcast(new MesaActualizada($mesa));
             }
         }
 
@@ -293,6 +319,7 @@ public function produccion()
     public function destroy(Pedido $pedido)
     {
         $pedido->delete();
+
         return redirect()->back()->with('success', 'Pedido eliminado correctamente');
     }
 }

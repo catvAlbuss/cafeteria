@@ -67,13 +67,22 @@ const getEstadoConfig = (estado: string) =>
 const ProductImage = ({
     src,
     alt,
-    className = "w-full h-full object-cover"
+    className = "w-full h-full object-cover",
+    onError,
 }: {
     src?: string;
     alt: string;
     className?: string;
+    onError?: (e: any) => void;
 }) => {
     const [hasError, setHasError] = useState(false);
+
+    const handleImageError = (e: any) => {
+        setHasError(true);
+        if (onError) {
+            onError(e);
+        }
+    };
 
     if (!src || hasError) {
         return (
@@ -89,7 +98,7 @@ const ProductImage = ({
             src={src}
             alt={alt}
             className={className}
-            onError={() => setHasError(true)}
+            onError={handleImageError}
         />
     );
 };
@@ -110,9 +119,34 @@ export default function Ventas() {
     const [productos, setProductos] = useState<Producto[]>([]);
     const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
     const [busqueda, setBusqueda] = useState('');
+
     const [pedidosActivos, setPedidosActivos] = useState<any[]>(pedidosActivosProp);
     const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any | null>(null);
     const [modalEdicionAbierto, setModalEdicionAbierto] = useState(false);
+
+    const [pedidoEnviado, setPedidoEnviado] = useState(false);
+
+   
+useEffect(() => {
+    if (platos && platos.length > 0) {
+        const productosProcesados = platos.map((p: any) => ({
+            id: p.id,
+            nombre: p.nombre,
+            precio: typeof p.precio === 'string' ? parseFloat(p.precio) : p.precio,
+            categoria: p.categoria || '',
+            imagen: p.imagen || '/img/productos/placeholder.jpeg',
+            stock: typeof p.stock === 'string' ? parseInt(p.stock) : p.stock,
+            disponible: p.disponible === 1 || p.disponible === true,
+        }));
+        setProductos(productosProcesados);
+    }
+}, [platos]);
+
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const mesaInicial = urlParams.get('mesa') || '';
+    const [mesa] = useState(mesaInicial);
+
     const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(mesaInfoProp);
 
   
@@ -414,6 +448,11 @@ export default function Ventas() {
                                                 src={producto.imagen}
                                                 alt={producto.nombre}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = '/img/productos/placeholder.jpeg';
+                                                }}
+
                                             />
                                         </div>
 
@@ -473,6 +512,9 @@ export default function Ventas() {
                                                     src={item.imagen}
                                                     alt={item.nombre}
                                                     className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = '/img/productos/placeholder.jpeg';
+                                                    }}
                                                 />
                                             </div>
                                             <div className="min-w-0">

@@ -2,13 +2,19 @@
 
 import { Head, usePage, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
+import { useSedeChannel } from '@/hooks/useSedeChannel';
 import {
     Search,
     Clock,
     CheckCircle,
     XCircle,
     Bell,
-    ChevronRight
+    ChevronRight,
+    Bike,
+    Radio,
+    Timer,
+    Wifi,
+
 } from 'lucide-react';
 import {
     agruparPedidosPorArea,
@@ -161,6 +167,7 @@ export default function Produccion() {
         });
     };
 
+
     // ============================================================
     // TOMAR PEDIDO - NUEVA FUNCIÓN (SOLO PARA LA CAMPANITA)
     // ============================================================
@@ -178,7 +185,6 @@ export default function Produccion() {
         );
 
         if (!confirmar) return;
-
 
         router.patch(`/pedidos/${pedido.id}`, { estado: 'preparando' }, {
             onSuccess: () => {
@@ -199,6 +205,45 @@ export default function Produccion() {
             }
         });
     };
+
+    // Tiempo real: nuevos pedidos y cambios de estado desde cualquier terminal
+    useSedeChannel('produccion', {
+        'pedido.creado': (payload: any) => {
+            setPedidos(prev => (prev.some(p => p.id === payload.id)
+                ? prev
+                : [...prev, { ...payload, tipo_origen: payload.tipo === 'delivery' ? 'delivery' : 'mesa' }]));
+        },
+        'pedido.actualizado': (payload: any) => {
+            setPedidos(prev => {
+                if (['listo', 'entregado', 'pagado', 'cancelado'].includes(payload.estado)) {
+                    return prev.filter(p => p.id !== payload.id);
+                }
+                return prev.map(p => (p.id === payload.id ? { ...p, estado: payload.estado } : p));
+            });
+        },
+    });
+
+    // Función para contar pedidos por estado
+    const contarPorEstado = (estado: string) => {
+        return pedidosFiltrados.filter(p => p.estado === estado).length;
+    };
+
+    const pedidosParaNotificar = pedidos
+        .filter(p => ['pendiente', 'preparando'].includes(p.estado))
+        .sort((a, b) => {
+            const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return createdA - createdB;
+        });
+    const pedidosUrgentes = pedidosParaNotificar.filter(p => {
+        const createdAt = p.created_at ? new Date(p.created_at).getTime() : NaN;
+        return Number.isFinite(createdAt) && Date.now() - createdAt > 10 * 60 * 1000;
+    }).length;
+    const eventosLivePreview = [
+        { label: 'pedido.creado', description: 'Ingresara directo al tablero' },
+        { label: 'pedido.actualizado', description: 'Sincronizara cambios de estado' },
+        { label: 'pedido.listo', description: 'Avisara a salon y caja' },
+    ];
     return (
         <>
             <Head title="Producción" />
@@ -245,7 +290,9 @@ export default function Produccion() {
                                                 ✅ No hay pedidos pendientes
                                             </div>
                                         ) : (
+
                                             pedidos.filter(p => p.estado === 'pendiente').map((pedido) => (
+
                                                 <div
                                                     key={pedido.id}
                                                     className="p-3 rounded-xl border bg-orange-50 border-orange-300 mb-2 last:mb-0"
@@ -300,6 +347,56 @@ export default function Produccion() {
                 </div>
 
                 {/* Barra de búsqueda y filtros */}
+                <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_0.8fr]">
+                    <div className="rounded-xl border border-[#8D6B53]/15 bg-white p-4 shadow-sm">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p className="flex items-center gap-2 text-sm font-bold text-[#2D1B1A]">
+                                    <Radio className="h-4 w-4 text-green-500" />
+                                    Centro de trabajo en vivo
+                                </p>
+                                <p className="mt-1 text-xs text-[#8D6B53]">Diseno listo para conectar eventos de Broadcasting por sede.</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                                    <Wifi className="h-3.5 w-3.5" />
+                                    Standby
+                                </span>
+                                <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                                    Urgentes: {pedidosUrgentes}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+                            {eventosLivePreview.map(evento => (
+                                <div key={evento.label} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                                    <p className="font-mono text-xs font-semibold text-[#2D1B1A]">{evento.label}</p>
+                                    <p className="mt-1 text-[11px] text-gray-500">{evento.description}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 rounded-xl border border-[#8D6B53]/15 bg-white p-4 text-center shadow-sm">
+                        <div className="rounded-lg bg-orange-50 px-2 py-3">
+                            <Timer className="mx-auto mb-1 h-4 w-4 text-orange-500" />
+                            <p className="text-xl font-bold text-orange-700">{contarPorEstado('pendiente')}</p>
+                            <p className="text-[11px] text-gray-500">Pendientes</p>
+                        </div>
+                        <div className="rounded-lg bg-blue-50 px-2 py-3">
+                            <Clock className="mx-auto mb-1 h-4 w-4 text-blue-500" />
+                            <p className="text-xl font-bold text-blue-700">{contarPorEstado('preparando')}</p>
+                            <p className="text-[11px] text-gray-500">Preparando</p>
+                        </div>
+                        <div className="rounded-lg bg-green-50 px-2 py-3">
+                            <CheckCircle className="mx-auto mb-1 h-4 w-4 text-green-500" />
+                            <p className="text-xl font-bold text-green-700">{contarPorEstado('listo')}</p>
+                            <p className="text-[11px] text-gray-500">Listos</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="bg-white rounded-2xl shadow-sm p-4 border border-[#8D6B53]/10">
                     <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-4">
                         <div className="flex-1 relative">
@@ -382,6 +479,7 @@ export default function Produccion() {
         </>
     );
 }
+
 
 // ============================================================
 // COMPONENTE: Área Card
@@ -509,3 +607,4 @@ function AreaCard({
         </div>
     );
 }
+

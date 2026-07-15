@@ -31,12 +31,13 @@ import type { NavItem } from '@/types';
 export function AppSidebar() {
     const page = usePage();
     const dashboardUrl = '/dashboard';
+    const permissions = page.props.auth.permissions;
 
-    //  TODAS LAS PÁGINAS (SIN items)
-    const mainNavItems: NavItem[] = [
-        // DASHBOARD
+    //  TODAS LAS PÁGINAS (se filtran según el permiso de "ver" de cada rol)
+    const allNavItems: NavItem[] = [
+        // DASHBOARD - siempre visible, sin permiso asociado
         {
-            title: 'Dashboard',
+            title: 'Inicio',
             href: '/dashboard',
             icon: LayoutDashboard,
         },
@@ -44,97 +45,83 @@ export function AppSidebar() {
             title: ' Ventas',
             href: '/ventas',
             icon: DollarSign,
+            permission: 'ver ventas',
         },
-        
         {
             title: 'Caja',
             href: '/caja',
             icon: DollarSign,
+            permission: 'ver caja',
         },
-        
         {
             title: 'Reportes',
             href: '/reportes',
             icon: BarChart3,
+            permission: 'ver reportes',
         },
         {
             title: ' Contador',
             href: '/contador',
             icon: DollarSign,
+            permission: 'ver contador',
         },
-        
+
         //  RESTAURANTE - TÍTULO SEPARADOR
         {
             title: ' Platos',
             href: '/platos',
             icon: Coffee,
+            permission: 'ver platos',
         },
         {
             title: 'Mesas',
             href: '/mesas',
             icon: Coffee,
+            permission: 'ver mesas',
         },
         {
             title: ' Covers',
             href: '/covers',
             icon: Coffee,
+            permission: 'ver covers',
         },
-        
-     
+
         {
             title: 'Producción',
             href: '/produccion',
             icon: Package,
+            permission: 'ver produccion',
         },
         {
             title: 'Cardex',
             href: '/cardex',
             icon: Package,
+            permission: 'ver cardex',
         },
         {
             title: 'Mermas',
             href: '/mermas',
             icon: Package,
+            permission: 'ver mermas',
         },
-       
 
         {
             title: 'Clientes',
             href: '/clientes',
             icon: Users,
+            permission: 'ver clientes',
         },
         {
             title: 'Delivery',
             href: '/delivery',
             icon: MapPin,
-        },
-        
-        // ⚙️ CONFIGURACIÓN - TÍTULO SEPARADOR
-      
-        {
-            title: 'Configuración',
-            href: '/configuracion',
-            icon: Settings,
-        },
-        {
-            title: ' Mi Perfil',
-            href: '/perfil',
-            icon: UserCog,
+            permission: 'ver delivery',
         },
     ];
 
-    const footerNavItems: NavItem[] = [
-        {
-            title: 'Documentación',
-            href: 'https://laravel.com/docs/starter-kits#react',
-            icon: FileText,
-        },
-        {
-            title: 'Soporte',
-            href: '/soporte',
-            icon: HelpCircle,
-        },
-    ];
+    const mainNavItems: NavItem[] = allNavItems.filter(
+        (item) => !item.permission || permissions.includes(item.permission),
+    );
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -160,7 +147,6 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
