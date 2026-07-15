@@ -9,29 +9,25 @@ class Pedido extends Model
     protected $fillable = [
         'numero',
         'mesa_id',
-        'mesa',        
+        'mesa',
         'cliente',
-        'tipo',        
+        'tipo',
         'productos',
         'total',
         'estado',
+        'area',
         'observaciones',
         'hora_pedido',
         'hora_entrega',
         'caja_id',
         'metodo_pago',
-        // 🚚 Campos de delivery
-        'codigo',
-        'telefono',
-        'direccion',
-        'repartidor',
-        'estado_delivery',
     ];
 
     protected $casts = [
         'productos' => 'array',
         'hora_pedido' => 'datetime',
         'hora_entrega' => 'datetime',
+        'total' => 'decimal:2',
     ];
 
     // Relación con mesa

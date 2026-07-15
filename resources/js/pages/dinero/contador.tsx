@@ -186,7 +186,7 @@ export default function Contador() {
                 {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-[#2D1B1A]">💰 Contador</h1>
+                        <h1 className="text-3xl font-bold text-[#2D1B1A]"> Contador</h1>
                         <p className="text-[#5A3D2B] text-sm mt-1">Control financiero, apertura y cierre de caja</p>
                     </div>
                     <div className="flex flex-wrap gap-3">

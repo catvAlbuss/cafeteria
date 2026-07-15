@@ -1,9 +1,25 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { UserRound, Armchair, Search, Minus, Plus, ShoppingBag, Send, ShoppingCart } from 'lucide-react';
 import axios from 'axios';
+import { detectarArea } from '@/utils/clasificarPedidos';
+import {
+    UserRound,
+    Armchair,
+    Search,
+    Minus,
+    Plus,
+    ShoppingBag,
+    Send,
+    ShoppingCart,
+    Package,
+    ImageOff
+} from 'lucide-react';
+import ModalEditarPedido from '@/components/modals/ModalEditarPedido';
 import { toast } from 'sonner';
 
+// ============================================================
+// INTERFACES
+// ============================================================
 interface Producto {
     id: number;
     nombre: string;
@@ -31,14 +47,9 @@ interface MesaInfo {
     mesero?: string | null;
 }
 
-interface Mesa {
-    id: number;
-    numero: string;
-}
-
-// -----------------------------------------------------------------------
-// Mismos tokens de color que mesa.tsx, para que el sistema se vea unificado.
-// -----------------------------------------------------------------------
+// ============================================================
+// CONFIGURACIÓN DE ESTADOS
+// ============================================================
 const ESTADOS = {
     libre: { label: 'Libre', soft: 'bg-[#1F8A5F]/10 text-[#1F8A5F]', solid: 'bg-[#1F8A5F]' },
     pendiente: { label: 'Pendiente', soft: 'bg-[#B7791F]/10 text-[#B7791F]', solid: 'bg-[#B7791F]' },
@@ -47,70 +58,126 @@ const ESTADOS = {
     listo_cobrar: { label: 'Cobrar', soft: 'bg-[#7B4FC9]/10 text-[#7B4FC9]', solid: 'bg-[#7B4FC9]' },
 } as const;
 
-const getEstadoConfig = (estado: string) => ESTADOS[estado as keyof typeof ESTADOS] ?? ESTADOS.libre;
+const getEstadoConfig = (estado: string) =>
+    ESTADOS[estado as keyof typeof ESTADOS] ?? ESTADOS.libre;
 
+// ============================================================
+// COMPONENTE: Imagen con fallback
+// ============================================================
+const ProductImage = ({
+    src,
+    alt,
+    className = "w-full h-full object-cover"
+}: {
+    src?: string;
+    alt: string;
+    className?: string;
+}) => {
+    const [hasError, setHasError] = useState(false);
+
+    if (!src || hasError) {
+        return (
+            <div className="w-full h-full bg-[#F5EDE3] flex flex-col items-center justify-center">
+                <ImageOff className="w-8 h-8 text-[#C9A96E]" strokeWidth={1.5} />
+                <span className="text-[10px] text-[#8D6B53] mt-1">Sin imagen</span>
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={src}
+            alt={alt}
+            className={className}
+            onError={() => setHasError(true)}
+        />
+    );
+};
+
+// ============================================================
+// COMPONENTE PRINCIPAL
+// ============================================================
 export default function Ventas() {
-    
-    const { platos = [], mesaInfo: mesaInfoProp = null } = usePage().props as any;
+    const {
+        platos = [],
+        mesaInfo: mesaInfoProp = null,
+        pedidosActivos: pedidosActivosProp = [],
+    } = usePage().props as any;
 
-  
+    // ============================================================
+    // STATES
+    // ============================================================
     const [productos, setProductos] = useState<Producto[]>([]);
     const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
     const [busqueda, setBusqueda] = useState('');
-    const [pedidoEnviado, setPedidoEnviado] = useState(false);
-
-   
-useEffect(() => {
-    if (platos && platos.length > 0) {
-        const productosProcesados = platos.map((p: any) => ({
-            id: p.id,
-            nombre: p.nombre,
-            precio: typeof p.precio === 'string' ? parseFloat(p.precio) : p.precio,
-            categoria: p.categoria || '',
-            imagen: p.imagen || '/img/productos/placeholder.jpg',
-            stock: typeof p.stock === 'string' ? parseInt(p.stock) : p.stock,
-            disponible: p.disponible === 1 || p.disponible === true,
-        }));
-        setProductos(productosProcesados);
-    }
-}, [platos]);
-
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const mesaInicial = urlParams.get('mesa') || '';
-    const [mesa] = useState(mesaInicial);
+    const [pedidosActivos, setPedidosActivos] = useState<any[]>(pedidosActivosProp);
+    const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any | null>(null);
+    const [modalEdicionAbierto, setModalEdicionAbierto] = useState(false);
     const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(mesaInfoProp);
 
+  
+
+      // ============================================================
+    // EFECTOS
+    // ============================================================
+    // Procesar productos desde props
     useEffect(() => {
+        if (platos && platos.length > 0) {
+            const productosProcesados = platos.map((p: any) => ({
+                id: p.id,
+                nombre: p.nombre,
+                precio: typeof p.precio === 'string' ? parseFloat(p.precio) : p.precio,
+                categoria: p.categoria || '',
+                imagen: p.imagen || '',
+                stock: typeof p.stock === 'string' ? parseInt(p.stock) : p.stock,
+                disponible: p.disponible === 1 || p.disponible === true,
+            }));
+            setProductos(productosProcesados);
+        }
+    }, [platos]);
+
+    // Mantener pedidosActivos sincronizado con lo que devuelve el backend
+    useEffect(() => {
+        setPedidosActivos(pedidosActivosProp);
+    }, [pedidosActivosProp]);
+
+    // 👇 NUEVO: Recargar automáticamente al volver a la página
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                router.reload({
+                    only: ['pedidosActivos', 'mesaInfo'],
+                    preserveUrl: true
+                });
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, []);
+
+    // Obtener información de la mesa desde API si no viene en props
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const mesa = urlParams.get('mesa');
+
         if (mesa && !mesaInfoProp) {
             axios.get(`/api/mesas/${mesa}`)
-                .then(response => {
-                    setMesaInfo(response.data);
-                })
-                .catch(() => {
-                    // silencioso: si falla, simplemente no mostramos la tarjeta de mesa
-                });
+                .then(response => setMesaInfo(response.data))
+                .catch(() => { /* Silencioso */ });
         }
-    }, [mesa, mesaInfoProp]);
+    }, [mesaInfoProp]);
 
-
+    // ============================================================
+    // FUNCIONES DE CARRITO
+    // ============================================================
     const totalCarrito = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
 
-
-    const productosFiltrados = productos
-        .filter(p => p.stock > 0) // 👈 Solo productos con stock
-        .filter(p =>
-            p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-            p.categoria.toLowerCase().includes(busqueda.toLowerCase())
-        );
-
     const agregarProducto = (producto: Producto) => {
-
         if (!producto.disponible) {
             toast.warning('Este producto no está disponible');
             return;
         }
-
 
         if (producto.stock <= 0) {
             toast.warning('Este producto está agotado');
@@ -118,8 +185,8 @@ useEffect(() => {
         }
 
         const existente = carrito.find(item => item.id === producto.id);
+
         if (existente) {
-            // Verificar que no exceda el stock
             if (existente.cantidad + 1 > producto.stock) {
                 toast.error('No hay suficiente stock');
                 return;
@@ -130,12 +197,19 @@ useEffect(() => {
                     : item
             ));
         } else {
-            setCarrito([...carrito, { ...producto, cantidad: 1 }]);
+            setCarrito([...carrito, {
+                id: producto.id,
+                nombre: producto.nombre,
+                precio: producto.precio,
+                cantidad: 1,
+                imagen: producto.imagen
+            }]);
         }
     };
 
     const quitarProducto = (id: number) => {
         const existente = carrito.find(item => item.id === id);
+
         if (existente && existente.cantidad > 1) {
             setCarrito(carrito.map(item =>
                 item.id === id
@@ -148,13 +222,16 @@ useEffect(() => {
     };
 
 
+    // ============================================================
+    // ENVIAR PEDIDO - VERSIÓN CORREGIDA (SOLO ESTA PARTE)
+    // ============================================================
     const enviarPedido = () => {
         if (carrito.length === 0) {
             toast.warning('Agrega productos al pedido');
             return;
         }
 
-        // Verificar stock antes de enviar
+        // Verificar stock
         const productosSinStock = carrito.filter(item => {
             const producto = productos.find(p => p.id === item.id);
             return producto && item.cantidad > producto.stock;
@@ -165,24 +242,35 @@ useEffect(() => {
             return;
         }
 
-        router.post('/pedidos', {
-            mesa_id: mesaInfo?.id || null,
-            cliente: 'Anónimo',
-            productos: carrito.map(item => ({
+        // 👇 Preparar productos con categoría (para detectar área)
+        const productosConCategoria = carrito.map(item => {
+            const productoOriginal = productos.find(p => p.id === item.id);
+            return {
                 id: item.id,
                 nombre: item.nombre,
                 cantidad: item.cantidad,
                 precio: item.precio,
-                subtotal: item.precio * item.cantidad
-            })),
+                subtotal: item.precio * item.cantidad,
+                categoria: productoOriginal?.categoria || '',
+                imagen: item.imagen,
+            };
+        });
+
+        // 👇 Detectar área
+        const areaDetectada = detectarArea(productosConCategoria);
+
+        router.post('/pedidos', {
+            mesa_id: mesaInfo?.id || null,
+            cliente: 'Anónimo',
+            productos: productosConCategoria, // 👈 Enviar con categoría
             total: totalCarrito,
+            area: areaDetectada, // 👈 Enviar área
             observaciones: '',
         }, {
+            preserveScroll: true,
             onSuccess: () => {
-                setPedidoEnviado(true);
-
                 toast.success('Pedido enviado a cocina', {
-                    description: `Mesa: ${mesa || 'No asignada'} · Mesero: ${mesaInfo?.mesero || 'No asignado'} · Total: S/ ${totalCarrito.toFixed(2)}`,
+                    description: `Mesa: ${mesaInfo?.numero || 'No asignada'} · Mesero: ${mesaInfo?.mesero || 'No asignado'} · Total: S/ ${totalCarrito.toFixed(2)} · Área: ${areaDetectada}`,
                     duration: 5000,
                     style: {
                         background: '#2D1B1A',
@@ -192,13 +280,26 @@ useEffect(() => {
                 });
 
                 setCarrito([]);
+                router.reload({ only: ['pedidosActivos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
             },
             onError: (errors) => {
                 toast.error('Error al enviar pedido: ' + Object.values(errors).join(' '));
             }
         });
     };
+    // ============================================================
+    // FILTRADO DE PRODUCTOS
+    // ============================================================
+    const productosFiltrados = productos
+        .filter(p => p.stock > 0)
+        .filter(p =>
+            p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+            p.categoria.toLowerCase().includes(busqueda.toLowerCase())
+        );
 
+    // ============================================================
+    // RENDER
+    // ============================================================
     return (
         <>
             <Head title="Ventas" />
@@ -211,7 +312,7 @@ useEffect(() => {
                 </div>
 
                 {/* Información de la mesa */}
-                {mesaInfo && !pedidoEnviado && (
+                {mesaInfo && (
                     <div className="relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-black/5">
                         <div className="absolute -top-2 -right-2">
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide text-white shadow-sm ${getEstadoConfig(mesaInfo.estado).solid}`}>
@@ -223,17 +324,11 @@ useEffect(() => {
                             {/* Mesa */}
                             <div className="flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-full bg-[#FBF7F0] border-2 border-[#C9A96E] flex items-center justify-center">
-                                    <span className="text-lg font-bold text-[#2D1B1A]">
-                                        #{mesaInfo.numero}
-                                    </span>
+                                    <span className="text-lg font-bold text-[#2D1B1A]">#{mesaInfo.numero}</span>
                                 </div>
                                 <div>
-                                    <p className="text-[10px] uppercase text-[#8D6B53] font-semibold tracking-wider">
-                                        Mesa
-                                    </p>
-                                    <p className="text-sm text-[#2D1B1A] font-medium">
-                                        {mesaInfo.capacidad} personas
-                                    </p>
+                                    <p className="text-[10px] uppercase text-[#8D6B53] font-semibold tracking-wider">Mesa</p>
+                                    <p className="text-sm text-[#2D1B1A] font-medium">{mesaInfo.capacidad} personas</p>
                                 </div>
                             </div>
 
@@ -245,21 +340,15 @@ useEffect(() => {
                                     <UserRound className="w-5 h-5 text-[#2D1B1A]" strokeWidth={2} />
                                 </div>
                                 <div>
-                                    <p className="text-[10px] uppercase text-[#8D6B53] font-semibold tracking-wider">
-                                        Mesero
-                                    </p>
-                                    <p className="text-sm text-[#2D1B1A] font-medium">
-                                        {mesaInfo.mesero || 'No asignado'}
-                                    </p>
+                                    <p className="text-[10px] uppercase text-[#8D6B53] font-semibold tracking-wider">Mesero</p>
+                                    <p className="text-sm text-[#2D1B1A] font-medium">{mesaInfo.mesero || 'No asignado'}</p>
                                 </div>
                             </div>
 
                             {/* Sillas */}
                             <div className="flex items-center gap-2 ml-auto bg-[#FBF7F0] px-3 py-1.5 rounded-full border border-black/5">
                                 <Armchair className="w-4 h-4 text-[#8D6B53]" strokeWidth={2} />
-                                <span className="text-sm text-[#2D1B1A] font-medium">
-                                    {mesaInfo.sillas} sillas
-                                </span>
+                                <span className="text-sm text-[#2D1B1A] font-medium">{mesaInfo.sillas} sillas</span>
                             </div>
                         </div>
                     </div>
@@ -267,8 +356,9 @@ useEffect(() => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-                    {/* COLUMNA 1: Buscador y productos */}
+                    {/* COLUMNA 1: Productos */}
                     <div className="lg:col-span-2">
+                        {/* Buscador */}
                         <div className="relative mb-4">
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" strokeWidth={2} />
                             <input
@@ -302,7 +392,7 @@ useEffect(() => {
                                             }
                                         }}
                                     >
-                                        {/* Badge: No disponible */}
+                                        {/* Badges */}
                                         {!producto.disponible && (
                                             <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10 rounded-2xl">
                                                 <span className="text-white font-bold text-xs px-3 py-1 bg-red-600 rounded-full shadow-lg">
@@ -310,8 +400,6 @@ useEffect(() => {
                                                 </span>
                                             </div>
                                         )}
-
-                                        {/* Badge: Agotado */}
                                         {producto.disponible && producto.stock <= 0 && (
                                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10 rounded-2xl">
                                                 <span className="text-white font-bold text-xs px-3 py-1 bg-orange-500 rounded-full shadow-lg">
@@ -320,16 +408,16 @@ useEffect(() => {
                                             </div>
                                         )}
 
+                                        {/* Imagen */}
                                         <div className="h-32 bg-[#F5EDE3] flex items-center justify-center overflow-hidden">
-                                            <img
+                                            <ProductImage
                                                 src={producto.imagen}
                                                 alt={producto.nombre}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                                                onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = '/img/productos/placeholder.jpg';
-                                                }}
                                             />
                                         </div>
+
+                                        {/* Información */}
                                         <div className="p-3">
                                             <p className="font-medium text-[#2D1B1A] text-sm">{producto.nombre}</p>
                                             <div className="flex justify-between items-center mt-1">
@@ -379,21 +467,20 @@ useEffect(() => {
                             <div className="space-y-2 max-h-64 overflow-y-auto">
                                 {carrito.map((item) => (
                                     <div key={item.id} className="flex items-center justify-between border-b border-black/5 py-2">
-                                        <div className="flex items-center gap-2">
-                                            <img
-                                                src={item.imagen}
-                                                alt={item.nombre}
-                                                className="w-10 h-10 rounded-lg object-cover"
-                                                onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = '/img/productos/placeholder.jpg';
-                                                }}
-                                            />
-                                            <div>
-                                                <p className="text-sm font-medium text-[#2D1B1A]">{item.nombre}</p>
+                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-[#F5EDE3]">
+                                                <ProductImage
+                                                    src={item.imagen}
+                                                    alt={item.nombre}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-[#2D1B1A] truncate">{item.nombre}</p>
                                                 <p className="text-xs text-[#8D6B53]">S/ {item.precio.toFixed(2)} x {item.cantidad}</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-shrink-0">
                                             <button
                                                 onClick={() => quitarProducto(item.id)}
                                                 className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition flex items-center justify-center active:scale-90"
@@ -401,28 +488,19 @@ useEffect(() => {
                                                 <Minus className="w-3.5 h-3.5" strokeWidth={2.5} />
                                             </button>
                                             <span className="text-sm font-bold text-[#2D1B1A] w-4 text-center">{item.cantidad}</span>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => quitarProducto(item.id)}
-                                                    className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition flex items-center justify-center active:scale-90"
-                                                >
-                                                    <Minus className="w-3.5 h-3.5" strokeWidth={2.5} />
-                                                </button>
-                                                <span className="text-sm font-bold text-[#2D1B1A] w-4 text-center">{item.cantidad}</span>
-                                                <button
-                                                    onClick={() => {
-                                                        const producto = productos.find(p => p.id === item.id);
-                                                        if (producto && producto.stock > item.cantidad) {
-                                                            agregarProducto(producto);
-                                                        } else {
-                                                            toast.error('Stock insuficiente');
-                                                        }
-                                                    }}
-                                                    className="w-6 h-6 rounded-full bg-[#2D1B1A]/5 text-[#2D1B1A] hover:bg-[#2D1B1A]/10 transition flex items-center justify-center active:scale-90"
-                                                >
-                                                    <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-                                                </button>
-                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    const producto = productos.find(p => p.id === item.id);
+                                                    if (producto && producto.stock > item.cantidad) {
+                                                        agregarProducto(producto);
+                                                    } else {
+                                                        toast.error('Stock insuficiente');
+                                                    }
+                                                }}
+                                                className="w-6 h-6 rounded-full bg-[#2D1B1A]/5 text-[#2D1B1A] hover:bg-[#2D1B1A]/10 transition flex items-center justify-center active:scale-90"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
@@ -447,6 +525,81 @@ useEffect(() => {
                         )}
                     </div>
                 </div>
+
+                {/* ===== PEDIDOS ACTIVOS ===== */}
+                {pedidosActivos.length > 0 && (
+                    <div className="mt-4">
+                        <div className="bg-white rounded-2xl border border-[#F3E1C8] p-4 shadow-sm">
+                            <h3 className="font-bold text-[#2D1B1A] text-sm mb-3 flex items-center gap-2">
+                                <Package className="w-4 h-4" />
+                                Pedidos Activos ({pedidosActivos.length})
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {pedidosActivos.map((pedido, index) => (
+                                    <div
+                                        key={pedido.id ?? index}
+                                        className="flex items-center justify-between p-3 bg-[#FBF7F0] rounded-xl border border-[#F3E1C8] cursor-pointer hover:border-[#C9A96E] transition"
+                                        onClick={() => {
+                                            setPedidoSeleccionado(pedido);
+                                            setModalEdicionAbierto(true);
+                                        }}
+                                    >
+                                        <div>
+                                            <p className="text-sm font-medium text-[#2D1B1A]">{pedido.numero}</p>
+                                            <p className="text-xs text-[#8D6B53]">
+                                                {pedido.productos.length} productos · S/ {Number(pedido.total).toFixed(2)}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${pedido.estado === 'pendiente' ? 'bg-orange-100 text-orange-700' :
+                                                pedido.estado === 'preparando' ? 'bg-blue-100 text-blue-700' :
+                                                    pedido.estado === 'listo' ? 'bg-green-100 text-green-600' :
+                                                        'bg-gray-100 text-gray-500'
+                                                }`}>
+                                                {pedido.estado === 'listo' ? '✅ Listo' :
+                                                    pedido.estado === 'preparando' ? '👨‍🍳 Preparando' :
+                                                        pedido.estado || 'Pendiente'}
+                                            </span>
+                                            <button
+                                                onClick={() => {
+                                                    window.location.href = `/ventas?mesa_id=${pedido.mesa_id}`;
+                                                }}
+                                                className="flex-1 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-medium text-sm transition"
+                                            >
+                                                ✏️ Editar pedido
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ===== MODAL DE EDICIÓN ===== */}
+                {pedidoSeleccionado && (
+                    <ModalEditarPedido
+                        isOpen={modalEdicionAbierto}
+                        onClose={() => {
+                            setModalEdicionAbierto(false);
+                            setPedidoSeleccionado(null);
+                        }}
+                        pedido={pedidoSeleccionado}
+                        productos={productos}
+                        onPedidoActualizado={() => {
+                            setModalEdicionAbierto(false);
+                            setPedidoSeleccionado(null);
+                            toast.success('✅ Pedido actualizado');
+                            router.reload({ only: ['pedidosActivos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
+                        }}
+                        onPedidoCancelado={() => {
+                            setModalEdicionAbierto(false);
+                            setPedidoSeleccionado(null);
+                            toast.success('🗑️ Pedido cancelado');
+                            router.reload({ only: ['pedidosActivos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
+                        }}
+                    />
+                )}
             </div>
         </>
     );

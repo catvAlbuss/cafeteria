@@ -6,36 +6,54 @@ use App\Models\Pedido;
 use App\Models\Mesa;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use App\Models\Plato; 
+use App\Models\Plato;
 use App\Models\Delivery;
 
 class PedidoController extends Controller
 {
-    public function index(Request $request)
-    {
-        $mesaNumero = $request->query('mesa');
-        $mesaInfo = $mesaNumero ? Mesa::where('numero', $mesaNumero)->first() : null;
-        $platos = Plato::all();
-        $pedidos = Pedido::with('mesa')
-            ->orderBy('created_at', 'desc')
-            ->limit(50) 
-            ->get();
+public function index(Request $request)
+{
+    $mesaId = $request->query('mesa_id');
+    $mesaNumero = $request->query('mesa');
 
-        return Inertia::render('dinero/ventas', [
-            'platos' => $platos,       
-            'mesas' => Mesa::all(),     
-            'mesaInfo' => $mesaInfo,    
-            'pedidos' => $pedidos,        
-        ]);
-    }
+    $mesaInfo = $mesaId
+        ? Mesa::find($mesaId)
+        : ($mesaNumero ? Mesa::where('numero', $mesaNumero)->first() : null);
 
+    $platos = Plato::all();
+
+   
+    $pedidosActivos = $mesaInfo
+        ? Pedido::where('mesa_id', $mesaInfo->id)
+            ->whereNotIn('estado', ['pagado', 'cancelado'])
+            ->limit(50)  
+            ->get()
+            ->sortByDesc('created_at') 
+        : collect();
+
+  
+    $pedidos = Pedido::with('mesa')
+        ->limit(50) 
+        ->get()
+        ->sortByDesc('created_at'); 
+
+    return Inertia::render('dinero/ventas', [
+        'platos' => $platos,
+        'mesas' => Mesa::all(),
+        'mesaInfo' => $mesaInfo,
+        'pedidos' => $pedidos,
+        'pedidosActivos' => $pedidosActivos,
+    ]);
+}
 public function produccion()
 {
-    // Pedidos de mesas
+   
     $pedidos = Pedido::with('mesa')
         ->whereIn('estado', ['pendiente', 'preparando'])
-        ->orderBy('created_at', 'asc')
+     
+        ->limit(100) 
         ->get()
+        ->sortBy('created_at')
         ->map(function ($pedido) {
             $pedido->tipo_origen = 'mesa';
             return $pedido;
@@ -43,30 +61,28 @@ public function produccion()
 
     // Pedidos de delivery
     $deliveries = Delivery::whereIn('estado_delivery', ['preparando', 'listo_para_entregar'])
-    ->orderBy('created_at', 'asc')
-    ->get()
-    ->map(function ($delivery) {
-        $p = new \stdClass();
-        $p->id = $delivery->id;
-        $p->numero = $delivery->codigo;
-        $p->mesa_id = null;
-        $p->mesa = null;
-        $p->cliente = $delivery->cliente;
-        $p->productos = is_array($delivery->productos)
-            ? $delivery->productos
-            : (json_decode($delivery->productos, true) ?? []);
-        $p->total = $delivery->total;
-        // El tablero de Producción solo entiende pendiente/preparando/listo,
-        // así que "listo_para_entregar" se muestra como "listo" ahí.
-        $p->estado = $delivery->estado_delivery === 'listo_para_entregar' ? 'listo' : $delivery->estado_delivery;
-        $p->tipo = 'delivery';
-        $p->tipo_origen = 'delivery';
-        $p->created_at = $delivery->created_at;
-        $p->hora_pedido = $delivery->created_at;
-        $p->observaciones = null;
-        $p->hora_entrega = null;
-        return $p;
-    });
+        ->orderBy('created_at', 'asc')
+        ->get()
+        ->map(function ($delivery) {
+            $p = new \stdClass();
+            $p->id = $delivery->id;
+            $p->numero = $delivery->codigo;
+            $p->mesa_id = null;
+            $p->mesa = null;
+            $p->cliente = $delivery->cliente;
+            $p->productos = is_array($delivery->productos)
+                ? $delivery->productos
+                : (json_decode($delivery->productos, true) ?? []);
+            $p->total = $delivery->total;
+            $p->estado = $delivery->estado_delivery === 'listo_para_entregar' ? 'listo' : $delivery->estado_delivery;
+            $p->tipo = 'delivery';
+            $p->tipo_origen = 'delivery';
+            $p->created_at = $delivery->created_at;
+            $p->hora_pedido = $delivery->created_at;
+            $p->observaciones = null;
+            $p->hora_entrega = null;
+            return $p;
+        });
 
     // Unir y ordenar
     $todos = collect($pedidos)->concat($deliveries)
@@ -77,14 +93,13 @@ public function produccion()
         'pedidos' => $todos
     ]);
 }
-
     public function caja()
     {
         $pedidos = Pedido::with('mesa')
             ->where('estado', 'listo')
             ->orderBy('created_at', 'asc')
             ->get();
-        
+
         return Inertia::render('dinero/caja', [
             'pedidos' => $pedidos
         ]);
@@ -101,6 +116,7 @@ public function produccion()
             'metodo_pago' => 'nullable|string',
             'tipo' => 'nullable|string',
             'estado' => 'nullable|string|in:pendiente,preparando,listo,entregado,pagado,cancelado',
+            'area' => 'nullable|string|in:cocina,bar,horno,postres', 
             'observaciones' => 'nullable|string',
         ]);
 
@@ -115,7 +131,8 @@ public function produccion()
             'total' => $validated['total'],
             'metodo_pago' => $validated['metodo_pago'] ?? null,
             'tipo' => $validated['tipo'] ?? 'mesa',
-            'estado' => $estado, 
+            'estado' => $estado,
+            'area' => $validated['area'] ?? 'cocina',
             'observaciones' => $validated['observaciones'] ?? null,
             'hora_pedido' => now(),
         ]);
@@ -143,49 +160,89 @@ public function produccion()
 
     public function update(Request $request, Pedido $pedido)
     {
-        $validated = $request->validate([
-            'estado' => 'required|in:pendiente,preparando,listo,entregado,pagado,cancelado',
-        ]);
+        // Si viene de la edición de productos (desde Ventas)
+        if ($request->has('productos')) {
+            $request->validate([
+                'productos' => 'required|array|min:1',
+                'productos.*.id' => 'required|integer',
+                'productos.*.nombre' => 'required|string',
+                'productos.*.cantidad' => 'required|integer|min:1',
+                'productos.*.precio' => 'required|numeric|min:0',
+                'productos.*.subtotal' => 'required|numeric|min:0',
+                'total' => 'required|numeric|min:0',
+            ]);
 
-        $pedido->estado = $validated['estado'];
+            if (!in_array($pedido->estado, ['pendiente', 'preparando'])) {
+                return redirect()->back()->with('error', 'Este pedido ya no se puede editar');
+            }
 
-        if ($validated['estado'] === 'entregado') {
-            $pedido->hora_entrega = now();
+            $pedido->productos = $request->productos;
+            $pedido->total = $request->total;
+            $pedido->save();
+
+            return redirect()->back()->with('success', 'Pedido actualizado correctamente');
         }
 
-        $pedido->save();
+        // Si viene de cambio de estado (desde Producción)
+        if ($request->has('estado')) {
+            $validated = $request->validate([
+                'estado' => 'required|in:pendiente,preparando,listo,entregado,pagado,cancelado',
+            ]);
 
-        return redirect()->back()->with('success', 'Estado del pedido actualizado');
+            $pedido->estado = $validated['estado'];
+
+            if ($validated['estado'] === 'entregado') {
+                $pedido->hora_entrega = now();
+            }
+
+            $pedido->save();
+
+            return redirect()->back()->with('success', 'Estado del pedido actualizado');
+        }
+
+        return redirect()->back()->with('error', 'No se realizaron cambios');
     }
 
-    // ✅ NUEVO: Marcar pedido como listo (para cocina)
+    // 🗑️ NUEVO: Cancelar un pedido activo (desde el modal de edición en Ventas)
+    public function cancelar(Pedido $pedido)
+    {
+        if (!in_array($pedido->estado, ['pendiente', 'preparando'])) {
+            return redirect()->back()->with('error', 'Este pedido ya no se puede cancelar');
+        }
+
+        $pedido->estado = 'cancelado';
+        $pedido->save();
+
+        return redirect()->back()->with('success', 'Pedido cancelado');
+    }
+
+    //  Marcar pedido como listo (para cocina)
     public function marcarListo($id)
     {
         $pedido = Pedido::findOrFail($id);
         $pedido->estado = 'listo';
-        
+
         if ($pedido->tipo === 'delivery') {
             $pedido->estado_delivery = 'listo_para_entregar';
         }
-        
+
         $pedido->save();
 
         return redirect()->back()->with('success', 'Pedido marcado como listo');
     }
-
-    // ✅ NUEVO: Enviar delivery a cocina
+    //  Enviar delivery a cocina
     public function enviarACocina($id)
     {
         $pedido = Pedido::findOrFail($id);
-        
+
         if ($pedido->tipo === 'delivery' && $pedido->estado === 'pendiente') {
             $pedido->estado = 'preparando';
             $pedido->estado_delivery = 'preparando';
             $pedido->save();
-            
+
             return redirect()->back()->with('success', 'Pedido enviado a cocina');
         }
-        
+
         return redirect()->back()->with('error', 'No se puede enviar este pedido a cocina');
     }
 
@@ -205,7 +262,7 @@ public function produccion()
             ->where('estado', 'listo')
             ->orderBy('created_at', 'asc')
             ->get();
-        
+
         return response()->json($pedidos);
     }
 
