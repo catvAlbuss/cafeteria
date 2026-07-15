@@ -163,6 +163,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/mesas/{mesa}/entregar', [MesaController::class, 'entregar'])->name('mesas.entregar');
     Route::patch('/mesas/{origen}/transferir-silla/{destino}', [MesaController::class, 'transferirSilla'])
         ->name('mesas.transferir-silla');
+        Route::patch('/mesas/{mesa}/cobrar', [PedidoController::class, 'cobrarMesa'])->name('mesas.cobrar');
 
     // PEDIDOS
 
@@ -188,11 +189,6 @@ Route::middleware(['auth'])->group(function () {
 
 });
 
-
-
-
-    //  NUEVAS RUTAS PARA MESAS
-    // (si es necesario añadir rutas adicionales para mesas, hacerlo dentro del grupo de autenticación arriba)
 
 
 Route::prefix('{current_team}')

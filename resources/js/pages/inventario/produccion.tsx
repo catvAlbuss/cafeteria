@@ -144,7 +144,7 @@ export default function Produccion() {
             return;
         }
 
-        // 👇 ESTA ES LA PARTE ORIGINAL QUE NOTIFICA A LA MESA
+      
         router.patch(`/pedidos/${pedido.id}`, { estado: nuevoEstado }, {
             onSuccess: () => {
                 if (nuevoEstado === 'listo') {
@@ -154,7 +154,7 @@ export default function Produccion() {
                         p.id === pedido.id ? { ...p, estado: nuevoEstado } : p
                     ));
                 }
-                // 👇 ESTO NOTIFICA A LA MESA (YA FUNCIONABA)
+              
                 if (nuevoEstado === 'listo' && pedido.mesa_id) {
                     router.post(`/mesas/${pedido.mesa_id}/pedido-listo`, {}, {
                         onSuccess: () => router.reload()

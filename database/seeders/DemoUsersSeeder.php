@@ -22,7 +22,7 @@ class DemoUsersSeeder extends Seeder
             ['name' => 'Administrador', 'email' => 'admin@cafeteria.test', 'usuario' => 'admin', 'pin' => '0000', 'role' => 'Gerente', 'teamRole' => TeamRole::Owner],
             ['name' => 'Mesero Demo', 'email' => 'mesero@cafeteria.test', 'usuario' => 'mesero', 'pin' => '1234', 'role' => 'Mesero', 'teamRole' => TeamRole::Member],
             ['name' => 'Cajero Demo', 'email' => 'cajero@cafeteria.test', 'usuario' => 'cajero', 'pin' => '5678', 'role' => 'Cajero', 'teamRole' => TeamRole::Member],
-            ['name' => 'Cocinero Demo', 'email' => 'cocinero@cafeteria.test', 'usuario' => 'cocinero', 'pin' => '9012', 'role' => 'Cocinero', 'teamRole' => TeamRole::Member],
+            ['name' => 'Cocinero Demo', 'email' => '    ', 'usuario' => 'cocinero', 'pin' => '9012', 'role' => 'Cocinero', 'teamRole' => TeamRole::Member],
         ];
 
         foreach ($empleados as $datos) {

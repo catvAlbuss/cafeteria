@@ -126,32 +126,28 @@ export default function Ventas() {
 
     const [pedidoEnviado, setPedidoEnviado] = useState(false);
 
-   
-useEffect(() => {
-    if (platos && platos.length > 0) {
-        const productosProcesados = platos.map((p: any) => ({
-            id: p.id,
-            nombre: p.nombre,
-            precio: typeof p.precio === 'string' ? parseFloat(p.precio) : p.precio,
-            categoria: p.categoria || '',
-            imagen: p.imagen || '/img/productos/placeholder.jpeg',
-            stock: typeof p.stock === 'string' ? parseInt(p.stock) : p.stock,
-            disponible: p.disponible === 1 || p.disponible === true,
-        }));
-        setProductos(productosProcesados);
-    }
-}, [platos]);
 
+    useEffect(() => {
+        if (platos && platos.length > 0) {
+            const productosProcesados = platos.map((p: any) => ({
+                id: p.id,
+                nombre: p.nombre,
+                precio: typeof p.precio === 'string' ? parseFloat(p.precio) : p.precio,
+                categoria: p.categoria || '',
+                imagen: p.imagen || '/img/productos/placeholder.jpeg',
+                stock: typeof p.stock === 'string' ? parseInt(p.stock) : p.stock,
+                disponible: p.disponible === 1 || p.disponible === true,
+            }));
+            setProductos(productosProcesados);
+        }
+    }, [platos]);
 
     const urlParams = new URLSearchParams(window.location.search);
     const mesaInicial = urlParams.get('mesa') || '';
     const [mesa] = useState(mesaInicial);
-
     const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(mesaInfoProp);
 
-  
-
-      // ============================================================
+    // ============================================================
     // EFECTOS
     // ============================================================
     // Procesar productos desde props
@@ -175,7 +171,6 @@ useEffect(() => {
         setPedidosActivos(pedidosActivosProp);
     }, [pedidosActivosProp]);
 
-    // 👇 NUEVO: Recargar automáticamente al volver a la página
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (!document.hidden) {
@@ -255,7 +250,6 @@ useEffect(() => {
         }
     };
 
-
     // ============================================================
     // ENVIAR PEDIDO - VERSIÓN CORREGIDA (SOLO ESTA PARTE)
     // ============================================================
@@ -276,7 +270,6 @@ useEffect(() => {
             return;
         }
 
-        // 👇 Preparar productos con categoría (para detectar área)
         const productosConCategoria = carrito.map(item => {
             const productoOriginal = productos.find(p => p.id === item.id);
             return {
@@ -290,15 +283,14 @@ useEffect(() => {
             };
         });
 
-        // 👇 Detectar área
         const areaDetectada = detectarArea(productosConCategoria);
 
         router.post('/pedidos', {
             mesa_id: mesaInfo?.id || null,
             cliente: 'Anónimo',
-            productos: productosConCategoria, // 👈 Enviar con categoría
+            productos: productosConCategoria,
             total: totalCarrito,
-            area: areaDetectada, // 👈 Enviar área
+            area: areaDetectada,
             observaciones: '',
         }, {
             preserveScroll: true,
@@ -346,7 +338,7 @@ useEffect(() => {
                 </div>
 
                 {/* Información de la mesa */}
-                {mesaInfo && (
+                {mesaInfo && carrito.length === 0 && pedidosActivos.length === 0 && (
                     <div className="relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-black/5">
                         <div className="absolute -top-2 -right-2">
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide text-white shadow-sm ${getEstadoConfig(mesaInfo.estado).solid}`}>
@@ -589,28 +581,19 @@ useEffect(() => {
                                         <div>
                                             <p className="text-sm font-medium text-[#2D1B1A]">{pedido.numero}</p>
                                             <p className="text-xs text-[#8D6B53]">
-                                                {pedido.productos.length} productos · S/ {Number(pedido.total).toFixed(2)}
+                                                🪑 Mesa {mesaInfo?.numero || '?'} · {mesaInfo?.capacidad || 0} personas · {pedido.productos.length} productos · S/ {Number(pedido.total).toFixed(2)}
                                             </p>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${pedido.estado === 'pendiente' ? 'bg-orange-100 text-orange-700' :
-                                                pedido.estado === 'preparando' ? 'bg-blue-100 text-blue-700' :
-                                                    pedido.estado === 'listo' ? 'bg-green-100 text-green-600' :
-                                                        'bg-gray-100 text-gray-500'
-                                                }`}>
-                                                {pedido.estado === 'listo' ? '✅ Listo' :
-                                                    pedido.estado === 'preparando' ? '👨‍🍳 Preparando' :
-                                                        pedido.estado || 'Pendiente'}
-                                            </span>
-                                            <button
-                                                onClick={() => {
-                                                    window.location.href = `/ventas?mesa_id=${pedido.mesa_id}`;
-                                                }}
-                                                className="flex-1 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-medium text-sm transition"
-                                            >
-                                                ✏️ Editar pedido
-                                            </button>
-                                        </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPedidoSeleccionado(pedido);
+                                                setModalEdicionAbierto(true);
+                                            }}
+                                            className="px-3 py-1.5 rounded-lg bg-[#C9A96E] hover:bg-[#B8975D] text-white text-xs font-medium transition"
+                                        >
+                                            ✏️ Editar pedido
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -628,17 +611,29 @@ useEffect(() => {
                         }}
                         pedido={pedidoSeleccionado}
                         productos={productos}
-                        onPedidoActualizado={() => {
+                        onPedidoActualizado={(pedidoActualizado) => {
+                        console.log('📥 Pedido recibido en Ventas:', pedidoActualizado);
+                           
+                            setPedidosActivos(prev =>
+                                prev.map(p =>
+                                    p.id === pedidoActualizado.id
+                                        ? {
+                                            ...pedidoActualizado,
+                                            productos: pedidoActualizado.productos 
+                                        }
+                                        : p
+                                )
+                            );
                             setModalEdicionAbierto(false);
                             setPedidoSeleccionado(null);
                             toast.success('✅ Pedido actualizado');
-                            router.reload({ only: ['pedidosActivos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
+                            router.reload({ only: ['pedidosActivos'], preserveScroll: true });
                         }}
                         onPedidoCancelado={() => {
                             setModalEdicionAbierto(false);
                             setPedidoSeleccionado(null);
                             toast.success('🗑️ Pedido cancelado');
-                            router.reload({ only: ['pedidosActivos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
+                            router.reload({ only: ['pedidosActivos'] });
                         }}
                     />
                 )}

@@ -24,7 +24,7 @@ function createEcho(): Echo<'reverb'> | undefined {
     });
 }
 
-if (typeof window !== 'undefined' && !window.Echo) {
+if (typeof window !== 'undefined' && !window.Echo && import.meta.env.VITE_REVERB_APP_KEY) {
     window.Echo = createEcho();
 }
 

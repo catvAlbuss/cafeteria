@@ -578,11 +578,8 @@ export default function MesasDistribucion() {
     };
 
     const abrirModalCobro = (mesa: Mesa) => {
-
-        const pedidoActivo = pedidos.find(p => p.mesa_id === mesa.id);
-
-
-        setPedidoCobro(pedidoActivo || null);
+        const pedidosDeLaMesa = pedidos.filter(p => p.mesa_id === mesa.id);
+        setPedidoCobro(pedidosDeLaMesa);
         setMesaCobro(mesa);
         setModalCobroAbierto(true);
     };

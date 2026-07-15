@@ -83,13 +83,13 @@ export default function ModalEditarPedido({
             nuevos = [...pedidoEdit.productos, { ...producto, cantidad: 1, subtotal: producto.precio }];
         }
         const nuevoTotal = nuevos.reduce((sum: number, p: any) => sum + p.subtotal, 0);
+        console.log('🔄 Productos en el modal DESPUÉS de agregar:', nuevos);
         setPedidoEdit({ ...pedidoEdit, productos: nuevos, total: nuevoTotal });
         toast.success(`✅ ${producto.nombre} agregado`);
         setModalAgregarAbierto(false);
     };
 
     // Guardar cambios
-
     const guardarCambios = () => {
         if (pedidoEdit.productos.length === 0) {
             alert('El pedido no puede quedar vacío');
@@ -101,9 +101,15 @@ export default function ModalEditarPedido({
             total: pedidoEdit.total,
         }, {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (response) => {
+                console.log('✅ Respuesta del backend:', response);
                 toast.success('✅ Pedido actualizado');
-                onPedidoActualizado(pedidoEdit);
+
+               
+                onPedidoActualizado({
+                    ...pedidoEdit,
+                    productos: pedidoEdit.productos
+                });
                 onClose();
             },
             onError: (errors) => {
@@ -150,7 +156,7 @@ export default function ModalEditarPedido({
                                 <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-xl border border-gray-200">
                                     <div className="flex-1">
                                         <p className="text-sm font-medium text-[#2D1B1A]">{item.nombre}</p>
-                                        
+
                                         <p className="text-xs text-[#8D6B53]">S/ {Number(item.precio).toFixed(2)} c/u</p>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -262,4 +268,4 @@ export default function ModalEditarPedido({
             )}
         </>
     );
-}
+}       

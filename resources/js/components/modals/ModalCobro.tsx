@@ -34,7 +34,7 @@ interface Pedido {
 interface ModalCobroProps {
     isOpen: boolean;
     mesa: Mesa | null;
-    pedido?: Pedido | null;
+    pedido?: Pedido[];
     onClose: () => void;
     onSuccess: () => void;
 }
@@ -61,19 +61,20 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
 
     if (!isOpen || !mesa) return null;
 
-    const total = typeof pedido?.total === 'number'
-        ? pedido.total
-        : parseFloat(pedido?.total as string) || 0;
-
-    const productos = pedido?.productos
-        ? (typeof pedido.productos === 'string' ? JSON.parse(pedido.productos) : pedido.productos)
-        : [];
+    const pedidosArray = pedido || [];
+    const total = pedidosArray.reduce((sum, p) => {
+        const t = typeof p.total === 'number' ? p.total : parseFloat(p.total as string) || 0;
+        return sum + t;
+    }, 0);
+    const productos = pedidosArray.flatMap(p =>
+        typeof p.productos === 'string' ? JSON.parse(p.productos) : p.productos
+    );
 
     const montoRecibidoNum = parseFloat(montoRecibido) || 0;
     const cambio = montoRecibidoNum - total;
 
     const handleCobrar = () => {
-        setCargando(true);
+    setCargando(true);
 
         const ventaData = {
             mesa_id: mesa.id,
@@ -253,7 +254,7 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                         setCargando(false);
                         setExito(true);
 
-                        
+
                         setTimeout(() => {
                             onSuccess(); // el padre hace router.reload({ only: ['mesas','pedidos'] })
                         }, 1200);
