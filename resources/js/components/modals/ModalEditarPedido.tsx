@@ -101,15 +101,9 @@ export default function ModalEditarPedido({
             total: pedidoEdit.total,
         }, {
             preserveScroll: true,
-            onSuccess: (response) => {
-                console.log('✅ Respuesta del backend:', response);
+            onSuccess: () => {
                 toast.success('✅ Pedido actualizado');
-
-               
-                onPedidoActualizado({
-                    ...pedidoEdit,
-                    productos: pedidoEdit.productos
-                });
+                onPedidoActualizado(pedidoEdit.id);
                 onClose();
             },
             onError: (errors) => {
@@ -118,7 +112,6 @@ export default function ModalEditarPedido({
         });
     };
 
-    // Cancelar pedido
     const cancelarPedido = () => {
         if (!confirm('¿Seguro que deseas cancelar este pedido?')) return;
         router.patch(`/pedidos/${pedidoEdit.id}/cancelar`, {}, {
@@ -268,4 +261,4 @@ export default function ModalEditarPedido({
             )}
         </>
     );
-}       
+}
