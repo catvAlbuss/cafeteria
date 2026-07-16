@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, usePage, router } from '@inertiajs/react';
 import { useState } from 'react';
 import {
     Package,
@@ -16,119 +16,171 @@ import {
     Printer,
     FileSpreadsheet,
     ArrowUp,
-    ArrowDown
+    ArrowDown,
+    Clock
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Movimiento {
     id: number;
-    fecha: string;
-    producto: string;
-    categoria: string;
+    item_type: string;
+    item_id: number;
     tipo: 'entrada' | 'salida';
     cantidad: number;
-    stockFinal: number;
-    proveedor: string;
-    responsable: string;
+    stock_resultante: number;
+    motivo: string;
+    observaciones: string;
+    user: { name: string };
+    item: { nombre: string; categoria: string };
+    created_at: string;
 }
 
-interface ProductoCardex {
+interface Plato {
     id: number;
     nombre: string;
     categoria: string;
-    stockActual: number;
+    stock: number;
+}
+
+interface Insumo {
+    id: number;
+    nombre: string;
+    categoria: string;
+    stock: number;
+    unidad: string;
 }
 
 export default function Cardex() {
-    // 📊 Datos de ejemplo
-    const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
+    const { platos, insumos, movimientos } = usePage().props as any;
+
+    const [movimientosData, setMovimientosData] = useState<Movimiento[]>(movimientos || []);
     const [modalAbierto, setModalAbierto] = useState(false);
 
-    const [productos] = useState<ProductoCardex[]>([
-        { id: 1, nombre: 'Café Americano', categoria: 'Bebidas', stockActual: 50 },
-        { id: 2, nombre: 'Café Latte', categoria: 'Bebidas', stockActual: 30 },
-        { id: 3, nombre: 'Cheesecake', categoria: 'Postres', stockActual: 15 },
-        { id: 4, nombre: 'Croissant', categoria: 'Panadería', stockActual: 25 },
-        { id: 5, nombre: 'Sándwich de Pollo', categoria: 'Salados', stockActual: 18 },
-        { id: 6, nombre: 'Jugo Natural', categoria: 'Bebidas', stockActual: 22 },
-        { id: 7, nombre: 'Matcha Latte', categoria: 'Bebidas', stockActual: 28 },
-        { id: 8, nombre: 'Cappuccino', categoria: 'Bebidas', stockActual: 35 },
-    ]);
-
+    // Estado del formulario
     const [nuevoMovimiento, setNuevoMovimiento] = useState({
-        producto: '',
-        tipo: 'entrada',
+        producto_id: '',
+        tipo: 'entrada' as 'entrada' | 'salida',
         cantidad: 0,
         proveedor: '',
-        responsable: '',
         observaciones: '',
     });
 
-    // 📊 Estadísticas
-    const totalStock = productos.reduce((sum, p) => sum + p.stockActual, 0);
-    const totalEntradas = movimientos.filter(m => m.tipo === 'entrada').reduce((sum, m) => sum + m.cantidad, 0);
-    const totalSalidas = movimientos.filter(m => m.tipo === 'salida').reduce((sum, m) => sum + m.cantidad, 0);
-    const totalProductos = productos.length;
-
-    // 🔍 Filtros
+    // Filtros
     const [busqueda, setBusqueda] = useState('');
     const [filtroTipo, setFiltroTipo] = useState('');
+    const [filtroItemType, setFiltroItemType] = useState('');
     const [fechaInicio, setFechaInicio] = useState('');
     const [fechaFin, setFechaFin] = useState('');
 
+    // Estadísticas
+    const totalEntradas = (movimientosData || []).filter(m => m.tipo === 'entrada').reduce((sum, m) => sum + m.cantidad, 0);
+    const totalSalidas = (movimientosData || []).filter(m => m.tipo === 'salida').reduce((sum, m) => sum + m.cantidad, 0);
+
+    const totalProductos = (platos || []).length + (insumos || []).length;
+
     const formatNumber = (num: number): string => num.toLocaleString('es-PE');
 
-    const movimientosFiltrados = movimientos.filter(m => {
+    const movimientosFiltrados = (movimientosData || []).filter(m => {
         const busquedaOk = !busqueda ||
-            m.producto.toLowerCase().includes(busqueda.toLowerCase()) ||
-            m.proveedor.toLowerCase().includes(busqueda.toLowerCase());
+            (m.item?.nombre || '').toLowerCase().includes(busqueda.toLowerCase());
         const tipoOk = !filtroTipo || m.tipo === filtroTipo;
-        return busquedaOk && tipoOk;
+        const itemTypeOk = !filtroItemType || m.item_type === filtroItemType;
+        return busquedaOk && tipoOk && itemTypeOk;
     });
+
+    const guardarMovimiento = () => {
+        if (!nuevoMovimiento.producto_id || nuevoMovimiento.cantidad <= 0) {
+            toast.warning('Complete todos los campos correctamente');
+            return;
+        }
+
+        const [tipo, id] = nuevoMovimiento.producto_id.split('-');
+        const item = tipo === 'plato' 
+            ? (platos || []).find((p: Plato) => p.id === Number(id))
+            : (insumos || []).find((i: Insumo) => i.id === Number(id));
+
+        if (!item) {
+            toast.error('Producto no encontrado');
+            return;
+        }
+
+        if (nuevoMovimiento.tipo === 'salida' && item.stock < nuevoMovimiento.cantidad) {
+            toast.error(`Stock insuficiente para ${item.nombre}`);
+            return;
+        }
+
+        const nuevoStock = nuevoMovimiento.tipo === 'entrada' 
+            ? item.stock + nuevoMovimiento.cantidad 
+            : item.stock - nuevoMovimiento.cantidad;
+
+        // Aquí iría la llamada al backend para registrar el movimiento
+        toast.info('Funcionalidad en desarrollo');
+
+        // Por ahora, simular el movimiento
+        const nuevoMov: Movimiento = {
+            id: Date.now(),
+            item_type: tipo,
+            item_id: Number(id),
+            tipo: nuevoMovimiento.tipo,
+            cantidad: nuevoMovimiento.cantidad,
+            stock_resultante: nuevoStock,
+            motivo: 'ajuste',
+            observaciones: nuevoMovimiento.observaciones || '',
+            user: { name: 'Usuario actual' },
+            item: { nombre: item.nombre, categoria: item.categoria || '' },
+            created_at: new Date().toISOString(),
+        };
+
+        setMovimientosData([nuevoMov, ...movimientosData]);
+        setModalAbierto(false);
+        setNuevoMovimiento({ producto_id: '', tipo: 'entrada', cantidad: 0, proveedor: '', observaciones: '' });
+        toast.success('✅ Movimiento registrado correctamente');
+    };
 
     return (
         <>
             <Head title="Cardex - Dolce Cafe" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-6 bg-[#FBF3E7]">
+            <div className="flex h-full flex-1 flex-col gap-6 p-6 bg-[#FBF3E7]">
 
-                {/* ===== HEADER ===== */}
+                {/* HEADER */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-[#2D1B1A]">📦 Cardex</h1>
-                        <p className="text-[#5A3D2B] text-sm mt-1">Control de inventario y movimientos de productos</p>
+                        <h1 className="text-3xl font-bold text-[#2D1B1A] flex items-center gap-3">
+                            <span className="bg-gradient-to-r from-amber-500 to-orange-500 p-2 rounded-xl text-white">📊</span>
+                            Cardex
+                        </h1>
+                        <p className="text-[#5A3D2B] text-sm mt-1 ml-1">Control de inventario y movimientos de productos</p>
                     </div>
                     <div className="flex flex-wrap gap-3">
                         <button
                             onClick={() => setModalAbierto(true)}
-                            className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold"
+                            className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold hover:shadow-lg active:scale-95"
                         >
                             <Plus className="w-4 h-4" />
                             Nuevo movimiento
                         </button>
-                        <button className="inline-flex items-center gap-2 bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm">
+                        <button className="inline-flex items-center gap-2 bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm hover:shadow-lg active:scale-95">
                             <FileSpreadsheet className="w-4 h-4" />
                             Exportar
                         </button>
                     </div>
                 </div>
 
-                {/* ===== TARJETAS DE RESUMEN ===== */}
+                {/* TARJETAS DE RESUMEN */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8]">
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8] hover:shadow-md transition">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-[#5A3D2B] font-medium">Stock total</p>
-                                <p className="text-3xl font-bold text-[#2D1B1A] mt-1">{formatNumber(totalStock)}</p>
+                                <p className="text-sm text-[#5A3D2B] font-medium">Total productos</p>
+                                <p className="text-3xl font-bold text-[#2D1B1A] mt-1">{formatNumber(totalProductos)}</p>
                             </div>
                             <div className="w-12 h-12 rounded-xl bg-[#F3E1C8] flex items-center justify-center">
                                 <Warehouse className="w-6 h-6 text-[#8A5A2B]" />
                             </div>
                         </div>
-                        <div className="mt-2">
-                            <span className="text-xs text-[#5A3D2B]/60">Unidades en inventario</span>
-                        </div>
                     </div>
 
-                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8]">
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8] hover:shadow-md transition">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-[#5A3D2B] font-medium">Entradas</p>
@@ -138,12 +190,9 @@ export default function Cardex() {
                                 <TrendingUp className="w-6 h-6 text-green-600" />
                             </div>
                         </div>
-                        <div className="mt-2">
-                            <span className="text-xs text-[#5A3D2B]/60">Unidades ingresadas</span>
-                        </div>
                     </div>
 
-                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8]">
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8] hover:shadow-md transition">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-[#5A3D2B] font-medium">Salidas</p>
@@ -153,42 +202,36 @@ export default function Cardex() {
                                 <TrendingDown className="w-6 h-6 text-red-600" />
                             </div>
                         </div>
-                        <div className="mt-2">
-                            <span className="text-xs text-[#5A3D2B]/60">Unidades consumidas</span>
-                        </div>
                     </div>
 
-                    <div className="bg-[#2D1B1A] rounded-2xl p-5 text-white">
+                    <div className="bg-[#2D1B1A] rounded-2xl p-5 text-white hover:shadow-md transition">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-white/60 text-sm font-medium">Productos</p>
-                                <p className="text-3xl font-bold mt-1">{totalProductos}</p>
+                                <p className="text-white/60 text-sm font-medium">Movimientos</p>
+                                <p className="text-3xl font-bold mt-1">{(movimientosData || []).length}</p>
                             </div>
                             <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
-                                <Package className="w-6 h-6 text-[#C9A96E]" />
+                                <Clock className="w-6 h-6 text-[#C9A96E]" />
                             </div>
-                        </div>
-                        <div className="mt-2">
-                            <span className="text-xs text-white/40">En el sistema</span>
                         </div>
                     </div>
                 </div>
 
-                {/* ===== FILTROS ===== */}
+                {/* FILTROS */}
                 <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#F3E1C8]">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                             <input
                                 type="text"
                                 placeholder="Buscar movimientos..."
-                                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#2D1B1A] placeholder-gray-400 bg-white"
+                                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8D5C4] text-sm text-[#2D1B1A] placeholder-[#8D6B53] focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-white transition"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
                             />
                         </div>
                         <select
-                            className="border border-gray-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#2D1B1A] bg-white"
+                            className="border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-white transition"
                             value={filtroTipo}
                             onChange={(e) => setFiltroTipo(e.target.value)}
                         >
@@ -196,37 +239,65 @@ export default function Cardex() {
                             <option value="entrada">Entradas</option>
                             <option value="salida">Salidas</option>
                         </select>
+                        <select
+                            className="border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-white transition"
+                            value={filtroItemType}
+                            onChange={(e) => setFiltroItemType(e.target.value)}
+                        >
+                            <option value="">Todos los items</option>
+                            <option value="plato">🍽️ Platos</option>
+                            <option value="insumo">📦 Insumos</option>
+                        </select>
                         <input
                             type="date"
-                            className="border border-gray-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#2D1B1A] bg-white"
+                            className="border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-white transition
+                            [&::-webkit-calendar-picker-indicator]:!opacity-100
+                            [&::-webkit-calendar-picker-indicator]:!cursor-pointer
+                            [&::-webkit-calendar-picker-indicator]:!bg-gray-400
+                            [&::-webkit-calendar-picker-indicator]:!rounded-md
+                            [&::-webkit-calendar-picker-indicator]:!p-0.5
+                            [&::-webkit-calendar-picker-indicator]:!w-5
+                            [&::-webkit-calendar-picker-indicator]:!h-5
+                            [&::-webkit-calendar-picker-indicator]:hover:!bg-gray-500"
                             value={fechaInicio}
                             onChange={(e) => setFechaInicio(e.target.value)}
                         />
                         <input
                             type="date"
-                            className="border border-gray-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none text-[#2D1B1A] bg-white"
+                            className="border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-white transition
+                            [&::-webkit-calendar-picker-indicator]:!opacity-100
+                            [&::-webkit-calendar-picker-indicator]:!cursor-pointer
+                            [&::-webkit-calendar-picker-indicator]:!bg-gray-400
+                            [&::-webkit-calendar-picker-indicator]:!rounded-md
+                            [&::-webkit-calendar-picker-indicator]:!p-0.5
+                            [&::-webkit-calendar-picker-indicator]:!w-5
+                            [&::-webkit-calendar-picker-indicator]:!h-5
+                            [&::-webkit-calendar-picker-indicator]:hover:!bg-gray-500"
                             value={fechaFin}
                             onChange={(e) => setFechaFin(e.target.value)}
                         />
                         <button
-                            onClick={() => { setBusqueda(''); setFiltroTipo(''); setFechaInicio(''); setFechaFin(''); }}
-                            className="bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white rounded-xl text-sm font-semibold transition py-2"
+                            onClick={() => { setBusqueda(''); setFiltroTipo(''); setFiltroItemType(''); setFechaInicio(''); setFechaFin(''); }}
+                            className="bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white rounded-xl text-sm font-semibold transition py-2.5 hover:shadow-md active:scale-95"
                         >
                             Limpiar filtros
                         </button>
                     </div>
                 </div>
 
-                {/* ===== TABLA DE MOVIMIENTOS ===== */}
+                {/* TABLA DE MOVIMIENTOS */}
                 <div className="bg-white rounded-2xl shadow-sm border border-[#F3E1C8] overflow-hidden">
                     <div className="flex justify-between items-center p-5 border-b border-[#F3E1C8]">
                         <div>
-                            <h2 className="text-xl font-bold text-[#2D1B1A]">📋 Movimientos de inventario</h2>
+                            <h2 className="text-xl font-bold text-[#2D1B1A] flex items-center gap-2">
+                                <Package className="w-5 h-5 text-amber-500" />
+                                Movimientos de inventario
+                            </h2>
                             <p className="text-xs text-[#5A3D2B] mt-1">{movimientosFiltrados.length} registros</p>
                         </div>
                         <button
                             onClick={() => window.print()}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2"
+                            className="bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 hover:shadow-md active:scale-95"
                         >
                             <Printer className="w-4 h-4" />
                             Imprimir
@@ -235,37 +306,53 @@ export default function Cardex() {
 
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-[#FBF7F0]">
+                            <thead className="bg-[#FBF7F0] border-b-2 border-[#F3E1C8]">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-[#5A3D2B] uppercase tracking-wider">Fecha</th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-[#5A3D2B] uppercase tracking-wider">Producto</th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-[#5A3D2B] uppercase tracking-wider">Categoría</th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-[#5A3D2B] uppercase tracking-wider">Tipo</th>
-                                    <th className="px-4 py-3 text-center text-xs font-bold text-[#5A3D2B] uppercase tracking-wider">Cantidad</th>
-                                    <th className="px-4 py-3 text-center text-xs font-bold text-[#5A3D2B] uppercase tracking-wider">Stock final</th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-[#5A3D2B] uppercase tracking-wider">Proveedor</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Fecha</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Tipo</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Producto</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Categoría</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Tipo Mov.</th>
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Cantidad</th>
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Stock final</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Motivo</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-[#F3E1C8]">
+                            <tbody className="divide-y divide-[#FBF3E7]">
                                 {movimientosFiltrados.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="text-center py-10 text-[#8D6B53]">
-                                            No hay movimientos registrados
+                                        <td colSpan={8} className="text-center text-gray-400 py-12">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Package className="w-10 h-10 text-gray-300" />
+                                                <span>No hay movimientos registrados</span>
+                                            </div>
                                         </td>
                                     </tr>
                                 ) : (
                                     movimientosFiltrados.map((mov) => (
-                                        <tr key={mov.id} className="hover:bg-[#FBF7F0] transition">
-                                            <td className="px-4 py-3 text-sm text-[#2D1B1A]">{mov.fecha}</td>
-                                            <td className="px-4 py-3 text-sm font-medium text-[#2D1B1A]">{mov.producto}</td>
-                                            <td className="px-4 py-3 text-sm text-[#5A3D2B]">{mov.categoria}</td>
+                                        <tr key={mov.id} className="hover:bg-[#FBF7F0] transition group">
+                                            <td className="px-4 py-3 text-sm text-[#5A3D2B]">
+                                                {new Date(mov.created_at).toLocaleDateString()}
+                                            </td>
                                             <td className="px-4 py-3 text-sm">
-                                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                    mov.item_type === 'plato' 
+                                                        ? 'bg-blue-100 text-blue-700' 
+                                                        : 'bg-purple-100 text-purple-700'
+                                                }`}>
+                                                    {mov.item_type === 'plato' ? '🍽️ Plato' : '📦 Insumo'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm font-medium text-[#2D1B1A]">{mov.item?.nombre || '-'}</td>
+                                            <td className="px-4 py-3 text-sm text-[#5A3D2B]">{mov.item?.categoria || '-'}</td>
+                                            <td className="px-4 py-3 text-sm">
+                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
                                                     mov.tipo === 'entrada' 
                                                         ? 'bg-green-100 text-green-700' 
                                                         : 'bg-red-100 text-red-700'
                                                 }`}>
-                                                    {mov.tipo === 'entrada' ? '📥 Entrada' : '📤 Salida'}
+                                                    {mov.tipo === 'entrada' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                                    {mov.tipo === 'entrada' ? 'Entrada' : 'Salida'}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-sm font-semibold text-center">
@@ -273,8 +360,12 @@ export default function Cardex() {
                                                     {mov.tipo === 'entrada' ? '+' : '-'} {mov.cantidad}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 text-sm font-semibold text-center text-[#2D1B1A]">{mov.stockFinal}</td>
-                                            <td className="px-4 py-3 text-sm text-[#5A3D2B]">{mov.proveedor || '-'}</td>
+                                            <td className="px-4 py-3 text-sm font-bold text-center text-[#C9A96E]">{mov.stock_resultante}</td>
+                                            <td className="px-4 py-3 text-sm text-[#5A3D2B]">
+                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-[#FBF7F0] text-[#5A3D2B]">
+                                                    {mov.motivo}
+                                                </span>
+                                            </td>
                                         </tr>
                                     ))
                                 )}
@@ -283,9 +374,7 @@ export default function Cardex() {
                     </div>
                 </div>
 
-                {/* ============================================================ */}
-                {/* MODAL: Nuevo Movimiento */}
-                {/* ============================================================ */}
+                {/* ===== MODAL: Nuevo Movimiento ===== */}
                 {modalAbierto && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg">
@@ -311,15 +400,25 @@ export default function Cardex() {
                                 <div>
                                     <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
                                         <Package className="w-4 h-4 inline mr-1.5 text-[#C9A96E]" />
-                                        Producto
+                                        Producto / Insumo
                                     </label>
-                                    <input
-                                        type="text"
-                                        placeholder="Nombre del producto"
-                                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
-                                        value={nuevoMovimiento.producto}
-                                        onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, producto: e.target.value })}
-                                    />
+                                    <select
+                                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                        value={nuevoMovimiento.producto_id}
+                                        onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, producto_id: e.target.value })}
+                                    >
+                                        <option value="">Seleccionar producto</option>
+                                        {(platos || []).map((p: Plato) => (
+                                            <option key={`plato-${p.id}`} value={`plato-${p.id}`}>
+                                                🍽️ {p.nombre} (Stock: {p.stock})
+                                            </option>
+                                        ))}
+                                        {(insumos || []).map((i: Insumo) => (
+                                            <option key={`insumo-${i.id}`} value={`insumo-${i.id}`}>
+                                                📦 {i.nombre} (Stock: {i.stock} {i.unidad})
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -331,7 +430,7 @@ export default function Cardex() {
                                         <select
                                             className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
                                             value={nuevoMovimiento.tipo}
-                                            onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, tipo: e.target.value })}
+                                            onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, tipo: e.target.value as 'entrada' | 'salida' })}
                                         >
                                             <option value="entrada">📥 Entrada</option>
                                             <option value="salida">📤 Salida</option>
@@ -367,15 +466,14 @@ export default function Cardex() {
 
                                 <div>
                                     <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
-                                        <User className="w-4 h-4 inline mr-1.5 text-[#C9A96E]" />
-                                        Responsable
+                                        Observaciones
                                     </label>
-                                    <input
-                                        type="text"
-                                        placeholder="Nombre del responsable"
-                                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
-                                        value={nuevoMovimiento.responsable}
-                                        onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, responsable: e.target.value })}
+                                    <textarea
+                                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white resize-none"
+                                        rows={2}
+                                        placeholder="Notas adicionales..."
+                                        value={nuevoMovimiento.observaciones}
+                                        onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, observaciones: e.target.value })}
                                     />
                                 </div>
                             </div>
@@ -388,11 +486,8 @@ export default function Cardex() {
                                     Cancelar
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        setModalAbierto(false);
-                                        setNuevoMovimiento({ producto: '', tipo: 'entrada', cantidad: 0, proveedor: '', responsable: '', observaciones: '' });
-                                    }}
-                                    className="px-6 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-semibold text-sm transition flex items-center gap-2 shadow-md hover:shadow-lg"
+                                    onClick={guardarMovimiento}
+                                    className="px-6 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-semibold text-sm transition flex items-center gap-2 shadow-md hover:shadow-lg active:scale-95"
                                 >
                                     <Check className="w-4 h-4" />
                                     Guardar movimiento
@@ -401,7 +496,6 @@ export default function Cardex() {
                         </div>
                     </div>
                 )}
-
             </div>
         </>
     );

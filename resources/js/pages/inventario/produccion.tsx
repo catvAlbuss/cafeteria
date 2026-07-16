@@ -252,7 +252,7 @@ export default function Produccion() {
                 {/* ===== TÍTULO Y CAMPANITA ===== */}
                 <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-[#2D1B1A]">🏭 Producción</h1>
+                        <h1 className="text-2xl font-bold text-[#2D1B1A]"> Producción</h1>
                         <p className="text-[#5A3D2B] text-sm font-medium">Control de pedidos en cocina, bar, horno y postres</p>
                     </div>
                     <div className="flex items-center gap-4 flex-wrap">

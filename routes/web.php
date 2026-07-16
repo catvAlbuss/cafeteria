@@ -9,6 +9,9 @@ use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\PinController;
 use App\Http\Controllers\PlatoController;
 use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\CardexController;
+use App\Http\Controllers\MermaController;
+use App\Http\Controllers\InsumoController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Middleware\EnsureTeamMembership;
 use App\Models\Cover;
@@ -64,9 +67,12 @@ Route::middleware(['auth'])->group(function () {
     // Reportes
 
     Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
-
     Route::get('/reportes', [ReporteController::class, 'index'])->middleware('can:ver reportes')->name('reportes.index');
-
+// Cardex
+    Route::get('/cardex', [CardexController::class, 'index'])->name('cardex.index');
+// Mermas
+    Route::get('/mermas', [MermaController::class, 'index'])->name('mermas.index');
+    Route::post('/mermas', [MermaController::class, 'store'])->name('mermas.store');
 
     // ----------------------------
     //  RESTAURANTE
@@ -97,11 +103,11 @@ Route::middleware(['auth'])->group(function () {
     // ----------------------------
     //  INVENTARIO
     // ----------------------------
-
+// Insumos - Compras y Mermas
+    Route::post('/insumos/{insumo}/comprar', [InsumoController::class, 'comprar'])->name('insumos.comprar');
+    Route::post('/insumos/{insumo}/mermar', [InsumoController::class, 'mermar'])->name('insumos.mermar');
     Route::get('/produccion', [PedidoController::class, 'produccion'])->name('produccion');
-    Route::get('/cardex', fn() => Inertia::render('inventario/cardex'))->name('cardex');
-    Route::get('/mermas', fn() => Inertia::render('inventario/mermas'))->name('mermas');
-
+    Route::resource('insumos', InsumoController::class);
     // ----------------------------
     //  CLIENTES
     // ----------------------------
@@ -111,8 +117,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/delivery', [DeliveryController::class, 'store'])->name('delivery.store');
 
     Route::get('/produccion', [PedidoController::class, 'produccion'])->middleware('can:ver produccion')->name('produccion');
-    Route::get('/cardex', fn () => Inertia::render('inventario/cardex'))->middleware('can:ver cardex')->name('cardex');
-    Route::get('/mermas', fn () => Inertia::render('inventario/mermas'))->middleware('can:ver mermas')->name('mermas');
+ 
 
     // ----------------------------
     // 🧾 CLIENTES

@@ -70,6 +70,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver clientes',
             'ver delivery',
             'ver configuracion',
+            'ver insumos'
         ];
 
         foreach ($permissions as $permission) {
@@ -148,6 +149,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver mermas',
             'ver clientes',
             'ver delivery',
+            'ver insumos',
         ]);
 
         $roleGerente = Role::firstOrCreate([

@@ -24,4 +24,8 @@ class Plato extends Model
         
 
     ];
+      public function movimientos()
+    {
+        return $this->morphMany(MovimientoInventario::class, 'item');
+    }
 }

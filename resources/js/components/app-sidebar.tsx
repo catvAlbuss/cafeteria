@@ -93,6 +93,12 @@ export function AppSidebar() {
             permission: 'ver produccion',
         },
         {
+            title: 'Insumos',
+            href: '/insumos',
+            icon: Package,
+            permission: 'ver insumos',
+        },
+        {
             title: 'Cardex',
             href: '/cardex',
             icon: Package,
