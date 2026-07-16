@@ -406,12 +406,13 @@ function PlanoMesa({ mesa, colorClass, disabled }: { mesa: Mesa; colorClass: str
 // -----------------------------------------------------------------------
 // Tarjeta de mesa (también es zona "droppable" para recibir sillas)
 // -----------------------------------------------------------------------
-function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onVerPedido }: {
+function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onVerPedido, pedidos }: {
     mesa: Mesa;
     onCambiarEstado: (id: number, estado: string) => void;
     onTomarPedido: (mesa: Mesa) => void;
     onAbrirModalCobro: (mesa: Mesa) => void;
     onVerPedido?: (mesa: Mesa) => void;
+    pedidos: any[];
 }) {
     const config = getEstadoConfig(mesa.estado);
     const { setNodeRef, isOver } = useDroppable({ id: `mesa-${mesa.id}`, data: { mesaId: mesa.id } });
@@ -519,6 +520,13 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
             {mesa.pedido_listo && (
                 <button
                     onClick={() => {
+                       
+                        const pedido = pedidos.find(p => p.mesa_id === mesa.id);
+                        if (!pedido || pedido.estado !== 'listo') {
+                            alert('⚠️ El pedido debe estar en estado "Listo" para entregar.');
+                            return;
+                        }
+
                         router.post(`/mesas/${mesa.id}/entregar`, {}, {
                             onSuccess: () => router.reload()
                         });
@@ -715,7 +723,7 @@ export default function MesasDistribucion() {
         router.post('/mesas', { numero, capacidad, sillas: capacidad }, {
             onSuccess: () => {
                 swalSuccess('Mesa creada', `Mesa #${numero} registrada correctamente.`);
-                router.reload({ only: ['mesas'], preserveScroll: true });
+                router.reload({ only: ['mesas'] });
             },
             onError: (errors) => swalError('Error al crear mesa', errorsToText(errors)),
         });
@@ -816,6 +824,7 @@ export default function MesasDistribucion() {
                                         onTomarPedido={tomarPedido}
                                         onAbrirModalCobro={abrirModalCobro}
                                         onVerPedido={verPedido}
+                                        pedidos={pedidos}
                                     />
                                 ))}
                             </div>
@@ -855,7 +864,7 @@ export default function MesasDistribucion() {
                     onClose={() => setModalCobroAbierto(false)}
                     onSuccess={() => {
                         setModalCobroAbierto(false);
-                        router.reload({ only: ['mesas', 'pedidos'], preserveScroll: true });
+                        router.reload({ only: ['mesas', 'pedidos'], preserveUrl: true });
                     }}
                 />
             </div>

@@ -169,7 +169,7 @@ public function cobrarMesa(Request $request, Mesa $mesa)
             'area' => 'nullable|string|in:cocina,bar,horno,postres', 
             'observaciones' => 'nullable|string',
             'user_id' => 'nullable|integer|exists:users,id',
-            'team_id' => auth()->user()->current_team_id,
+            
         ]);
 
         if (! empty($validated['user_id']) && ! auth()->user()->currentTeam->members()->where('users.id', $validated['user_id'])->exists()) {
@@ -189,12 +189,11 @@ public function cobrarMesa(Request $request, Mesa $mesa)
             'metodo_pago' => $validated['metodo_pago'] ?? null,
             'tipo' => $validated['tipo'] ?? 'mesa',
             'estado' => $estado,
-
             'area' => $validated['area'] ?? 'cocina',
-
             'observaciones' => $validated['observaciones'] ?? null,
             'hora_pedido' => now(),
             'user_id' => $userId,
+            'team_id' => auth()->user()->current_team_id,
         ]);
 
         if ($estado === 'pendiente' && $pedido->mesa_id) {
@@ -235,15 +234,28 @@ public function update(Request $request, Pedido $pedido)
             'total' => 'required|numeric|min:0',
         ]);
 
-        if (!in_array($pedido->estado, ['pendiente', 'preparando'])) {
+        // Solo bloquear si el pedido ya cerró su ciclo (cobrado o cancelado)
+        if (in_array($pedido->estado, ['pagado', 'cancelado'])) {
             return redirect()->back()->with('error', 'Este pedido ya no se puede editar');
         }
 
+        $estabaListo = in_array($pedido->estado, ['listo', 'entregado']);
+
         $pedido->productos = $request->productos;
         $pedido->total = $request->total;
+
+        // Si ya estaba listo/entregado y se le agrega algo nuevo, vuelve a producción
+        if ($estabaListo) {
+            $pedido->estado = 'pendiente';
+        }
+
         $pedido->save();
 
         broadcast(new PedidoActualizado($pedido));
+
+        if ($estabaListo) {
+            broadcast(new PedidoCreado($pedido)); // dispara notificación en Producción como pedido nuevo
+        }
 
         return redirect()->back()->with('success', 'Pedido actualizado correctamente');
     }
