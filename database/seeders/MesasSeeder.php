@@ -29,9 +29,8 @@ class MesasSeeder extends Seeder
 
         foreach ($mesas as $mesa) {
             Mesa::withoutGlobalScopes()->updateOrCreate(
-                ['numero' => $mesa['numero']],
+                ['team_id' => $team->id, 'numero' => $mesa['numero']],
                 [
-                    'team_id' => $team->id,
                     'capacidad' => $mesa['capacidad'],
                     'sillas' => $mesa['capacidad'],
                     'estado' => 'libre',

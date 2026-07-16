@@ -21,16 +21,19 @@ class DemoUsersSeeder extends Seeder
         $empleados = [
             ['name' => 'Administrador', 'email' => 'admin@cafeteria.test', 'usuario' => 'admin', 'pin' => '0000', 'role' => 'Gerente', 'teamRole' => TeamRole::Owner],
             ['name' => 'Mesero Demo', 'email' => 'mesero@cafeteria.test', 'usuario' => 'mesero', 'pin' => '1234', 'role' => 'Mesero', 'teamRole' => TeamRole::Member],
+            ['name' => 'Ana Torres', 'email' => 'ana.mesera@cafeteria.test', 'usuario' => 'mesera.ana', 'pin' => '1235', 'role' => 'Mesero', 'teamRole' => TeamRole::Member],
+            ['name' => 'Carlos Ruiz', 'email' => 'carlos.mesero@cafeteria.test', 'usuario' => 'mesero.carlos', 'pin' => '1236', 'role' => 'Mesero', 'teamRole' => TeamRole::Member],
+            ['name' => 'Luis Perez', 'email' => 'luis.mesero@cafeteria.test', 'usuario' => 'mesero.luis', 'pin' => '1237', 'role' => 'Mesero', 'teamRole' => TeamRole::Member],
             ['name' => 'Cajero Demo', 'email' => 'cajero@cafeteria.test', 'usuario' => 'cajero', 'pin' => '5678', 'role' => 'Cajero', 'teamRole' => TeamRole::Member],
-            ['name' => 'Cocinero Demo', 'email' => '    ', 'usuario' => 'cocinero', 'pin' => '9012', 'role' => 'Cocinero', 'teamRole' => TeamRole::Member],
+            ['name' => 'Cocinero Demo', 'email' => 'cocinero@cafeteria.test', 'usuario' => 'cocinero', 'pin' => '9012', 'role' => 'Cocinero', 'teamRole' => TeamRole::Member],
         ];
 
         foreach ($empleados as $datos) {
             $user = User::updateOrCreate(
-                ['email' => $datos['email']],
+                ['usuario' => $datos['usuario']],
                 [
                     'name' => $datos['name'],
-                    'usuario' => $datos['usuario'],
+                    'email' => $datos['email'],
                     'password' => self::DEMO_PASSWORD,
                     'pin' => $datos['pin'],
                     'is_active' => true,
