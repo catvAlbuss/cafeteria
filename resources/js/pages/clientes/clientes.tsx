@@ -88,7 +88,7 @@ export default function Clientes() {
 
     // 🎨 Configuración de estados
     const getEstadoConfig = (estado: string) => {
-        switch(estado) {
+        switch (estado) {
             case 'activo': return { bg: 'bg-green-100', text: 'text-green-700', label: 'Activo', icon: CheckCircle };
             case 'vip': return { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'VIP', icon: Star };
             case 'inactivo': return { bg: 'bg-red-100', text: 'text-red-700', label: 'Inactivo', icon: XCircle };
@@ -178,11 +178,11 @@ export default function Clientes() {
         <>
             <Head title="Clientes - Dolce Cafe" />
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-6 bg-[#FBF3E7]">
-                
+
                 {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-[#2D1B1A]">👥 Clientes</h1>
+                        <h1 className="text-3xl font-bold text-[#2D1B1A]"> Clientes</h1>
                         <p className="text-[#5A3D2B] text-sm mt-1">Gestión y control de clientes del sistema</p>
                     </div>
                     <button
@@ -243,37 +243,40 @@ export default function Clientes() {
                 </div>
 
                 {/* ===== BUSCADOR Y FILTROS ===== */}
-                <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#F3E1C8]">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <div className="bg-white rounded-2xl p-3 shadow-sm border border-[#F3E1C8]">
+                    <div className="flex flex-col sm:flex-row gap-2 items-center">
+                        <div className="relative flex-1 w-full sm:w-auto">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8D6B53]" />
                             <input
                                 type="text"
-                                placeholder="Buscar por nombre, teléfono o email..."
-                                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
+                                placeholder="Buscar cliente..."
+                                className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#E8D5C4] focus:border-[#C9A96E] focus:ring-2 focus:ring-[#C9A96E]/20 focus:outline-none bg-white text-[#2D1B1A] placeholder-[#8D6B53] text-sm transition"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
                             />
                         </div>
-                        <select
-                            className="border border-gray-200 rounded-xl p-2 text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none"
-                            value={filtroEstado}
-                            onChange={(e) => setFiltroEstado(e.target.value)}
-                        >
-                            <option value="">Todos los estados</option>
-                            <option value="activo">Activos</option>
-                            <option value="vip">VIP</option>
-                            <option value="inactivo">Inactivos</option>
-                        </select>
-                        <button
-                            onClick={() => {
-                                setBusqueda('');
-                                setFiltroEstado('');
-                            }}
-                            className="bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white rounded-xl text-sm font-semibold transition"
-                        >
-                            Limpiar filtros
-                        </button>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                            <select
+                                className="border border-[#E8D5C4] rounded-lg px-3 py-2 text-sm text-[#2D1B1A] bg-white focus:border-[#C9A96E] focus:ring-2 focus:ring-[#C9A96E]/20 focus:outline-none transition appearance-none min-w-[130px]"
+                                value={filtroEstado}
+                                onChange={(e) => setFiltroEstado(e.target.value)}
+                            >
+                                <option value="">Todos los estados</option>
+                                <option value="activo">Activos</option>
+                                <option value="vip">VIP</option>
+                                <option value="inactivo">Inactivos</option>
+                            </select>
+                            <button
+                                onClick={() => {
+                                    setBusqueda('');
+                                    setFiltroEstado('');
+                                }}
+                                className="px-3 py-2 rounded-lg border border-[#E8D5C4] text-[#5A3D2B] hover:bg-[#FBF3E7] hover:border-[#C9A96E] transition text-xs font-medium flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                                Limpiar
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -481,13 +484,12 @@ export default function Clientes() {
                                     </div>
                                     <div>
                                         <h3 className="text-xl font-bold text-[#2D1B1A]">{clienteSeleccionado.nombre}</h3>
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                            clienteSeleccionado.estado === 'activo' ? 'bg-green-100 text-green-700' :
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${clienteSeleccionado.estado === 'activo' ? 'bg-green-100 text-green-700' :
                                             clienteSeleccionado.estado === 'vip' ? 'bg-yellow-100 text-yellow-700' :
-                                            'bg-red-100 text-red-700'
-                                        }`}>
+                                                'bg-red-100 text-red-700'
+                                            }`}>
                                             {clienteSeleccionado.estado === 'activo' ? 'Activo' :
-                                             clienteSeleccionado.estado === 'vip' ? 'VIP' : 'Inactivo'}
+                                                clienteSeleccionado.estado === 'vip' ? 'VIP' : 'Inactivo'}
                                         </span>
                                     </div>
                                 </div>

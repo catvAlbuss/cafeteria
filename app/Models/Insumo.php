@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-class Plato extends Model
+class Insumo extends Model
 {
     use BelongsToTeam;
 
@@ -15,14 +15,17 @@ class Plato extends Model
         'team_id',
         'nombre',
         'categoria',
-        'descripcion',
-        'precio',
+        'unidad',
         'stock',
-        'vendidos',
-        'imagen',
-        'disponible',
+        'precio',
+        'proveedor',
+        'activo',
+    ];
 
-        'modificado',
+    protected $casts = [
+        'stock' => 'decimal:2',
+        'precio' => 'decimal:2',
+        'activo' => 'boolean',
     ];
 
     public function recetas(): HasMany

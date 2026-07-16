@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Controllers\CajaController;
+use App\Http\Controllers\CardexController;
 use App\Http\Controllers\ContadorController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\InsumoController;
+use App\Http\Controllers\MermaController;
 use App\Http\Controllers\MesaController;
 use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\PinController;
@@ -53,8 +56,6 @@ Route::middleware(['auth'])->group(function () {
 
     // Reportes
 
-    Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
-
     Route::get('/reportes', [ReporteController::class, 'index'])->middleware('can:ver reportes')->name('reportes.index');
 
     // ----------------------------
@@ -80,28 +81,18 @@ Route::middleware(['auth'])->group(function () {
             ->values()
             ->all(),
     ]))->middleware('can:ver covers')->name('covers');
-    Route::delete('/platos/{plato}', [PlatoController::class, 'destroy'])->name('platos.destroy');
     Route::patch('/platos/{id}/disponibilidad', [PlatoController::class, 'toggleDisponibilidad'])->name('platos.disponibilidad');
 
     // ----------------------------
     //  INVENTARIO
     // ----------------------------
-
-    Route::get('/produccion', [PedidoController::class, 'produccion'])->name('produccion');
-    Route::get('/cardex', fn () => Inertia::render('inventario/cardex'))->name('cardex');
-    Route::get('/mermas', fn () => Inertia::render('inventario/mermas'))->name('mermas');
-
-    // ----------------------------
-    //  CLIENTES
-    // ----------------------------
-    Route::get('/clientes', fn () => Inertia::render('clientes/clientes'))->name('clientes');
-
-    Route::get('/delivery', [DeliveryController::class, 'index'])->name('delivery');
-    Route::post('/delivery', [DeliveryController::class, 'store'])->name('delivery.store');
-
+    Route::get('/cardex', [CardexController::class, 'index'])->name('cardex.index');
+    Route::get('/mermas', [MermaController::class, 'index'])->name('mermas.index');
+    Route::post('/mermas', [MermaController::class, 'store'])->name('mermas.store');
+    Route::resource('insumos', InsumoController::class);
+    Route::post('/insumos/{insumo}/comprar', [InsumoController::class, 'comprar'])->name('insumos.comprar');
+    Route::post('/insumos/{insumo}/mermar', [InsumoController::class, 'mermar'])->name('insumos.mermar');
     Route::get('/produccion', [PedidoController::class, 'produccion'])->middleware('can:ver produccion')->name('produccion');
-    Route::get('/cardex', fn () => Inertia::render('inventario/cardex'))->middleware('can:ver cardex')->name('cardex');
-    Route::get('/mermas', fn () => Inertia::render('inventario/mermas'))->middleware('can:ver mermas')->name('mermas');
 
     // ----------------------------
     // 🧾 CLIENTES
