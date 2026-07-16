@@ -61,12 +61,26 @@ class PedidoController extends Controller
         ]);
     }
 
-    public function produccion()
+    public function produccion(Request $request)
     {
-        $teamId = auth()->user()->current_team_id;
+        $user = $request->user();
+        $teamId = $user->current_team_id;
+        $areasDisponibles = collect([
+            'cocina' => $user->can('ver cocina'),
+            'bar' => $user->can('ver bar'),
+        ])->filter()->keys();
+
+        abort_if($areasDisponibles->isEmpty(), 403);
+
+        $areaSolicitada = $request->string('area')->toString();
+        $areaActiva = $areasDisponibles->contains($areaSolicitada)
+            ? $areaSolicitada
+            : $areasDisponibles->first();
+        $areasDePedidos = $areaActiva === 'bar' ? ['bar'] : ['cocina', 'horno', 'postres'];
 
         $pedidos = Pedido::with('mesa')
             ->where('team_id', $teamId)
+            ->whereIn('area', $areasDePedidos)
             ->whereIn('estado', ['pendiente', 'preparando'])
             ->limit(100)
             ->get()
@@ -79,7 +93,9 @@ class PedidoController extends Controller
             });
 
         // Pedidos de delivery
-        $deliveries = Delivery::whereIn('estado_delivery', ['preparando', 'listo_para_entregar'])
+        $deliveries = Delivery::where('team_id', $teamId)
+            ->whereIn('estado_delivery', ['preparando', 'listo_para_entregar'])
+            ->when($areaActiva === 'bar', fn ($query) => $query->whereRaw('1 = 0'))
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($delivery) {
@@ -111,6 +127,8 @@ class PedidoController extends Controller
 
         return Inertia::render('inventario/produccion', [
             'pedidos' => $todos,
+            'areaActiva' => $areaActiva,
+            'areasDisponibles' => $areasDisponibles->values(),
         ]);
     }
 

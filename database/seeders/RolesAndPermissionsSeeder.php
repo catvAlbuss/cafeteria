@@ -65,6 +65,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver platos',
             'ver covers',
             'ver produccion',
+            'ver cocina',
+            'ver bar',
             'ver cardex',
             'ver mermas',
             'ver clientes',
@@ -125,6 +127,20 @@ class RolesAndPermissionsSeeder extends Seeder
             'marcar pedido listo',
             'alertar falta insumos',
             'ver produccion',
+            'ver cocina',
+        ]);
+
+        $roleBar = Role::firstOrCreate([
+            'name' => 'Bar',
+            'guard_name' => 'web',
+            'team_id' => $team->id,
+        ]);
+        $roleBar->givePermissionTo([
+            'visualizar comandas',
+            'marcar pedido listo',
+            'alertar falta insumos',
+            'ver produccion',
+            'ver bar',
         ]);
 
         $roleSupervisor = Role::firstOrCreate([
@@ -145,6 +161,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver platos',
             'ver covers',
             'ver produccion',
+            'ver cocina',
+            'ver bar',
             'ver cardex',
             'ver mermas',
             'ver clientes',

@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
-import { 
-    LayoutDashboard, 
+import {
+    LayoutDashboard,
     DollarSign,
     BarChart3,
     Coffee,
@@ -87,10 +87,16 @@ export function AppSidebar() {
         },
 
         {
-            title: 'Producción',
-            href: '/produccion',
+            title: 'Cocina',
+            href: '/produccion?area=cocina',
             icon: Package,
-            permission: 'ver produccion',
+            permission: 'ver cocina',
+        },
+        {
+            title: 'Bar',
+            href: '/produccion?area=bar',
+            icon: Coffee,
+            permission: 'ver bar',
         },
         {
             title: 'Insumos',
