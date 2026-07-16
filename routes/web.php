@@ -38,16 +38,6 @@ Route::middleware(['auth'])->group(function () {
     //  DINERO
     // ----------------------------
 
-    Route::get('/caja', fn() => Inertia::render('dinero/caja'))->name('caja');
-    Route::post('/caja/registrar', [CajaController::class, 'registrar'])->name('caja.registrar');
-    Route::get('/caja/estado', [CajaController::class, 'estado'])->name('caja.estado');
-    Route::get('/ventas', [PedidoController::class, 'index'])->name('ventas');
-    Route::patch('/pedidos/{id}/marcar-listo', [PedidoController::class, 'marcarListo'])->name('pedidos.marcar-listo');
-
-    // Contador
-    Route::get('/contador', [ContadorController::class, 'index'])->name('contador.index');
-    Route::post('/contador/abrir', [ContadorController::class, 'abrir'])->name('contador.abrir');
-
     Route::get('/caja', fn () => Inertia::render('dinero/caja'))->middleware('can:ver caja')->name('caja');
     Route::post('/caja/registrar', [CajaController::class, 'registrar'])->middleware('operating.hours')->name('caja.registrar');
     Route::get('/caja/estado', [CajaController::class, 'estado'])->name('caja.estado');
@@ -66,7 +56,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reportes', [ReporteController::class, 'index'])->name('reportes.index');
 
     Route::get('/reportes', [ReporteController::class, 'index'])->middleware('can:ver reportes')->name('reportes.index');
-
 
     // ----------------------------
     //  RESTAURANTE
@@ -99,13 +88,13 @@ Route::middleware(['auth'])->group(function () {
     // ----------------------------
 
     Route::get('/produccion', [PedidoController::class, 'produccion'])->name('produccion');
-    Route::get('/cardex', fn() => Inertia::render('inventario/cardex'))->name('cardex');
-    Route::get('/mermas', fn() => Inertia::render('inventario/mermas'))->name('mermas');
+    Route::get('/cardex', fn () => Inertia::render('inventario/cardex'))->name('cardex');
+    Route::get('/mermas', fn () => Inertia::render('inventario/mermas'))->name('mermas');
 
     // ----------------------------
     //  CLIENTES
     // ----------------------------
-    Route::get('/clientes', fn() => Inertia::render('clientes/clientes'))->name('clientes');
+    Route::get('/clientes', fn () => Inertia::render('clientes/clientes'))->name('clientes');
 
     Route::get('/delivery', [DeliveryController::class, 'index'])->name('delivery');
     Route::post('/delivery', [DeliveryController::class, 'store'])->name('delivery.store');
@@ -134,16 +123,11 @@ Route::middleware(['auth'])->group(function () {
     //  CONFIGURACIÓN
     // ----------------------------
 
-    Route::get('/configuracion', fn() => Inertia::render('configuracion/configuracion'))->name('configuracion');
-    Route::get('/perfil', fn() => Inertia::render('configuracion/perfil'))->name('perfil');
-
     // ----------------------------
     // API/RECURSOS (Controladores)
     // ----------------------------
 
     // PLATOS
-    Route::resource('platos', PlatoController::class);
-
     Route::get('/configuracion', fn () => Inertia::render('configuracion/configuracion'))->middleware('can:configuracion sistema')->name('configuracion');
     Route::get('/perfil', fn () => Inertia::render('configuracion/perfil'))->name('perfil');
 
@@ -154,7 +138,6 @@ Route::middleware(['auth'])->group(function () {
     // PLATOS
     Route::resource('platos', PlatoController::class)->middlewareFor('index', 'can:ver platos');
 
-
     // MESAS
     Route::resource('mesas', MesaController::class)->middlewareFor('index', 'can:ver mesas');
     Route::patch('/mesas/{mesa}/estado', [MesaController::class, 'update'])->name('mesas.estado');
@@ -163,23 +146,16 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/mesas/{mesa}/entregar', [MesaController::class, 'entregar'])->name('mesas.entregar');
     Route::patch('/mesas/{origen}/transferir-silla/{destino}', [MesaController::class, 'transferirSilla'])
         ->name('mesas.transferir-silla');
-        Route::patch('/mesas/{mesa}/cobrar', [PedidoController::class, 'cobrarMesa'])->name('mesas.cobrar');
+    Route::patch('/mesas/{mesa}/cobrar', [PedidoController::class, 'cobrarMesa'])->name('mesas.cobrar');
 
     // PEDIDOS
 
-    Route::resource('pedidos', PedidoController::class); // ya incluye PATCH /pedidos/{pedido} -> update
     Route::get('/pedidos/pendientes', [PedidoController::class, 'pendientes'])->name('pedidos.pendientes');
     Route::get('/pedidos/listos', [PedidoController::class, 'listosParaCobrar'])->name('pedidos.listos');
     Route::patch('/pedidos/{pedido}/cobrar', [PedidoController::class, 'cobrar'])->name('pedidos.cobrar');
     Route::patch('/pedidos/{pedido}/cancelar', [PedidoController::class, 'cancelar'])->name('pedidos.cancelar');
-
     Route::resource('pedidos', PedidoController::class)->except(['store']);
     Route::post('/pedidos', [PedidoController::class, 'store'])->middleware('operating.hours')->name('pedidos.store');
-    Route::get('/pedidos/pendientes', [PedidoController::class, 'pendientes'])->name('pedidos.pendientes');
-    Route::get('/pedidos/listos', [PedidoController::class, 'listosParaCobrar'])->name('pedidos.listos');
-    Route::patch('/pedidos/{pedido}/cobrar', [PedidoController::class, 'cobrar'])->name('pedidos.cobrar');
-    Route::patch('/pedidos/{pedido}', [PedidoController::class, 'update'])->name('pedidos.update');
-
 
     // ----------------------------
     //  INVITACIONES (Opcional)
@@ -189,16 +165,10 @@ Route::middleware(['auth'])->group(function () {
 
 });
 
-
-
 Route::prefix('{current_team}')
     ->middleware(['auth', 'verified', EnsureTeamMembership::class])
     ->group(function () {
         // Route::get('dashboard', DashboardController::class)->name('dashboard');
     });
 
-
-
 require __DIR__.'/settings.php';
-
-
