@@ -89,7 +89,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/cardex', [CardexController::class, 'index'])->name('cardex.index');
     Route::get('/mermas', [MermaController::class, 'index'])->name('mermas.index');
     Route::post('/mermas', [MermaController::class, 'store'])->name('mermas.store');
-    Route::resource('insumos', InsumoController::class);
+    Route::resource('insumos', InsumoController::class)->only(['index', 'store', 'update', 'destroy']);
     Route::post('/insumos/{insumo}/comprar', [InsumoController::class, 'comprar'])->name('insumos.comprar');
     Route::post('/insumos/{insumo}/mermar', [InsumoController::class, 'mermar'])->name('insumos.mermar');
     Route::get('/produccion', [PedidoController::class, 'produccion'])->middleware('can:ver produccion')->name('produccion');
