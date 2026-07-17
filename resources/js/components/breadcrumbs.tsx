@@ -80,25 +80,34 @@ export function Breadcrumbs({
             }
 
             const audioContext = new AudioContext();
-            const gain = audioContext.createGain();
-            gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.55, audioContext.currentTime + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.62);
-            gain.connect(audioContext.destination);
+            const strikeBell = (delay: number, volume: number) => {
+                const startAt = audioContext.currentTime + delay;
+                const harmonics = [660, 1320, 1980, 2640];
 
-            const frequencies = tone === 'listo' ? [1040, 1320] : [880, 1100];
+                harmonics.forEach((frequency, index) => {
+                    const oscillator = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    const harmonicVolume = volume / (index + 1);
 
-            frequencies.forEach((frequency, index) => {
-                const oscillator = audioContext.createOscillator();
-                const startAt = audioContext.currentTime + index * 0.24;
+                    oscillator.type = index === 0 ? 'sine' : 'triangle';
+                    oscillator.frequency.setValueAtTime(frequency, startAt);
+                    gain.gain.setValueAtTime(0.0001, startAt);
+                    gain.gain.exponentialRampToValueAtTime(harmonicVolume, startAt + 0.012);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 1.25);
+                    oscillator.connect(gain);
+                    gain.connect(audioContext.destination);
+                    oscillator.start(startAt);
+                    oscillator.stop(startAt + 1.3);
+                });
+            };
 
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(frequency, startAt);
-                oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.72, startAt + 0.2);
-                oscillator.connect(gain);
-                oscillator.start(startAt);
-                oscillator.stop(startAt + 0.22);
-            });
+            strikeBell(0, 0.42);
+
+            if (tone === 'listo') {
+                strikeBell(0.32, 0.3);
+            }
+
+            window.setTimeout(() => void audioContext.close(), 1800);
         } catch {
             // Browsers can block audio until the first user interaction.
         }
