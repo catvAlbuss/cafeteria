@@ -21,11 +21,16 @@ class Caja extends Model
     protected $fillable = [
         'team_id',
         'user_id',
+        'closed_by',
         'caja',
         'turno',
         'monto_inicial',
+        'origen_fondo',
+        'justificacion_apertura',
         'fecha_apertura',
         'monto_final',
+        'efectivo_esperado',
+        'diferencia_cierre',
         'ventas_dia',
         'observaciones',
         'fecha_cierre',
@@ -35,10 +40,16 @@ class Caja extends Model
         'total_pedidos_mesa',
         'total_pedidos',
         'detalle_pedidos',
+        'resumen_cierre',
     ];
 
     protected $casts = [
         'detalle_pedidos' => 'array',
+        'resumen_cierre' => 'array',
+        'monto_inicial' => 'decimal:2',
+        'monto_final' => 'decimal:2',
+        'efectivo_esperado' => 'decimal:2',
+        'diferencia_cierre' => 'decimal:2',
         'fecha_apertura' => 'datetime',
         'fecha_cierre' => 'datetime',
     ];
@@ -49,6 +60,11 @@ class Caja extends Model
     public function pedidos(): HasMany
     {
         return $this->hasMany(Pedido::class);
+    }
+
+    public function movimientos(): HasMany
+    {
+        return $this->hasMany(MovimientoCaja::class);
     }
 
     /**

@@ -8,20 +8,19 @@ import {
     Clock,
     CheckCircle,
     XCircle,
-    Bell,
-    ChevronRight,
     Bike,
     Radio,
     Timer,
-    Wifi,
+    AlertTriangle,
+    CalendarDays,
+    Trophy,
+    Utensils,
 } from 'lucide-react';
 import {
     agruparPedidosPorArea,
     getEstadisticasPorArea,
     getAreaConfig,
-    getAreaColor,
 } from '@/utils/clasificarPedidos';
-import { toast } from 'sonner';
 
 interface Pedido {
     id: number;
@@ -47,6 +46,26 @@ interface Pedido {
     area?: string;
 }
 
+interface ResumenProduccion {
+    platosHoy: number;
+    porArea: Record<'cocina' | 'bar' | 'horno' | 'postres', number>;
+    productosMasPedidos: Array<{ nombre: string; cantidad: number }>;
+    stockEscaso: Array<{
+        id: number;
+        nombre: string;
+        stock: number;
+        stock_minimo: number;
+        unidad: string;
+    }>;
+    porVencer: Array<{
+        id: number;
+        nombre: string;
+        fecha_vencimiento: string;
+        dias: number;
+    }>;
+    totalInsumos: number;
+}
+
 export default function Produccion() {
     const { pedidos: pedidosIniciales, areaActiva } = usePage()
         .props as unknown as {
@@ -57,22 +76,12 @@ export default function Produccion() {
     const [pedidos, setPedidos] = useState<Pedido[]>(pedidosIniciales || []);
     const [busqueda, setBusqueda] = useState('');
     const [filtroEstado, setFiltroEstado] = useState<string>('todas');
-    const [notificacionesAbiertas, setNotificacionesAbiertas] = useState(false);
-    const [pendientes, setPendientes] = useState(0);
     const areasVisibles =
         areaActiva === 'bar' ? ['bar'] : ['cocina', 'horno', 'postres'];
 
     useEffect(() => {
         setPedidos(pedidosIniciales || []);
     }, [pedidosIniciales]);
-
-    useEffect(() => {
-        const interval = window.setInterval(() => {
-            router.reload({ only: ['pedidos'] });
-        }, 10_000);
-
-        return () => window.clearInterval(interval);
-    }, []);
 
     // Configuración de estados
     const getEstadoConfig = (estado: string) => {
@@ -136,29 +145,6 @@ export default function Produccion() {
     const pedidosAgrupados = agruparPedidosPorArea(pedidosFiltrados);
     const estadisticas = getEstadisticasPorArea(pedidosFiltrados);
 
-    // Actualizar contador de pendientes
-    useEffect(() => {
-        const pendientesCount = pedidos.filter(
-            (p) => p.estado === 'pendiente',
-        ).length;
-        setPendientes(pendientesCount);
-    }, [pedidos]);
-
-    // Cerrar panel de notificaciones
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as HTMLElement;
-            if (
-                !target.closest('.notificaciones-container') &&
-                notificacionesAbiertas
-            ) {
-                setNotificacionesAbiertas(false);
-            }
-        };
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
-    }, [notificacionesAbiertas]);
-
     // ============================================================
     // CAMBIAR ESTADO - VERSIÓN ORIGINAL (FUNCIONABA)
     // ============================================================
@@ -181,7 +167,6 @@ export default function Produccion() {
                         setPedidos((prev) =>
                             prev.filter((p) => p.id !== pedido.id),
                         );
-                        router.reload();
                     },
                     onError: (errors) => {
                         console.log('❌ Error:', errors);
@@ -209,7 +194,6 @@ export default function Produccion() {
                                     : p,
                             ),
                         );
-                        router.reload();
                     },
                     onError: (errors) => {
                         console.log('❌ Error:', errors);
@@ -242,68 +226,10 @@ export default function Produccion() {
                         );
                     }
 
-                    if (nuevoEstado === 'listo' && pedido.mesa_id) {
-                        router.post(
-                            `/mesas/${pedido.mesa_id}/pedido-listo`,
-                            {},
-                            {
-                                onSuccess: () => router.reload(),
-                            },
-                        );
-                    }
                 },
                 onError: (errors) => {
                     alert(
                         'Error al cambiar estado: ' +
-                            Object.values(errors).join(' '),
-                    );
-                },
-            },
-        );
-    };
-
-    // ============================================================
-    // TOMAR PEDIDO - NUEVA FUNCIÓN (SOLO PARA LA CAMPANITA)
-    // ============================================================
-    const tomarPedido = (pedido: Pedido) => {
-        if (!pedido || !pedido.id) {
-            toast.error('Error: Pedido sin identificar');
-            return;
-        }
-
-        const confirmar = confirm(
-            `📦 Tomar pedido #${pedido.numero}\n\n` +
-                `Cliente: ${pedido.cliente}\n` +
-                `Productos: ${pedido.productos?.length || 0} items\n\n` +
-                `¿Confirmas que lo prepararás?`,
-        );
-
-        if (!confirmar) return;
-
-        router.patch(
-            `/pedidos/${pedido.id}`,
-            { estado: 'preparando' },
-            {
-                onSuccess: () => {
-                    // Actualizar estado local
-                    setPedidos((prev) =>
-                        prev.map((p) =>
-                            p.id === pedido.id
-                                ? { ...p, estado: 'preparando', tomado: true }
-                                : p,
-                        ),
-                    );
-
-                    toast.success(
-                        `✅ Pedido #${pedido.numero} tomado - En preparación`,
-                    );
-
-                    // Cerrar notificaciones automáticamente
-                    setNotificacionesAbiertas(false);
-                },
-                onError: (errors) => {
-                    toast.error(
-                        'Error al tomar pedido: ' +
                             Object.values(errors).join(' '),
                     );
                 },
@@ -347,338 +273,205 @@ export default function Produccion() {
 
     // Función para contar pedidos por estado
     const contarPorEstado = (estado: string) => {
-        return pedidosFiltrados.filter((p) => p.estado === estado).length;
+        return pedidos.filter((pedido) => pedido.estado === estado).length;
     };
 
-    const pedidosParaNotificar = pedidos
-        .filter((p) => ['pendiente', 'preparando'].includes(p.estado))
-        .sort((a, b) => {
-            const createdA = a.created_at
-                ? new Date(a.created_at).getTime()
-                : 0;
-            const createdB = b.created_at
-                ? new Date(b.created_at).getTime()
-                : 0;
-            return createdA - createdB;
-        });
-    const pedidosUrgentes = pedidosParaNotificar.filter((p) => {
-        const createdAt = p.created_at ? new Date(p.created_at).getTime() : NaN;
-        return (
-            Number.isFinite(createdAt) &&
-            Date.now() - createdAt > 10 * 60 * 1000
-        );
-    }).length;
-    const eventosLivePreview = [
-        { label: 'pedido.creado', description: 'Ingresara directo al tablero' },
-        {
-            label: 'pedido.actualizado',
-            description: 'Sincronizara cambios de estado',
-        },
-        { label: 'pedido.listo', description: 'Avisara a salon y caja' },
-    ];
     return (
         <>
-            <Head title="Producción" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl bg-[#FBF7F0] p-4">
-                {/* ===== TÍTULO Y CAMPANITA ===== */}
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-[#2D1B1A]">
-                            {areaActiva === 'bar' ? 'Bar' : 'Cocina'}
-                        </h1>
-                        <p className="text-sm font-medium text-[#5A3D2B]">
-                            {areaActiva === 'bar'
-                                ? 'Tickets de bebidas y cafetería'
-                                : 'Tickets de cocina, horno y postres'}
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-4">
-                        {/* Campanita de notificaciones */}
-                        <div className="notificaciones-container relative">
-                            <button
-                                onClick={() =>
-                                    setNotificacionesAbiertas(
-                                        !notificacionesAbiertas,
-                                    )
-                                }
-                                className="relative flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 shadow-sm transition hover:bg-gray-50"
-                            >
-                                <Bell className="h-5 w-5 text-orange-500" />
-                                <span className="text-sm font-medium text-gray-700">
-                                    Notificaciones
-                                </span>
-                                {pendientes > 0 && (
-                                    <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                                        {pendientes}
-                                    </span>
-                                )}
-                            </button>
-
-                            {/* Panel desplegable */}
-                            {notificacionesAbiertas && (
-                                <div className="absolute right-0 z-50 mt-2 max-h-[400px] w-80 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl">
-                                    <div className="flex items-center justify-between border-b border-gray-100 p-4">
-                                        <h3 className="flex items-center gap-2 font-bold text-[#2D1B1A]">
-                                            <Bell className="h-4 w-4 text-orange-500" />
-                                            Notificaciones
-                                        </h3>
-                                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400">
-                                            {pendientes} pendientes
-                                        </span>
-                                    </div>
-
-                                    <div className="p-2">
-                                        {pendientes === 0 ? (
-                                            <div className="py-8 text-center text-sm text-gray-400">
-                                                ✅ No hay pedidos pendientes
-                                            </div>
-                                        ) : (
-                                            pedidos
-                                                .filter(
-                                                    (p) =>
-                                                        p.estado ===
-                                                        'pendiente',
-                                                )
-                                                .map((pedido) => (
-                                                    <div
-                                                        key={pedido.id}
-                                                        className="mb-2 rounded-xl border border-orange-300 bg-orange-50 p-3 last:mb-0"
-                                                    >
-                                                        <div className="flex items-start justify-between">
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                    <span className="rounded bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-600">
-                                                                        {
-                                                                            pedido.numero
-                                                                        }
-                                                                    </span>
-                                                                    <span className="text-xs text-gray-400">
-                                                                        {pedido.hora_pedido
-                                                                            ? new Date(
-                                                                                  pedido.hora_pedido,
-                                                                              ).toLocaleTimeString()
-                                                                            : 'N/A'}
-                                                                    </span>
-                                                                </div>
-                                                                <p className="mt-1 text-sm font-medium text-[#2D1B1A]">
-                                                                    {pedido.tipo_origen ===
-                                                                    'delivery'
-                                                                        ? '🚚 Delivery'
-                                                                        : `🪑 Mesa ${pedido.mesa?.numero || 'No asignada'}`}{' '}
-                                                                    -{' '}
-                                                                    {
-                                                                        pedido.cliente
-                                                                    }
-                                                                </p>
-                                                                <p className="truncate text-xs text-gray-500">
-                                                                    {pedido.productos &&
-                                                                    pedido
-                                                                        .productos
-                                                                        .length >
-                                                                        0
-                                                                        ? pedido.productos
-                                                                              .map(
-                                                                                  (
-                                                                                      p,
-                                                                                  ) =>
-                                                                                      `${p.cantidad}x ${p.nombre}`,
-                                                                              )
-                                                                              .join(
-                                                                                  ' · ',
-                                                                              )
-                                                                        : 'Cargando productos...'}
-                                                                </p>
-                                                            </div>
-                                                            <button
-                                                                onClick={() =>
-                                                                    tomarPedido(
-                                                                        pedido,
-                                                                    )
-                                                                }
-                                                                className="ml-2 flex items-center gap-1 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-white transition hover:bg-blue-600"
-                                                            >
-                                                                ⚡ Tomar
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                        )}
-                                    </div>
-
-                                    <div className="border-t border-gray-100 p-3">
-                                        <button
-                                            onClick={() =>
-                                                window.location.reload()
-                                            }
-                                            className="flex w-full items-center justify-center gap-1 text-center text-sm font-medium text-[#C9A96E] transition hover:text-[#B8975D]"
-                                        >
-                                            Actualizar{' '}
-                                            <ChevronRight className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <span className="rounded-lg bg-orange-100 px-3 py-1 text-sm text-orange-700">
-                            🟠 Pendientes:{' '}
-                            {estadisticas?.cocina?.pendientes +
-                                estadisticas?.bar?.pendientes +
-                                estadisticas?.horno?.pendientes +
-                                estadisticas?.postres?.pendientes || 0}
-                        </span>
-                        <span className="rounded-lg bg-blue-100 px-3 py-1 text-sm text-blue-700">
-                            🔵 Preparando:{' '}
-                            {estadisticas?.cocina?.preparando +
-                                estadisticas?.bar?.preparando +
-                                estadisticas?.horno?.preparando +
-                                estadisticas?.postres?.preparando || 0}
-                        </span>
-                        <span className="rounded-lg bg-green-100 px-3 py-1 text-sm text-green-600">
-                            🟢 Listos:{' '}
-                            {estadisticas?.cocina?.listos +
-                                estadisticas?.bar?.listos +
-                                estadisticas?.horno?.listos +
-                                estadisticas?.postres?.listos || 0}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Barra de búsqueda y filtros */}
-                <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-                    <div className="rounded-xl border border-[#8D6B53]/15 bg-white p-4 shadow-sm">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div>
-                                <p className="flex items-center gap-2 text-sm font-bold text-[#2D1B1A]">
-                                    <Radio className="h-4 w-4 text-green-500" />
-                                    Centro de trabajo sincronizado
-                                </p>
-                                <p className="mt-1 text-xs text-[#8D6B53]">
-                                    Los pedidos se actualizan automáticamente
-                                    cada 10 segundos.
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-                                    <Wifi className="h-3.5 w-3.5" />
-                                    Sincronización HTTP
-                                </span>
-                                <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-                                    Urgentes: {pedidosUrgentes}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
-                            {eventosLivePreview.map((evento) => (
-                                <div
-                                    key={evento.label}
-                                    className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
-                                >
-                                    <p className="font-mono text-xs font-semibold text-[#2D1B1A]">
-                                        {evento.label}
-                                    </p>
-                                    <p className="mt-1 text-[11px] text-gray-500">
-                                        {evento.description}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 rounded-xl border border-[#8D6B53]/15 bg-white p-4 text-center shadow-sm">
-                        <div className="rounded-lg bg-orange-50 px-2 py-3">
-                            <Timer className="mx-auto mb-1 h-4 w-4 text-orange-500" />
-                            <p className="text-xl font-bold text-orange-700">
-                                {contarPorEstado('pendiente')}
-                            </p>
-                            <p className="text-[11px] text-gray-500">
-                                Pendientes
-                            </p>
-                        </div>
-                        <div className="rounded-lg bg-blue-50 px-2 py-3">
-                            <Clock className="mx-auto mb-1 h-4 w-4 text-blue-500" />
-                            <p className="text-xl font-bold text-blue-700">
-                                {contarPorEstado('preparando')}
-                            </p>
-                            <p className="text-[11px] text-gray-500">
-                                Preparando
-                            </p>
-                        </div>
-                        <div className="rounded-lg bg-green-50 px-2 py-3">
-                            <CheckCircle className="mx-auto mb-1 h-4 w-4 text-green-500" />
-                            <p className="text-xl font-bold text-green-700">
-                                {contarPorEstado('listo')}
-                            </p>
-                            <p className="text-[11px] text-gray-500">Listos</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#8D6B53]/10 bg-white p-4 shadow-sm">
-                    <div className="flex flex-col items-stretch gap-4 lg:flex-row lg:items-center">
+            <Head title={areaActiva === 'bar' ? 'Bar' : 'Cocina'} />
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto bg-neutral-50 p-4">
+                <section className="rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm">
+                    <div className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center">
                         <div className="relative flex-1">
-                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
+                            <Search className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-neutral-400" />
                             <input
-                                type="text"
-                                placeholder="🔍 Buscar pedido, cliente o mesa..."
-                                className="w-full rounded-xl border border-gray-200 py-3 pr-4 pl-10 text-[#1A1A1A] placeholder-gray-400 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                type="search"
+                                placeholder="Buscar pedido, cliente o mesa"
+                                className="min-h-12 w-full rounded-xl border border-neutral-200 bg-neutral-50 py-3 pr-4 pl-12 text-sm font-semibold text-neutral-900 outline-none transition placeholder:font-medium placeholder:text-neutral-400 focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
                             />
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                             <button
+                                type="button"
                                 onClick={() => setFiltroEstado('todas')}
-                                className={`rounded-xl px-5 py-2 font-semibold transition ${filtroEstado === 'todas' ? 'bg-[#C9A96E] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                className={`min-h-12 rounded-xl border px-4 text-sm font-bold transition active:scale-[0.98] ${filtroEstado === 'todas' ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
                             >
-                                Todas
+                                Todas ({pedidos.length})
                             </button>
                             <button
+                                type="button"
                                 onClick={() => setFiltroEstado('pendiente')}
-                                className={`rounded-xl px-5 py-2 font-semibold transition ${filtroEstado === 'pendiente' ? 'bg-orange-600 text-white' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'}`}
+                                className={`flex min-h-12 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-bold transition active:scale-[0.98] ${filtroEstado === 'pendiente' ? 'border-orange-500 bg-orange-500 text-white shadow-sm' : 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
                             >
-                                Pendientes
+                                <span className="h-2.5 w-2.5 rounded-full bg-current opacity-70" />
+                                Pendientes ({contarPorEstado('pendiente')})
                             </button>
                             <button
+                                type="button"
                                 onClick={() => setFiltroEstado('preparando')}
-                                className={`rounded-xl px-5 py-2 font-semibold transition ${filtroEstado === 'preparando' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
+                                className={`flex min-h-12 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-bold transition active:scale-[0.98] ${filtroEstado === 'preparando' ? 'border-blue-600 bg-blue-600 text-white shadow-sm' : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
                             >
-                                Preparando
-                            </button>
-                            <button
-                                onClick={() => setFiltroEstado('listo')}
-                                className={`rounded-xl px-5 py-2 font-semibold transition ${filtroEstado === 'listo' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}
-                            >
-                                Listos
+                                <span className="h-2.5 w-2.5 rounded-full bg-current opacity-70" />
+                                En preparación ({contarPorEstado('preparando')})
                             </button>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <div
-                    className={`grid grid-cols-1 gap-6 ${areasVisibles.length > 1 ? 'xl:grid-cols-3' : ''}`}
-                >
-                    {areasVisibles.map((area) => (
-                        <AreaCard
-                            key={area}
-                            area={area}
-                            pedidos={pedidosAgrupados[area] || []}
-                            estadisticas={
-                                estadisticas[area] || {
-                                    total: 0,
-                                    pendientes: 0,
-                                    preparando: 0,
-                                    listos: 0,
-                                }
-                            }
-                            cambiarEstado={cambiarEstado}
-                            expandido={areasVisibles.length === 1}
-                        />
-                    ))}
-                </div>
+                <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
+                    <header className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
+                        <div>
+                            <h1 className="text-base font-black text-neutral-950">Cola de pedidos</h1>
+                            <p className="mt-0.5 text-sm font-medium text-neutral-500">Ordenados por hora de llegada</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                </span>
+                                En vivo
+                            </span>
+                            <span className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-black text-neutral-700">{pedidosFiltrados.length}</span>
+                        </div>
+                    </header>
+
+                    <div className={`grid grid-cols-1 gap-4 p-4 ${areasVisibles.length > 1 ? 'xl:grid-cols-3' : ''}`}>
+                        {areasVisibles.map((area) => (
+                            <AreaCard
+                                key={area}
+                                area={area}
+                                pedidos={pedidosAgrupados[area] || []}
+                                estadisticas={estadisticas[area] || { total: 0, pendientes: 0, preparando: 0, listos: 0 }}
+                                cambiarEstado={cambiarEstado}
+                                expandido={areasVisibles.length === 1}
+                            />
+                        ))}
+                    </div>
+                </section>
             </div>
         </>
+    );
+}
+
+Produccion.layout = (props: { areaActiva?: 'cocina' | 'bar' }) => {
+    const area = props.areaActiva === 'bar' ? 'bar' : 'cocina';
+    const title = area === 'bar' ? 'Bar' : 'Cocina';
+
+    return {
+        breadcrumbs: [
+            {
+                title,
+                href: `/produccion?area=${area}`,
+            },
+        ],
+    };
+};
+
+function ResumenOperativo({
+    area,
+    pedidosUrgentes,
+    resumen,
+}: {
+    area: 'cocina' | 'bar';
+    pedidosUrgentes: number;
+    resumen: ResumenProduccion;
+}) {
+    const areas = area === 'bar'
+        ? [{ key: 'bar', label: 'Bar' }]
+        : [
+              { key: 'cocina', label: 'Cocina' },
+              { key: 'horno', label: 'Horno' },
+              { key: 'postres', label: 'Postres' },
+          ];
+
+    return (
+        <section className="space-y-3" aria-label="Resumen operativo">
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
+                <div className="col-span-2 flex min-h-20 items-center justify-between rounded-xl bg-neutral-950 px-4 py-3 text-white">
+                    <div>
+                        <p className="flex items-center gap-2 text-xs font-bold text-emerald-300">
+                            <Radio className="h-4 w-4" /> En vivo
+                        </p>
+                        <p className="mt-1 text-sm font-black">Pedidos por Reverb</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-2xl font-black">{pedidosUrgentes}</p>
+                        <p className="text-[11px] text-white/65">urgentes</p>
+                    </div>
+                </div>
+
+                <div className="flex min-h-20 items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+                    <Utensils className="h-6 w-6 text-orange-600" />
+                    <div>
+                        <p className="text-2xl font-black text-orange-700">{resumen.platosHoy}</p>
+                        <p className="text-[11px] font-bold text-orange-700/70">platos hoy</p>
+                    </div>
+                </div>
+
+                {areas.map(({ key, label }) => (
+                    <div key={key} className="min-h-20 rounded-xl border border-blue-100 bg-white px-4 py-3">
+                        <p className="text-2xl font-black text-blue-700">{resumen.porArea[key as keyof ResumenProduccion['porArea']] ?? 0}</p>
+                        <p className="text-xs font-bold text-neutral-600">{label}</p>
+                    </div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                <article className="rounded-xl border border-red-200 bg-white p-3 shadow-sm">
+                    <h2 className="flex items-center gap-2 text-sm font-black text-red-700">
+                        <AlertTriangle className="h-4 w-4" /> Stock escaso
+                        <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs">{resumen.stockEscaso.length}</span>
+                    </h2>
+                    <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
+                        {resumen.stockEscaso.length === 0 ? (
+                            <p className="rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">Stock dentro de los mínimos.</p>
+                        ) : resumen.stockEscaso.map((insumo) => (
+                            <div key={insumo.id} className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-2 text-xs">
+                                <span className="font-bold text-neutral-900">{insumo.nombre}</span>
+                                <span className="font-black text-red-700">{insumo.stock} {insumo.unidad}</span>
+                            </div>
+                        ))}
+                    </div>
+                </article>
+
+                <article className="rounded-xl border border-amber-200 bg-white p-3 shadow-sm">
+                    <h2 className="flex items-center gap-2 text-sm font-black text-amber-700">
+                        <CalendarDays className="h-4 w-4" /> Por vencer en 3 días
+                        <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs">{resumen.porVencer.length}</span>
+                    </h2>
+                    <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
+                        {resumen.porVencer.length === 0 ? (
+                            <p className="rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">Sin vencimientos próximos registrados.</p>
+                        ) : resumen.porVencer.map((insumo) => (
+                            <div key={insumo.id} className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-xs">
+                                <span className="font-bold text-neutral-900">{insumo.nombre}</span>
+                                <span className="font-black text-amber-700">{insumo.dias === 0 ? 'vence hoy' : `${insumo.dias} días`}</span>
+                            </div>
+                        ))}
+                    </div>
+                </article>
+
+                <article className="rounded-xl border border-violet-200 bg-white p-3 shadow-sm">
+                    <h2 className="flex items-center gap-2 text-sm font-black text-violet-700">
+                        <Trophy className="h-4 w-4" /> Más pedidos · 30 días
+                    </h2>
+                    <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
+                        {resumen.productosMasPedidos.length === 0 ? (
+                            <p className="rounded-lg bg-neutral-50 p-2 text-xs font-semibold text-neutral-600">Aún no hay ventas terminadas.</p>
+                        ) : resumen.productosMasPedidos.map((producto, index) => (
+                            <div key={producto.nombre} className="flex items-center gap-2 rounded-lg bg-violet-50 px-3 py-2 text-xs">
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-200 font-black text-violet-800">{index + 1}</span>
+                                <span className="min-w-0 flex-1 truncate font-bold text-neutral-900">{producto.nombre}</span>
+                                <span className="font-black text-violet-700">{producto.cantidad}</span>
+                            </div>
+                        ))}
+                    </div>
+                </article>
+            </div>
+        </section>
     );
 }
 
@@ -699,7 +492,6 @@ function AreaCard({
     expandido?: boolean;
 }) {
     const config = getAreaConfig(area);
-    const colores = getAreaColor(area);
     const getEstadoConfig = (estado: string) => {
         switch (estado) {
             case 'pendiente':
@@ -730,59 +522,38 @@ function AreaCard({
     };
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-[#8D6B53]/10 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-gray-100 p-5">
-                <div>
-                    <h2 className="text-lg font-bold text-gray-800">
-                        {config.icono} {config.nombre}
-                    </h2>
-                    <p className="text-xs text-gray-500">
-                        {area === 'cocina'
-                            ? 'Preparación de alimentos'
-                            : area === 'bar'
-                              ? 'Bebidas y café'
-                              : area === 'horno'
-                                ? 'Panadería y pastelería'
-                                : 'Preparación y decoración'}
-                    </p>
+        <div className={`overflow-hidden rounded-xl ${expandido ? '' : 'border border-neutral-200 bg-neutral-50'}`}>
+            {!expandido && (
+                <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
+                    <div>
+                        <h2 className="text-base font-black text-neutral-950">{config.icono} {config.nombre}</h2>
+                        <p className="text-sm font-medium text-neutral-500">
+                            {area === 'cocina'
+                                ? 'Preparación de alimentos'
+                                : area === 'horno'
+                                  ? 'Panadería y pastelería'
+                                  : 'Preparación y decoración'}
+                        </p>
+                    </div>
+                    <div className="flex gap-2 text-sm font-bold">
+                        <span className="rounded-lg bg-orange-50 px-2.5 py-1 text-orange-700">{estadisticas?.pendientes || 0} pendientes</span>
+                        <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-blue-700">{estadisticas?.preparando || 0} preparando</span>
+                    </div>
                 </div>
-                <span className="text-xs font-medium text-[#C9A96E]">
-                    {pedidos.length} pedidos
-                </span>
-            </div>
-
-            {/* Estadísticas */}
-            <div className="grid grid-cols-3 gap-2 p-4 text-center">
-                <div className="rounded-xl bg-orange-100 py-2">
-                    <p className="font-bold text-orange-700">
-                        {estadisticas?.pendientes || 0}
-                    </p>
-                    <p className="text-xs text-gray-500">Pendientes</p>
-                </div>
-                <div className="rounded-xl bg-blue-100 py-2">
-                    <p className="font-bold text-blue-700">
-                        {estadisticas?.preparando || 0}
-                    </p>
-                    <p className="text-xs text-gray-500">Preparando</p>
-                </div>
-                <div className="rounded-xl bg-green-100 py-2">
-                    <p className="font-bold text-green-600">
-                        {estadisticas?.listos || 0}
-                    </p>
-                    <p className="text-xs text-gray-500">Listos</p>
-                </div>
-            </div>
+            )}
 
             {/* Lista de pedidos */}
             <div
-                className={`max-h-[70vh] overflow-y-auto p-4 ${expandido ? 'grid grid-cols-1 gap-3 md:grid-cols-2' : 'space-y-3'}`}
+                className={`max-h-[70vh] overflow-y-auto ${expandido ? 'grid min-h-64 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3' : 'min-h-56 space-y-3 p-3'}`}
             >
                 {pedidos.length === 0 ? (
-                    <p
-                        className={`py-4 text-center text-sm text-gray-400 ${expandido ? 'col-span-2' : ''}`}
-                    >
-                        No hay pedidos en {config.nombre.toLowerCase()}
-                    </p>
+                    <div className={`flex min-h-56 flex-col items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-6 text-center ${expandido ? 'md:col-span-2 xl:col-span-3' : ''}`}>
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-neutral-200">
+                            <Radio className="h-5 w-5 text-emerald-500" />
+                        </div>
+                        <p className="mt-4 text-base font-black text-neutral-800">Esperando nuevos pedidos</p>
+                        <p className="mt-1 max-w-sm text-sm font-medium text-neutral-500">Las comandas aparecerán aquí automáticamente cuando el mozo las envíe.</p>
+                    </div>
                 ) : (
                     pedidos.map((pedido) => {
                         const estado = getEstadoConfig(pedido.estado);
@@ -796,22 +567,22 @@ function AreaCard({
                         return (
                             <div
                                 key={pedido.id}
-                                className={`flex flex-col rounded-2xl border-2 p-4 shadow-sm transition ${
+                                className={`flex flex-col rounded-xl border bg-white p-4 shadow-sm transition hover:shadow-md ${
                                     pedido.estado === 'preparando'
-                                        ? 'border-blue-600 bg-blue-50'
+                                        ? 'border-blue-300 ring-2 ring-blue-100'
                                         : pedido.estado === 'listo'
-                                          ? 'border-green-500 bg-green-50'
+                                          ? 'border-emerald-300 ring-2 ring-emerald-100'
                                           : pedido.estado === 'pendiente'
-                                            ? 'border-orange-300 bg-orange-50'
-                                            : 'border-gray-200 bg-white'
+                                            ? 'border-orange-300 ring-2 ring-orange-100'
+                                            : 'border-neutral-200'
                                 }`}
                             >
                                 <div className="flex items-start justify-between gap-3 border-b border-black/5 pb-3">
                                     <div>
-                                        <h4 className="text-lg font-black text-[#2D1B1A]">
+                                        <h4 className="text-base font-black text-neutral-950">
                                             #{pedido.numero}
                                         </h4>
-                                        <p className="text-sm font-semibold text-gray-700">
+                                        <p className="mt-1 text-sm font-semibold text-neutral-600">
                                             {pedido.tipo_origen === 'delivery'
                                                 ? 'Delivery'
                                                 : `Mesa ${pedido.mesa?.numero || '-'}`}{' '}
@@ -825,7 +596,7 @@ function AreaCard({
                                             {estado.label}
                                         </span>
                                         <p
-                                            className={`mt-2 text-xs font-bold ${minutos >= 10 ? 'text-red-600' : 'text-gray-500'}`}
+                                            className={`mt-2 text-sm font-bold ${minutos >= 10 ? 'text-red-600' : 'text-neutral-500'}`}
                                         >
                                             {minutos} min
                                         </p>
@@ -836,12 +607,12 @@ function AreaCard({
                                     {pedido.productos.map((producto, index) => (
                                         <li
                                             key={`${pedido.id}-${index}`}
-                                            className="flex gap-3 text-sm text-gray-800"
+                                            className="flex items-center gap-3 text-sm text-neutral-800"
                                         >
-                                            <span className="min-w-9 rounded-lg bg-white px-2 py-1 text-center font-black shadow-sm">
+                                            <span className="min-w-10 rounded-lg bg-neutral-100 px-2 py-1.5 text-center font-black text-neutral-900">
                                                 {producto.cantidad}x
                                             </span>
-                                            <span className="py-1 font-semibold">
+                                            <span className="font-bold">
                                                 {producto.nombre}
                                             </span>
                                         </li>
@@ -863,26 +634,17 @@ function AreaCard({
                                                     'preparando',
                                                 )
                                             }
-                                            className="min-h-11 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
+                                            className="min-h-14 touch-manipulation rounded-xl bg-blue-600 px-5 py-3 text-base font-black text-white transition active:scale-[0.98] hover:bg-blue-700"
                                         >
                                             Empezar preparación
                                         </button>
                                     )}
                                     {pedido.estado === 'preparando' && (
                                         <button
-                                            onClick={() => {
-                                                if (
-                                                    confirm(
-                                                        `✅ Marcar pedido #${pedido.numero} como listo?`,
-                                                    )
-                                                ) {
-                                                    cambiarEstado(
-                                                        pedido,
-                                                        'listo',
-                                                    );
-                                                }
-                                            }}
-                                            className="min-h-11 rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700"
+                                            onClick={() =>
+                                                cambiarEstado(pedido, 'listo')
+                                            }
+                                            className="min-h-14 touch-manipulation rounded-xl bg-emerald-600 px-5 py-3 text-base font-black text-white transition active:scale-[0.98] hover:bg-emerald-700"
                                         >
                                             Marcar como listo
                                         </button>

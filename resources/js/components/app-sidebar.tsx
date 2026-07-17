@@ -32,6 +32,10 @@ export function AppSidebar() {
     const page = usePage();
     const dashboardUrl = '/dashboard';
     const permissions = page.props.auth.permissions;
+    const roles = page.props.auth.roles ?? [];
+    const currentTeam = page.props.currentTeam;
+    const canManageTeams = roles.includes('Gerente') || ['owner', 'admin'].includes(currentTeam?.role ?? '');
+    const isProductionOperator = roles.includes('Cocinero') || roles.includes('Bar');
 
     //  TODAS LAS PÁGINAS (se filtran según el permiso de "ver" de cada rol)
     const allNavItems: NavItem[] = [
@@ -60,7 +64,7 @@ export function AppSidebar() {
             permission: 'ver reportes',
         },
         {
-            title: ' Contador',
+            title: 'Turno de caja',
             href: '/contador',
             icon: DollarSign,
             permission: 'ver contador',
@@ -135,6 +139,14 @@ export function AppSidebar() {
         (item) => !item.permission || permissions.includes(item.permission),
     );
 
+    if (isProductionOperator) {
+        mainNavItems.push({
+            title: 'Mi inventario',
+            href: '/mi-inventario',
+            icon: Package,
+        });
+    }
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
@@ -147,11 +159,13 @@ export function AppSidebar() {
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <TeamSwitcher />
-                    </SidebarMenuItem>
-                </SidebarMenu>
+                {canManageTeams && (
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <TeamSwitcher />
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                )}
             </SidebarHeader>
 
             <SidebarContent>

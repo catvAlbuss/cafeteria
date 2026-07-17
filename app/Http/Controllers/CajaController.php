@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Pedido;
 use App\Models\Caja;
+use App\Models\Pedido;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -30,10 +30,9 @@ class CajaController extends Controller
             'total' => 'required|numeric|min:0',
         ]);
 
-        // Buscar caja abierta
-        $caja = Caja::where('estado', 'Abierta')->first();
+        $caja = Caja::query()->where('estado', 'Abierta')->first();
 
-        if (!$caja) {
+        if (! $caja) {
             return redirect()->back()->with('error', 'No hay caja abierta. Debes abrir caja primero.');
         }
 
@@ -51,13 +50,14 @@ class CajaController extends Controller
                 'igv' => $validated['igv'],
                 'total' => $validated['total'],
                 'caja_id' => $caja->id,
+                'user_id' => $request->user()->id,
                 'estado' => 'pagado',
                 'created_at' => now(),
             ]);
 
             // Actualizar la caja (sumar al total)
             $caja->update([
-                'total_ventas_caja' => DB::raw('total_ventas_caja + ' . $validated['total']),
+                'total_ventas_caja' => DB::raw('total_ventas_caja + '.$validated['total']),
                 'total_pedidos' => DB::raw('total_pedidos + 1'),
             ]);
 
@@ -67,7 +67,8 @@ class CajaController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Error al registrar pedido: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Error al registrar pedido: '.$e->getMessage());
         }
     }
 
@@ -76,7 +77,7 @@ class CajaController extends Controller
      */
     public function estado()
     {
-        $caja = Caja::where('estado', 'Abierta')->first();
+        $caja = Caja::query()->where('estado', 'Abierta')->first();
 
         return response()->json([
             'abierta' => $caja !== null,

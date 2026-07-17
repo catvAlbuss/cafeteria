@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\TeamRole;
+use App\Models\Caja;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -47,7 +49,14 @@ class HandleInertiaRequests extends Middleware
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'currentTeam' => fn () => $user?->currentTeam ? $user->toUserTeam($user->currentTeam) : null,
-            'teams' => fn () => $user?->toUserTeams(includeCurrent: true) ?? [],
+            'teams' => fn () => $user && ($user->hasRole('Gerente') || ($user->currentTeam && in_array($user->teamRole($user->currentTeam), [TeamRole::Owner, TeamRole::Admin], true)))
+                ? $user->toUserTeams(includeCurrent: true)
+                : [],
+            'jornadaCaja' => fn () => $user?->current_team_id ? [
+                'abierta' => Caja::query()->where('estado', 'Abierta')->exists(),
+                'puedeAbrir' => $user->hasAnyRole(['Gerente', 'Cajero'])
+                    || ($user->currentTeam && in_array($user->teamRole($user->currentTeam), [TeamRole::Owner, TeamRole::Admin], true)),
+            ] : ['abierta' => false, 'puedeAbrir' => false],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

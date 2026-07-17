@@ -2,16 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Caja;
+use App\Models\Mesa;
+use App\Models\Pedido;
 use App\Models\TeamInvitation;
+use App\Services\ProductionSummary;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request, ProductionSummary $productionSummary): Response
     {
-        $email = strtolower($request->user()->email);
+        $user = $request->user();
+        $email = strtolower($user->email);
 
         $pendingInvitations = TeamInvitation::query()
             ->with(['inviter', 'team'])
@@ -31,8 +36,43 @@ class DashboardController extends Controller
                 ],
             ]);
 
+        $productionArea = match (true) {
+            $user->hasRole('Bar') => 'bar',
+            $user->hasRole('Cocinero') => 'cocina',
+            default => null,
+        };
+
+        $productionAreas = $productionArea === 'bar'
+            ? ['bar']
+            : ['cocina', 'horno', 'postres'];
+
+        $cashierSummary = $user->hasRole('Cajero') ? [
+            'salesToday' => (float) Pedido::query()
+                ->whereHas('caja', fn ($query) => $query->where('estado', 'Abierta'))
+                ->where('estado', 'pagado')
+                ->sum('total'),
+            'transactionsToday' => Pedido::query()
+                ->whereHas('caja', fn ($query) => $query->where('estado', 'Abierta'))
+                ->where('estado', 'pagado')
+                ->count(),
+            'readyToCharge' => Pedido::query()
+                ->where('estado', 'listo')
+                ->count(),
+            'activeTables' => Mesa::query()
+                ->whereIn('estado', ['ocupada', 'listo_cobrar'])
+                ->count(),
+            'openRegister' => Caja::query()
+                ->where('estado', 'Abierta')
+                ->first(['id', 'caja', 'turno', 'monto_inicial', 'fecha_apertura']),
+        ] : null;
+
         return Inertia::render('dashboard', [
             'pendingInvitations' => $pendingInvitations,
+            'productionArea' => $productionArea,
+            'productionSummary' => $productionArea
+                ? $productionSummary->forTeamAndAreas((int) $user->current_team_id, $productionAreas)
+                : null,
+            'cashierSummary' => $cashierSummary,
         ]);
     }
 }

@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Bell, CalendarClock, ChevronRight, Radio } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -25,6 +25,15 @@ export function Breadcrumbs({
 }: {
     breadcrumbs: BreadcrumbItemType[];
 }) {
+    const { auth } = usePage<{
+        auth?: {
+            user?: { id: number; name: string };
+            permissions?: string[];
+        };
+    }>().props;
+    const permissions = auth?.permissions ?? [];
+    const canListenToProduction = permissions.includes('visualizar comandas');
+    const canListenToSalon = permissions.includes('crear pedidos');
     const currentTitle = breadcrumbs.at(-1)?.title ?? 'Panel';
     const [now, setNow] = useState<Date | null>(null);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -66,20 +75,25 @@ export function Breadcrumbs({
             }
 
             const audioContext = new AudioContext();
-            const oscillator = audioContext.createOscillator();
             const gain = audioContext.createGain();
-
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(tone === 'listo' ? 980 : 820, audioContext.currentTime);
-            oscillator.frequency.exponentialRampToValueAtTime(tone === 'listo' ? 620 : 520, audioContext.currentTime + 0.22);
             gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.18, audioContext.currentTime + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.32);
-
-            oscillator.connect(gain);
+            gain.gain.exponentialRampToValueAtTime(0.55, audioContext.currentTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.62);
             gain.connect(audioContext.destination);
-            oscillator.start();
-            oscillator.stop(audioContext.currentTime + 0.34);
+
+            const frequencies = tone === 'listo' ? [1040, 1320] : [880, 1100];
+
+            frequencies.forEach((frequency, index) => {
+                const oscillator = audioContext.createOscillator();
+                const startAt = audioContext.currentTime + index * 0.24;
+
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, startAt);
+                oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.72, startAt + 0.2);
+                oscillator.connect(gain);
+                oscillator.start(startAt);
+                oscillator.stop(startAt + 0.22);
+            });
         } catch {
             // Browsers can block audio until the first user interaction.
         }
@@ -107,17 +121,28 @@ export function Breadcrumbs({
                 tone: 'pedido',
             });
         },
-    });
+    }, canListenToProduction);
 
     useSedeChannel('salon', {
         'pedido.listo': (payload: any) => {
+            if (payload.mozo_id && payload.mozo_id !== auth?.user?.id) {
+                return;
+            }
+
+            const mozo = payload.mozo_nombre ? `Mozo ${payload.mozo_nombre}: ` : '';
+            const message = payload.mesa_numero
+                ? `la mesa ${payload.mesa_numero} está lista para atender`
+                : payload.mesa_id
+                  ? `la mesa ${payload.mesa_id} está lista para atender`
+                  : 'el pedido está listo para entregar';
+
             addNotification({
                 title: `Pedido listo ${payload.numero ?? ''}`.trim(),
-                description: payload.mesa_id ? `Mesa ${payload.mesa_id} lista para atender` : 'Pedido listo para entregar',
+                description: `${mozo}${message}`,
                 tone: 'listo',
             });
         },
-    });
+    }, canListenToSalon);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

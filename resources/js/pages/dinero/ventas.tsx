@@ -331,12 +331,6 @@ export default function Ventas() {
             <Head title="Ventas" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-3 sm:p-4 bg-[#FBF7F0]">
 
-                {/* Título */}
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-[#2D1B1A] tracking-tight">Tomar Pedido</h1>
-                    <p className="text-[#8D6B53] text-xs sm:text-sm font-medium">Busca productos y arma el pedido</p>
-                </div>
-
                 {/* Información de la mesa */}
                 {mesaInfo && carrito.length === 0 && pedidosActivos.length === 0 && (
                     <div className="relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-black/5">
@@ -641,3 +635,12 @@ export default function Ventas() {
         </>
     );
 }
+
+Ventas.layout = {
+    breadcrumbs: [
+        {
+            title: 'Ventas',
+            href: '/ventas',
+        },
+    ],
+};

@@ -67,6 +67,7 @@ export default function Contador() {
     const {
         cajas = [],
         cajaActual = null,
+        ultimaCaja = null,
         resumen = { ingresos: 0, cajaActual: 0 },
         movimientos = [],
         ingresosDetalle = [],
@@ -79,6 +80,7 @@ export default function Contador() {
     const [cajaActiva, setCajaActiva] = useState<RegistroCaja | null>(cajaActual);
     const [modalAperturaAbierto, setModalAperturaAbierto] = useState(false);
     const [modalCierreAbierto, setModalCierreAbierto] = useState(false);
+    const [modalMovimientoAbierto, setModalMovimientoAbierto] = useState(false);
     const [modalDetalleAbierto, setModalDetalleAbierto] = useState(false);
     const [registroSeleccionado, setRegistroSeleccionado] = useState<RegistroCaja | null>(null);
 
@@ -86,13 +88,14 @@ export default function Contador() {
         caja: 'Caja 01',
         turno: 'Mañana' as 'Mañana' | 'Tarde' | 'Noche',
         montoInicial: 0,
+        justificacionApertura: '',
     });
 
     const [formCierre, setFormCierre] = useState({
         montoFinal: 0,
-        ventasDia: 0,
         observaciones: '',
     });
+    const [formMovimiento, setFormMovimiento] = useState({ tipo: 'egreso', concepto: '', monto: 0 });
 
     const [filtroEstado, setFiltroEstado] = useState('');
     const [filtroEmpleado, setFiltroEmpleado] = useState('');
@@ -141,7 +144,12 @@ export default function Contador() {
     });
 
     const abrirModalApertura = () => {
-        setFormApertura({ caja: 'Caja 01', turno: 'Mañana', montoInicial: 0 });
+        setFormApertura({
+            caja: 'Caja 01',
+            turno: 'Mañana',
+            montoInicial: ultimaCaja?.monto_final ? Number(ultimaCaja.monto_final) : 0,
+            justificacionApertura: '',
+        });
         setModalAperturaAbierto(true);
     };
 
@@ -169,13 +177,13 @@ export default function Contador() {
             return;
         }
         setRegistroSeleccionado(abierta);
-        setFormCierre({ montoFinal: 0, ventasDia: 0, observaciones: '' });
+        setFormCierre({ montoFinal: 0, observaciones: '' });
         setModalCierreAbierto(true);
     };
 
     const guardarCierre = () => {
         if (!registroSeleccionado) return;
-        if (formCierre.montoFinal < 0 || formCierre.ventasDia < 0) {
+        if (formCierre.montoFinal < 0) {
             alert('Complete los campos correctamente.');
             return;
         }
@@ -188,6 +196,16 @@ export default function Contador() {
             onError: (errors) => {
                 alert('Error al cerrar caja: ' + Object.values(errors).join(' '));
             }
+        });
+    };
+
+    const guardarMovimiento = () => {
+        router.post('/contador/movimientos', formMovimiento, {
+            onSuccess: () => {
+                setModalMovimientoAbierto(false);
+                setFormMovimiento({ tipo: 'egreso', concepto: '', monto: 0 });
+                router.reload();
+            },
         });
     };
 
@@ -235,20 +253,10 @@ export default function Contador() {
 
     return (
         <>
-            <Head title="Contador - Dolce Cafe" />
+            <Head title="Turno de caja - Dolce Cafe" />
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-3xl p-6 bg-[#FBF3E7]">
 
-                {/* HEADER */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-[#2D1B1A] flex items-center gap-3">
-                            <span className="bg-gradient-to-r from-amber-500 to-orange-500 p-2 rounded-xl text-white">
-                                💰
-                            </span>
-                            Contador
-                        </h1>
-                        <p className="text-[#5A3D2B] text-sm mt-1 ml-1">Control financiero, apertura y cierre de caja</p>
-                    </div>
+                <div className="flex justify-end">
                     <div className="flex flex-wrap gap-3">
                         {!cajaActiva ? (
                             <button
@@ -259,13 +267,18 @@ export default function Contador() {
                                 Abrir Caja
                             </button>
                         ) : (
-                            <button
-                                onClick={abrirModalCierre}
-                                className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold hover:shadow-lg active:scale-95"
-                            >
-                                <CheckCircle className="w-4 h-4" />
-                                Cerrar Caja
-                            </button>
+                            <>
+                                <button onClick={() => setModalMovimientoAbierto(true)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white shadow-md transition hover:bg-emerald-700">
+                                    <Plus className="w-4 h-4" /> Movimiento
+                                </button>
+                                <button
+                                    onClick={abrirModalCierre}
+                                    className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold hover:shadow-lg active:scale-95"
+                                >
+                                    <CheckCircle className="w-4 h-4" />
+                                    Cerrar Caja
+                                </button>
+                            </>
                         )}
                         <button className="inline-flex items-center gap-2 bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm hover:shadow-lg active:scale-95">
                             <FileSpreadsheet className="w-4 h-4" />
@@ -583,6 +596,24 @@ export default function Contador() {
                 </div>
 
                 {/* ===== MODALES ===== */}
+                {modalMovimientoAbierto && cajaActiva && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                        <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+                            <h2 className="text-xl font-bold text-[#2D1B1A]">Registrar movimiento</h2>
+                            <div className="mt-5 space-y-4">
+                                <select className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3" value={formMovimiento.tipo} onChange={(e) => setFormMovimiento({ ...formMovimiento, tipo: e.target.value })}>
+                                    <option value="ingreso">Ingreso</option><option value="aporte">Aporte</option><option value="egreso">Gasto</option><option value="retiro">Retiro</option>
+                                </select>
+                                <input className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3" value={formMovimiento.concepto} onChange={(e) => setFormMovimiento({ ...formMovimiento, concepto: e.target.value })} placeholder="Concepto y motivo" />
+                                <input type="number" min="0.01" step="0.01" className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3" value={formMovimiento.monto} onChange={(e) => setFormMovimiento({ ...formMovimiento, monto: Number(e.target.value) })} placeholder="Monto" />
+                            </div>
+                            <div className="mt-6 flex justify-end gap-3">
+                                <button onClick={() => setModalMovimientoAbierto(false)} className="rounded-xl bg-gray-100 px-5 py-2.5 font-semibold">Cancelar</button>
+                                <button onClick={guardarMovimiento} disabled={!formMovimiento.concepto || formMovimiento.monto <= 0} className="rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50">Registrar</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {/* Modal Apertura */}
                 {modalAperturaAbierto && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -612,6 +643,11 @@ export default function Contador() {
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Monto Inicial (S/)</label>
                                     <input type="number" step="0.01" className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 transition" value={formApertura.montoInicial} onChange={(e) => setFormApertura({ ...formApertura, montoInicial: parseFloat(e.target.value) || 0 })} placeholder="0.00" />
+                                    {ultimaCaja && <p className="mt-2 text-xs text-gray-500">Ultimo cierre: {formatCurrency(ultimaCaja.monto_final)}. Si modifica el monto, indique el motivo.</p>}
+                                </div>
+                                <div>
+                                    <label className="text-sm text-gray-500 font-medium">Justificación del ajuste</label>
+                                    <textarea rows={2} className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none focus:ring-2 focus:ring-[#C9A96E]" value={formApertura.justificacionApertura} onChange={(e) => setFormApertura({ ...formApertura, justificacionApertura: e.target.value })} placeholder="Solo necesaria si difiere del cierre anterior" />
                                 </div>
                             </div>
                             <div className="border-t border-[#F3E1C8] p-6 flex justify-end gap-3">
@@ -641,7 +677,7 @@ export default function Contador() {
                                     <div><label className="text-xs text-gray-500">Monto Inicial</label><p className="font-semibold text-[#C9A96E]">{formatCurrency(registroSeleccionado.monto_inicial)}</p></div>
                                 </div>
                                 <div><label className="text-sm text-gray-500 font-medium">Monto Final (S/)</label><input type="number" step="0.01" className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 transition" value={formCierre.montoFinal} onChange={(e) => setFormCierre({ ...formCierre, montoFinal: parseFloat(e.target.value) || 0 })} placeholder="0.00" /></div>
-                                <div><label className="text-sm text-gray-500 font-medium">Ventas del Día (S/)</label><input type="number" step="0.01" className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 transition" value={formCierre.ventasDia} onChange={(e) => setFormCierre({ ...formCierre, ventasDia: parseFloat(e.target.value) || 0 })} placeholder="0.00" /></div>
+                                <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Arqueo ciego: ingrese el efectivo contado. El sistema calculará la diferencia después de confirmar.</p>
                                 <div><label className="text-sm text-gray-500 font-medium">Observaciones</label><textarea rows={3} className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 transition" value={formCierre.observaciones} onChange={(e) => setFormCierre({ ...formCierre, observaciones: e.target.value })} placeholder="Observaciones del cierre..." /></div>
                             </div>
                             <div className="border-t border-[#F3E1C8] p-6 flex justify-end gap-3">
@@ -689,3 +725,12 @@ export default function Contador() {
         </>
     );
 }
+
+Contador.layout = {
+    breadcrumbs: [
+        {
+            title: 'Contador',
+            href: '/contador',
+        },
+    ],
+};

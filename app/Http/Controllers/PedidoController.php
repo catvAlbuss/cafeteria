@@ -6,7 +6,9 @@ use App\Events\MesaActualizada;
 use App\Events\PedidoActualizado;
 use App\Events\PedidoCreado;
 use App\Events\PedidoListo;
+use App\Models\Caja;
 use App\Models\Delivery;
+use App\Models\Insumo;
 use App\Models\Mesa;
 use App\Models\Pedido;
 use App\Models\Plato;
@@ -132,6 +134,86 @@ class PedidoController extends Controller
         ]);
     }
 
+    /**
+     * @param  array<int, string>  $areas
+     * @return array<string, mixed>
+     */
+    private function resumenProduccion(int $teamId, array $areas): array
+    {
+        $pedidosTerminadosHoy = Pedido::query()
+            ->where('team_id', $teamId)
+            ->whereIn('area', $areas)
+            ->whereIn('estado', ['listo', 'entregado', 'pagado'])
+            ->whereDate('created_at', today())
+            ->get(['area', 'productos']);
+
+        $cantidadPorArea = collect(['cocina', 'bar', 'horno', 'postres'])
+            ->mapWithKeys(fn (string $area) => [$area => 0]);
+
+        foreach ($pedidosTerminadosHoy as $pedido) {
+            $cantidad = collect($pedido->productos ?? [])->sum(fn (array $producto) => (int) ($producto['cantidad'] ?? 1));
+            $cantidadPorArea[$pedido->area] = ($cantidadPorArea[$pedido->area] ?? 0) + $cantidad;
+        }
+
+        $productosMasPedidos = [];
+        $pedidosRecientes = Pedido::query()
+            ->where('team_id', $teamId)
+            ->whereIn('area', $areas)
+            ->whereIn('estado', ['listo', 'entregado', 'pagado'])
+            ->where('created_at', '>=', now()->subDays(30))
+            ->get(['productos']);
+
+        foreach ($pedidosRecientes as $pedido) {
+            foreach ($pedido->productos ?? [] as $producto) {
+                $nombre = (string) ($producto['nombre'] ?? 'Producto');
+                $productosMasPedidos[$nombre] = ($productosMasPedidos[$nombre] ?? 0) + (int) ($producto['cantidad'] ?? 1);
+            }
+        }
+
+        arsort($productosMasPedidos);
+
+        $insumos = Insumo::query()
+            ->where('team_id', $teamId)
+            ->where('activo', true)
+            ->get(['id', 'nombre', 'categoria', 'unidad', 'stock', 'stock_minimo', 'fecha_vencimiento']);
+
+        $stockEscaso = $insumos
+            ->filter(fn (Insumo $insumo) => (float) $insumo->stock <= (float) $insumo->stock_minimo)
+            ->sortBy(fn (Insumo $insumo) => (float) $insumo->stock - (float) $insumo->stock_minimo)
+            ->take(6)
+            ->map(fn (Insumo $insumo) => [
+                'id' => $insumo->id,
+                'nombre' => $insumo->nombre,
+                'stock' => (float) $insumo->stock,
+                'stock_minimo' => (float) $insumo->stock_minimo,
+                'unidad' => $insumo->unidad,
+            ])->values();
+
+        $porVencer = $insumos
+            ->filter(fn (Insumo $insumo) => $insumo->fecha_vencimiento
+                && $insumo->fecha_vencimiento->between(today(), today()->addDays(3)))
+            ->sortBy('fecha_vencimiento')
+            ->take(6)
+            ->map(fn (Insumo $insumo) => [
+                'id' => $insumo->id,
+                'nombre' => $insumo->nombre,
+                'fecha_vencimiento' => $insumo->fecha_vencimiento?->toDateString(),
+                'dias' => today()->diffInDays($insumo->fecha_vencimiento, false),
+            ])->values();
+
+        return [
+            'platosHoy' => $cantidadPorArea->sum(),
+            'porArea' => $cantidadPorArea,
+            'productosMasPedidos' => collect($productosMasPedidos)
+                ->take(5)
+                ->map(fn (int $cantidad, string $nombre) => compact('nombre', 'cantidad'))
+                ->values(),
+            'stockEscaso' => $stockEscaso,
+            'porVencer' => $porVencer,
+            'totalInsumos' => $insumos->count(),
+        ];
+    }
+
     public function cobrarMesa(Request $request, Mesa $mesa)
     {
         $validated = $request->validate([
@@ -139,6 +221,8 @@ class PedidoController extends Controller
             'pedido_ids' => 'required|array|min:1',
             'pedido_ids.*' => 'exists:pedidos,id',
         ]);
+
+        $caja = Caja::query()->where('estado', 'Abierta')->firstOrFail();
 
         $pedidos = Pedido::whereIn('id', $validated['pedido_ids'])
             ->where('mesa_id', $mesa->id)
@@ -148,6 +232,7 @@ class PedidoController extends Controller
         foreach ($pedidos as $pedido) {
             $pedido->estado = 'pagado';
             $pedido->metodo_pago = $validated['metodo_pago'];
+            $pedido->caja_id = $caja->id;
             $pedido->save();
             broadcast(new PedidoActualizado($pedido));
         }
@@ -296,6 +381,16 @@ class PedidoController extends Controller
             broadcast(new PedidoActualizado($pedido));
 
             if ($validated['estado'] === 'listo') {
+                if ($pedido->mesa_id) {
+                    $mesa = Mesa::find($pedido->mesa_id);
+
+                    if ($mesa) {
+                        $mesa->pedido_listo = true;
+                        $mesa->save();
+                        broadcast(new MesaActualizada($mesa));
+                    }
+                }
+
                 broadcast(new PedidoListo($pedido));
             }
 
@@ -381,7 +476,11 @@ class PedidoController extends Controller
             'monto_recibido' => 'nullable|numeric|min:0',
         ]);
 
+        $caja = Caja::query()->where('estado', 'Abierta')->firstOrFail();
+
         $pedido->estado = 'pagado';
+        $pedido->metodo_pago = $validated['metodo_pago'];
+        $pedido->caja_id = $caja->id;
         $pedido->save();
 
         broadcast(new PedidoActualizado($pedido));

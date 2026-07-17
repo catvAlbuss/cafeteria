@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Enums\TeamPermission;
+use App\Enums\TeamRole;
 use App\Models\Team;
 use App\Models\User;
 
@@ -13,7 +14,7 @@ class TeamPolicy
      */
     public function viewAny(User $user): bool
     {
-        return true;
+        return $this->canManageTeams($user);
     }
 
     /**
@@ -21,7 +22,7 @@ class TeamPolicy
      */
     public function view(User $user, Team $team): bool
     {
-        return $user->belongsToTeam($team);
+        return $user->belongsToTeam($team) && $this->canManageTeams($user, $team);
     }
 
     /**
@@ -29,7 +30,7 @@ class TeamPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $this->canManageTeams($user);
     }
 
     /**
@@ -47,7 +48,8 @@ class TeamPolicy
     {
         return ! $team->is_personal
             && $user->belongsToTeam($team)
-            && ! $user->ownsTeam($team);
+            && ! $user->ownsTeam($team)
+            && $this->canManageTeams($user, $team);
     }
 
     /**
@@ -96,5 +98,17 @@ class TeamPolicy
     public function delete(User $user, Team $team): bool
     {
         return ! $team->is_personal && $user->hasTeamPermission($team, TeamPermission::DeleteTeam);
+    }
+
+    private function canManageTeams(User $user, ?Team $team = null): bool
+    {
+        if ($user->hasRole('Gerente')) {
+            return true;
+        }
+
+        $team ??= $user->currentTeam;
+        $role = $team ? $user->teamRole($team) : null;
+
+        return in_array($role, [TeamRole::Owner, TeamRole::Admin], true);
     }
 }

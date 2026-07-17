@@ -6,9 +6,42 @@ use App\Models\Insumo;
 use App\Models\MovimientoInventario;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class InsumoController extends Controller
 {
+    public function operativo(Request $request): Response
+    {
+        $user = $request->user();
+        $area = match (true) {
+            $user->hasRole('Bar') => 'bar',
+            $user->hasRole('Cocinero') => 'cocina',
+            default => null,
+        };
+
+        abort_unless($area, 403);
+
+        $insumos = Insumo::query()
+            ->where('team_id', $user->current_team_id)
+            ->where('area', $area)
+            ->where('activo', true)
+            ->orderBy('nombre')
+            ->get()
+            ->map(fn (Insumo $insumo) => [
+                'id' => $insumo->id,
+                'nombre' => $insumo->nombre,
+                'categoria' => $insumo->categoria,
+                'unidad' => $insumo->unidad,
+                'stock' => (float) $insumo->stock,
+                'stock_minimo' => (float) $insumo->stock_minimo,
+                'fecha_vencimiento' => $insumo->fecha_vencimiento?->toDateString(),
+            ]);
+
+        return Inertia::render('inventario/operativo', [
+            'insumos' => $insumos,
+        ]);
+    }
+
     public function index()
     {
         $teamId = auth()->user()->current_team_id;
@@ -29,8 +62,11 @@ class InsumoController extends Controller
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'categoria' => 'nullable|string|max:255',
+            'area' => 'required|in:cocina,bar',
             'unidad' => 'required|string|max:50',
             'stock' => 'nullable|numeric|min:0',
+            'stock_minimo' => 'nullable|numeric|min:0',
+            'fecha_vencimiento' => 'nullable|date',
             'precio' => 'nullable|numeric|min:0',
             'proveedor' => 'nullable|string|max:255',
         ]);
@@ -39,8 +75,11 @@ class InsumoController extends Controller
             'team_id' => $teamId,
             'nombre' => $validated['nombre'],
             'categoria' => $validated['categoria'] ?? null,
+            'area' => $validated['area'],
             'unidad' => $validated['unidad'],
             'stock' => $validated['stock'] ?? 0,
+            'stock_minimo' => $validated['stock_minimo'] ?? 5,
+            'fecha_vencimiento' => $validated['fecha_vencimiento'] ?? null,
             'precio' => $validated['precio'] ?? 0,
             'proveedor' => $validated['proveedor'] ?? null,
             'activo' => true,
@@ -69,8 +108,11 @@ class InsumoController extends Controller
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
             'categoria' => 'nullable|string|max:255',
+            'area' => 'required|in:cocina,bar',
             'unidad' => 'required|string|max:50',
             'precio' => 'nullable|numeric|min:0',
+            'stock_minimo' => 'nullable|numeric|min:0',
+            'fecha_vencimiento' => 'nullable|date',
             'proveedor' => 'nullable|string|max:255',
             'activo' => 'nullable|boolean',
         ]);

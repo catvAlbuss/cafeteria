@@ -164,12 +164,7 @@ export default function Caja() {
             <Head title="Caja" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4 bg-[#FBF7F0]">
                 
-                {/* Título */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-[#2D1B1A]"> Caja</h1>
-                        <p className="text-[#5A3D2B] text-sm font-medium">Gestión de pedidos y cobros</p>
-                    </div>
+                <div className="flex items-center justify-end">
                     <div className="flex items-center gap-3 text-sm text-gray-500">
                         <span className="px-3 py-1 bg-white rounded-lg border">
                             Pedido #27362
@@ -449,4 +444,13 @@ export default function Caja() {
             </div>
         </>
     );
-}   
+}
+
+Caja.layout = {
+    breadcrumbs: [
+        {
+            title: 'Caja',
+            href: '/caja',
+        },
+    ],
+};

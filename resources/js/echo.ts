@@ -12,12 +12,19 @@ function createEcho(): Echo<'reverb'> | undefined {
     if (typeof window === 'undefined') return undefined;
 
     const key = import.meta.env.VITE_REVERB_APP_KEY;
-    const host = import.meta.env.VITE_REVERB_HOST;
+    const host = import.meta.env.VITE_REVERB_HOST?.trim().toLowerCase();
     const localHosts = ['localhost', '127.0.0.1', '::1'];
 
     if (!key || !host || (import.meta.env.PROD && localHosts.includes(host))) {
+        if (import.meta.env.PROD) {
+            console.error('Reverb no se inició: configura VITE_REVERB_APP_KEY y un VITE_REVERB_HOST público antes de ejecutar npm run build.');
+        }
+
         return undefined;
     }
+
+    const forceTLS = (import.meta.env.VITE_REVERB_SCHEME ?? window.location.protocol.replace(':', '')) === 'https';
+    const configuredPort = Number(import.meta.env.VITE_REVERB_PORT || (forceTLS ? 443 : 80));
 
     window.Pusher = Pusher;
 
@@ -25,10 +32,11 @@ function createEcho(): Echo<'reverb'> | undefined {
         broadcaster: 'reverb',
         key,
         wsHost: host,
-        wsPort: import.meta.env.VITE_REVERB_PORT ?? 80,
-        wssPort: import.meta.env.VITE_REVERB_PORT ?? 443,
-        forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? 'https') === 'https',
-        enabledTransports: ['ws', 'wss'],
+        wsPort: configuredPort,
+        wssPort: configuredPort,
+        forceTLS,
+        enabledTransports: forceTLS ? ['wss'] : ['ws'],
+        disableStats: true,
     });
 }
 

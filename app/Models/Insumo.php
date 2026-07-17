@@ -15,8 +15,11 @@ class Insumo extends Model
         'team_id',
         'nombre',
         'categoria',
+        'area',
         'unidad',
         'stock',
+        'stock_minimo',
+        'fecha_vencimiento',
         'precio',
         'proveedor',
         'activo',
@@ -24,6 +27,8 @@ class Insumo extends Model
 
     protected $casts = [
         'stock' => 'decimal:2',
+        'stock_minimo' => 'decimal:2',
+        'fecha_vencimiento' => 'date',
         'precio' => 'decimal:2',
         'activo' => 'boolean',
     ];

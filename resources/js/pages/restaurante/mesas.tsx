@@ -776,12 +776,7 @@ export default function MesasDistribucion() {
             <Head title="Distribución de Mesas" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-3 sm:p-4 bg-[#FBF7F0]">
 
-                {/* TÍTULO + BOTÓN NUEVA MESA */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-xl sm:text-2xl font-bold text-[#2D1B1A]">Gestión de Mesas</h1>
-                        <p className="text-[#5A3D2B] text-xs sm:text-sm font-medium">Administración del restaurante</p>
-                    </div>
+                <div className="flex justify-end gap-3">
                     <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                         <button
                             onClick={crearMesa}
@@ -799,10 +794,6 @@ export default function MesasDistribucion() {
                         </div>
                     </div>
                 </div>
-
-                <p className="text-[11px] text-[#8D6B53] -mt-2">
-                    Tip: arrastra una silla a otra mesa libre para redistribuirlas.
-                </p>
 
                 {/* 👇 PLANO DE MESAS - SIN BARRA LATERAL */}
                 <div className="w-full">
@@ -871,3 +862,12 @@ export default function MesasDistribucion() {
         </>
     );
 }
+
+MesasDistribucion.layout = {
+    breadcrumbs: [
+        {
+            title: 'Mesas',
+            href: '/mesas',
+        },
+    ],
+};

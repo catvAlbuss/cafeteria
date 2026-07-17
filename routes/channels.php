@@ -24,7 +24,7 @@ Broadcast::channel('sede.{teamId}.salon', function (User $user, int $teamId) {
 
 // Caja: dashboard del cajero
 Broadcast::channel('sede.{teamId}.caja', function (User $user, int $teamId) {
-    return (int) $user->current_team_id === $teamId && $user->can('procesar pagos');
+    return (int) $user->current_team_id === $teamId;
 });
 
 // Mapa de mesas en tiempo real

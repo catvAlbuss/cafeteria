@@ -12,8 +12,11 @@ export default function ModalInsumo({ isOpen, onClose, insumo, onSave }: ModalIn
     const [formulario, setFormulario] = useState({
         nombre: '',
         categoria: '',
+        area: 'cocina',
         unidad: 'kg',
         stock: 0,
+        stock_minimo: 5,
+        fecha_vencimiento: '',
         precio: 0,
         proveedor: '',
         activo: true,
@@ -24,8 +27,11 @@ export default function ModalInsumo({ isOpen, onClose, insumo, onSave }: ModalIn
             setFormulario({
                 nombre: insumo.nombre || '',
                 categoria: insumo.categoria || '',
+                area: insumo.area || 'cocina',
                 unidad: insumo.unidad || 'kg',
                 stock: insumo.stock || 0,
+                stock_minimo: insumo.stock_minimo ?? 5,
+                fecha_vencimiento: insumo.fecha_vencimiento?.slice(0, 10) || '',
                 precio: insumo.precio || 0,
                 proveedor: insumo.proveedor || '',
                 activo: insumo.activo ?? true,
@@ -34,8 +40,11 @@ export default function ModalInsumo({ isOpen, onClose, insumo, onSave }: ModalIn
             setFormulario({
                 nombre: '',
                 categoria: '',
+                area: 'cocina',
                 unidad: 'kg',
                 stock: 0,
+                stock_minimo: 5,
+                fecha_vencimiento: '',
                 precio: 0,
                 proveedor: '',
                 activo: true,
@@ -113,6 +122,42 @@ export default function ModalInsumo({ isOpen, onClose, insumo, onSave }: ModalIn
                                 <option value="mL">mL</option>
                                 <option value="unidades">unidades</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Área responsable *</label>
+                        <select
+                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50"
+                            value={formulario.area}
+                            onChange={(e) => setFormulario({ ...formulario, area: e.target.value })}
+                        >
+                            <option value="cocina">Cocina</option>
+                            <option value="bar">Bar</option>
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">Administración define quién podrá visualizar este insumo.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Stock mínimo</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50"
+                                value={formulario.stock_minimo}
+                                onChange={(e) => setFormulario({ ...formulario, stock_minimo: parseFloat(e.target.value) || 0 })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Fecha de vencimiento</label>
+                            <input
+                                type="date"
+                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50"
+                                value={formulario.fecha_vencimiento}
+                                onChange={(e) => setFormulario({ ...formulario, fecha_vencimiento: e.target.value })}
+                            />
                         </div>
                     </div>
 
