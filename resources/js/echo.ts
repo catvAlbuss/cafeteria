@@ -11,20 +11,23 @@ declare global {
 function createEcho(): Echo<'reverb'> | undefined {
     if (typeof window === 'undefined') return undefined;
 
-    const key = import.meta.env.VITE_REVERB_APP_KEY;
-    const host = import.meta.env.VITE_REVERB_HOST?.trim().toLowerCase();
+    const meta = (name: string) => document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)?.content.trim();
+    const key = meta('reverb-key') || import.meta.env.VITE_REVERB_APP_KEY;
+    const rawHost = meta('reverb-host') || import.meta.env.VITE_REVERB_HOST;
+    const host = rawHost?.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
     const localHosts = ['localhost', '127.0.0.1', '::1'];
 
     if (!key || !host || (import.meta.env.PROD && localHosts.includes(host))) {
         if (import.meta.env.PROD) {
-            console.error('Reverb no se inició: configura VITE_REVERB_APP_KEY y un VITE_REVERB_HOST público antes de ejecutar npm run build.');
+            console.error('Reverb no se inició: configura REVERB_APP_KEY y REVERB_HOST con un dominio público.');
         }
 
         return undefined;
     }
 
-    const forceTLS = (import.meta.env.VITE_REVERB_SCHEME ?? window.location.protocol.replace(':', '')) === 'https';
-    const configuredPort = Number(import.meta.env.VITE_REVERB_PORT || (forceTLS ? 443 : 80));
+    const scheme = meta('reverb-scheme') || import.meta.env.VITE_REVERB_SCHEME || window.location.protocol.replace(':', '');
+    const forceTLS = scheme === 'https';
+    const configuredPort = Number(meta('reverb-port') || import.meta.env.VITE_REVERB_PORT || (forceTLS ? 443 : 80));
 
     window.Pusher = Pusher;
 
