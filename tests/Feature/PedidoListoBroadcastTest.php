@@ -5,6 +5,7 @@ use App\Models\Mesa;
 use App\Models\Pedido;
 use App\Models\User;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldRescue;
 
 test('broadcasts the ready order immediately with the assigned waiter', function () {
     $mozo = new User(['name' => 'Lucía Ramos']);
@@ -24,6 +25,7 @@ test('broadcasts the ready order immediately with the assigned waiter', function
     $event = new PedidoListo($pedido);
 
     expect($event)->toBeInstanceOf(ShouldBroadcastNow::class)
+        ->and($event)->toBeInstanceOf(ShouldRescue::class)
         ->and($event->broadcastAs())->toBe('pedido.listo')
         ->and($event->broadcastWith())->toMatchArray([
             'id' => 42,
