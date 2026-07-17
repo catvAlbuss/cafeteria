@@ -54,8 +54,7 @@ class HandleInertiaRequests extends Middleware
                 : [],
             'jornadaCaja' => fn () => $user?->current_team_id ? [
                 'abierta' => Caja::query()->where('estado', 'Abierta')->exists(),
-                'puedeAbrir' => $user->hasAnyRole(['Gerente', 'Cajero'])
-                    || ($user->currentTeam && in_array($user->teamRole($user->currentTeam), [TeamRole::Owner, TeamRole::Admin], true)),
+                'puedeAbrir' => $user->can('manage-cash-session'),
             ] : ['abierta' => false, 'puedeAbrir' => false],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

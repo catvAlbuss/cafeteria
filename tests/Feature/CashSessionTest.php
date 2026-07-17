@@ -65,6 +65,8 @@ test('cashiers, venue administrators, and management can open the cash session',
         $user->assignRole($roleName);
     }
 
+    $this->actingAs($user)->get(route('contador.index'))->assertOk();
+
     $response = $this->actingAs($user)->post(route('contador.abrir'), [
         'caja' => 'Caja 01',
         'turno' => 'Mañana',
@@ -75,6 +77,40 @@ test('cashiers, venue administrators, and management can open the cash session',
 
     expect(Caja::query()->where('user_id', $user->id)->where('estado', 'Abierta')->exists())->toBeTrue();
 })->with(['cashier', 'administrator', 'management']);
+
+test('operational roles cannot view, open, or close the cash session', function (string $roleName) {
+    $team = Team::factory()->create();
+    $user = User::factory()->create(['current_team_id' => $team->id]);
+    $team->members()->attach($user, ['role' => TeamRole::Member->value]);
+    app(PermissionRegistrar::class)->setPermissionsTeamId($team->id);
+    Role::query()->create([
+        'name' => $roleName,
+        'guard_name' => 'web',
+        'team_id' => $team->id,
+    ]);
+    $user->assignRole($roleName);
+    $cashSession = Caja::query()->create([
+        'team_id' => $team->id,
+        'user_id' => $user->id,
+        'caja' => 'Caja Principal',
+        'turno' => 'Todo el día',
+        'monto_inicial' => 100,
+        'fecha_apertura' => now(),
+        'estado' => 'Abierta',
+    ]);
+
+    $this->actingAs($user)->get(route('contador.index'))->assertForbidden();
+    $this->actingAs($user)->post(route('contador.abrir'), [
+        'caja' => 'Caja 02',
+        'turno' => 'Todo el día',
+        'montoInicial' => 100,
+    ])->assertForbidden();
+    $this->actingAs($user)->post(route('contador.cerrar', $cashSession), [
+        'montoFinal' => 100,
+    ])->assertForbidden();
+
+    expect($cashSession->fresh()->estado)->toBe('Abierta');
+})->with(['Mesero', 'Cocinero', 'Bar', 'Supervisor']);
 
 test('an all-day cash session opened by one employee unlocks the venue for the rest of the team', function () {
     $team = Team::factory()->create();

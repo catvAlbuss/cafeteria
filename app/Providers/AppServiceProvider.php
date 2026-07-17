@@ -2,13 +2,16 @@
 
 namespace App\Providers;
 
+use App\Enums\TeamRole;
 use App\Events\MesaActualizada;
 use App\Events\PedidoActualizado;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -28,7 +31,18 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->configureAuthorization();
         $this->configureCacheInvalidation();
+    }
+
+    protected function configureAuthorization(): void
+    {
+        Gate::define('manage-cash-session', function (User $user): bool {
+            $teamRole = $user->currentTeam ? $user->teamRole($user->currentTeam) : null;
+
+            return $user->hasAnyRole(['Gerente', 'Cajero'])
+                || in_array($teamRole, [TeamRole::Owner, TeamRole::Admin], true);
+        });
     }
 
     /**

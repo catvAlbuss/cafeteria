@@ -35,6 +35,7 @@ export function AppSidebar() {
     const roles = page.props.auth.roles ?? [];
     const currentTeam = page.props.currentTeam;
     const canManageTeams = roles.includes('Gerente') || ['owner', 'admin'].includes(currentTeam?.role ?? '');
+    const canManageCashSession = roles.includes('Gerente') || roles.includes('Cajero') || ['owner', 'admin'].includes(currentTeam?.role ?? '');
     const isProductionOperator = roles.includes('Cocinero') || roles.includes('Bar');
 
     //  TODAS LAS PÁGINAS (se filtran según el permiso de "ver" de cada rol)
@@ -135,9 +136,9 @@ export function AppSidebar() {
         },
     ];
 
-    const mainNavItems: NavItem[] = allNavItems.filter(
-        (item) => !item.permission || permissions.includes(item.permission),
-    );
+    const mainNavItems: NavItem[] = allNavItems.filter((item) => item.href === '/contador'
+        ? canManageCashSession
+        : !item.permission || permissions.includes(item.permission));
 
     if (isProductionOperator) {
         mainNavItems.push({

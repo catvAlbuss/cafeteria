@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\TeamRole;
 use App\Events\CajaActualizada;
 use App\Models\Caja;
 use App\Models\Team;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,6 +17,8 @@ class ContadorController extends Controller
 {
     public function index(Request $request): Response
     {
+        Gate::authorize('manage-cash-session');
+
         $cajaActual = Caja::query()->with(['empleadoUser', 'movimientos.user'])
             ->where('estado', 'Abierta')->first();
         $ultimaCaja = Caja::query()->where('estado', 'Cerrada')->latest('fecha_cierre')->first();
@@ -27,7 +29,7 @@ class ContadorController extends Controller
             'cajas' => $cajas,
             'cajaActual' => $cajaActual,
             'ultimaCaja' => $ultimaCaja?->only(['id', 'monto_final', 'fecha_cierre']),
-            'puedeAbrir' => $this->puedeGestionar($request),
+            'puedeAbrir' => true,
             'resumen' => [
                 'ingresos' => $resumenCaja['ventas_totales'],
                 'cajaActual' => $resumenCaja['efectivo_esperado'],
@@ -56,7 +58,7 @@ class ContadorController extends Controller
 
     public function abrir(Request $request): RedirectResponse
     {
-        abort_unless($this->puedeGestionar($request), 403);
+        Gate::authorize('manage-cash-session');
 
         $validated = $request->validate([
             'caja' => ['required', 'string', 'max:50'],
@@ -106,7 +108,7 @@ class ContadorController extends Controller
 
     public function cerrar(Request $request, int $id): RedirectResponse
     {
-        abort_unless($this->puedeGestionar($request), 403);
+        Gate::authorize('manage-cash-session');
 
         $validated = $request->validate([
             'montoFinal' => ['required', 'numeric', 'min:0'],
@@ -159,15 +161,6 @@ class ContadorController extends Controller
         $caja->delete();
 
         return back()->with('success', 'Registro eliminado correctamente.');
-    }
-
-    private function puedeGestionar(Request $request): bool
-    {
-        $user = $request->user();
-        $teamRole = $user->currentTeam ? $user->teamRole($user->currentTeam) : null;
-
-        return $user->hasAnyRole(['Gerente', 'Cajero'])
-            || in_array($teamRole, [TeamRole::Owner, TeamRole::Admin], true);
     }
 
     /** @return array<string, float> */

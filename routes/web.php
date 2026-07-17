@@ -49,10 +49,10 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/pedidos/{id}/marcar-listo', [PedidoController::class, 'marcarListo'])->middleware('cash.session')->name('pedidos.marcar-listo');
 
     //  Solo esta ruta para el contador (con el controlador)
-    Route::get('/contador', [ContadorController::class, 'index'])->middleware('can:ver contador')->name('contador.index');
-    Route::post('/contador/abrir', [ContadorController::class, 'abrir'])->middleware('operating.hours')->name('contador.abrir');
+    Route::get('/contador', [ContadorController::class, 'index'])->middleware('can:manage-cash-session')->name('contador.index');
+    Route::post('/contador/abrir', [ContadorController::class, 'abrir'])->middleware(['can:manage-cash-session', 'operating.hours'])->name('contador.abrir');
 
-    Route::post('/contador/cerrar/{id}', [ContadorController::class, 'cerrar'])->name('contador.cerrar');
+    Route::post('/contador/cerrar/{id}', [ContadorController::class, 'cerrar'])->middleware('can:manage-cash-session')->name('contador.cerrar');
     Route::post('/contador/movimientos', [MovimientoCajaController::class, 'store'])->middleware('cash.session')->name('contador.movimientos.store');
     Route::delete('/contador/{id}', [ContadorController::class, 'destroy'])->name('contador.destroy');
 
