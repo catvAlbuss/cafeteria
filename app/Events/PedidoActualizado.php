@@ -6,10 +6,11 @@ use App\Models\Pedido;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldRescue;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class PedidoActualizado implements ShouldBroadcastNow
+class PedidoActualizado implements ShouldBroadcastNow, ShouldRescue
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -41,6 +42,9 @@ class PedidoActualizado implements ShouldBroadcastNow
             'numero' => $this->pedido->numero,
             'mesa_id' => $this->pedido->mesa_id,
             'estado' => $this->pedido->estado,
+            'area' => $this->pedido->area,
+            'productos' => $this->pedido->productos,
+            'total' => $this->pedido->total,
             'hora_entrega' => $this->pedido->hora_entrega,
         ];
     }

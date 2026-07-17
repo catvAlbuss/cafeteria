@@ -240,6 +240,10 @@ export default function Produccion() {
     // Tiempo real: nuevos pedidos y cambios de estado desde cualquier terminal
     useSedeChannel('produccion', {
         'pedido.creado': (payload: any) => {
+            if (!areasVisibles.includes(payload.area)) {
+                return;
+            }
+
             setPedidos((prev) =>
                 prev.some((p) => p.id === payload.id)
                     ? prev
@@ -257,6 +261,10 @@ export default function Produccion() {
         },
         'pedido.actualizado': (payload: any) => {
             setPedidos((prev) => {
+                if (!areasVisibles.includes(payload.area)) {
+                    return prev.filter((p) => p.id !== payload.id);
+                }
+
                 if (
                     ['listo', 'entregado', 'pagado', 'cancelado'].includes(
                         payload.estado,

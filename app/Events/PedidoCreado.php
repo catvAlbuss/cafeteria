@@ -6,10 +6,11 @@ use App\Models\Pedido;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldRescue;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class PedidoCreado implements ShouldBroadcastNow
+class PedidoCreado implements ShouldBroadcastNow, ShouldRescue
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -20,7 +21,10 @@ class PedidoCreado implements ShouldBroadcastNow
      */
     public function broadcastOn(): array
     {
-        return [new PrivateChannel("sede.{$this->pedido->team_id}.produccion")];
+        return [
+            new PrivateChannel("sede.{$this->pedido->team_id}.produccion"),
+            new PrivateChannel("sede.{$this->pedido->team_id}.pedidos"),
+        ];
     }
 
     public function broadcastAs(): string
@@ -45,6 +49,7 @@ class PedidoCreado implements ShouldBroadcastNow
             'productos' => $this->pedido->productos,
             'total' => $this->pedido->total,
             'estado' => $this->pedido->estado,
+            'area' => $this->pedido->area,
             'observaciones' => $this->pedido->observaciones,
             'hora_pedido' => $this->pedido->hora_pedido,
             'created_at' => $this->pedido->created_at,

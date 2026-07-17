@@ -2,6 +2,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { detectarArea } from '@/utils/clasificarPedidos';
+import { useSedeChannel } from '@/hooks/useSedeChannel';
 import {
     UserRound,
     Armchair,
@@ -146,6 +147,23 @@ export default function Ventas() {
     const mesaInicial = urlParams.get('mesa') || '';
     const [mesa] = useState(mesaInicial);
     const [mesaInfo, setMesaInfo] = useState<MesaInfo | null>(mesaInfoProp);
+
+    useSedeChannel('pedidos', {
+        'pedido.creado': (pedido: any) => {
+            if (pedido.mesa_id !== mesaInfo?.id || pedido.estado !== 'pendiente') {
+                return;
+            }
+
+            setPedidosActivos((current) => current.some((item) => item.id === pedido.id)
+                ? current
+                : [pedido, ...current]);
+        },
+        'pedido.actualizado': (pedido: any) => {
+            setPedidosActivos((current) => ['pagado', 'cancelado'].includes(pedido.estado)
+                ? current.filter((item) => item.id !== pedido.id)
+                : current.map((item) => item.id === pedido.id ? { ...item, ...pedido } : item));
+        },
+    });
 
     // ============================================================
     // EFECTOS
@@ -306,7 +324,6 @@ export default function Ventas() {
                 });
 
                 setCarrito([]);
-                router.reload({ only: ['pedidosActivos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
             },
             onError: (errors) => {
                 toast.error('Error al enviar pedido: ' + Object.values(errors).join(' '));
@@ -621,13 +638,11 @@ export default function Ventas() {
                             setModalEdicionAbierto(false);
                             setPedidoSeleccionado(null);
                             toast.success('✅ Pedido actualizado');
-                            router.reload({ only: ['pedidosActivos'], preserveScroll: true });
                         }}
                         onPedidoCancelado={() => {
                             setModalEdicionAbierto(false);
                             setPedidoSeleccionado(null);
                             toast.success('🗑️ Pedido cancelado');
-                            router.reload({ only: ['pedidosActivos'] });
                         }}
                     />
                 )}

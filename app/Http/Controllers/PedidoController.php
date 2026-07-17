@@ -12,11 +12,16 @@ use App\Models\Insumo;
 use App\Models\Mesa;
 use App\Models\Pedido;
 use App\Models\Plato;
+use App\Services\ProductionAreaClassifier;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class PedidoController extends Controller
 {
+    public function __construct(private readonly ProductionAreaClassifier $productionAreaClassifier) {}
+
     public function index(Request $request)
     {
         $mesaNumero = $request->query('mesa');
@@ -265,7 +270,13 @@ class PedidoController extends Controller
             'mesa_id' => 'nullable|exists:mesas,id',
             'mesa' => 'nullable|string',
             'cliente' => 'nullable|string|max:255',
-            'productos' => 'required|array',
+            'productos' => 'required|array|min:1',
+            'productos.*.id' => 'nullable|integer',
+            'productos.*.nombre' => 'required|string|max:255',
+            'productos.*.cantidad' => 'required|integer|min:1',
+            'productos.*.precio' => 'required|numeric|min:0',
+            'productos.*.subtotal' => 'required|numeric|min:0',
+            'productos.*.categoria' => 'nullable|string|max:100',
             'total' => 'required|numeric|min:0',
             'metodo_pago' => 'nullable|string',
             'tipo' => 'nullable|string',
@@ -283,45 +294,56 @@ class PedidoController extends Controller
         $estado = $validated['estado'] ?? 'pendiente';
         $userId = $validated['user_id'] ?? auth()->id();
 
-        $pedido = Pedido::create([
-            'numero' => Pedido::generarNumero(),
-            'mesa_id' => $validated['mesa_id'] ?? null,
-            'mesa' => $validated['mesa'] ?? null,
-            'cliente' => $validated['cliente'] ?? 'Anónimo',
-            'productos' => $validated['productos'],
-            'total' => $validated['total'],
-            'metodo_pago' => $validated['metodo_pago'] ?? null,
-            'tipo' => $validated['tipo'] ?? 'mesa',
-            'estado' => $estado,
-            'area' => $validated['area'] ?? 'cocina',
-            'observaciones' => $validated['observaciones'] ?? null,
-            'hora_pedido' => now(),
-            'user_id' => $userId,
-            'team_id' => auth()->user()->current_team_id,
-        ]);
+        $productsByArea = $estado === 'pendiente'
+            ? $this->productionAreaClassifier->group($validated['productos'], $validated['area'] ?? 'cocina')
+            : [($validated['area'] ?? 'cocina') => $validated['productos']];
 
-        if ($estado === 'pendiente' && $pedido->mesa_id) {
-            $mesa = Mesa::find($pedido->mesa_id);
-            if ($mesa && $mesa->estado !== 'ocupada') {
-                $mesa->estado = 'ocupada';
-                if (! $mesa->user_id) {
-                    $mesa->user_id = $userId;
+        $orders = DB::transaction(function () use ($validated, $estado, $userId, $productsByArea) {
+            $orders = collect($productsByArea)->map(function (array $products, string $area) use ($validated, $estado, $userId) {
+                return Pedido::create([
+                    'numero' => Pedido::generarNumero(),
+                    'mesa_id' => $validated['mesa_id'] ?? null,
+                    'mesa' => $validated['mesa'] ?? null,
+                    'cliente' => $validated['cliente'] ?? 'Anónimo',
+                    'productos' => $products,
+                    'total' => collect($products)->sum(fn (array $product): float => (float) $product['subtotal']),
+                    'metodo_pago' => $validated['metodo_pago'] ?? null,
+                    'tipo' => $validated['tipo'] ?? 'mesa',
+                    'estado' => $estado,
+                    'area' => $area,
+                    'observaciones' => $validated['observaciones'] ?? null,
+                    'hora_pedido' => now(),
+                    'user_id' => $userId,
+                    'team_id' => auth()->user()->current_team_id,
+                ]);
+            })->values();
+
+            if ($estado === 'pendiente' && ! empty($validated['mesa_id'])) {
+                $mesa = Mesa::query()->find($validated['mesa_id']);
+                if ($mesa && $mesa->estado !== 'ocupada') {
+                    $mesa->estado = 'ocupada';
+                    $mesa->user_id ??= $userId;
+                    $mesa->save();
                 }
-                $mesa->save();
-                broadcast(new MesaActualizada($mesa));
-            }
-        }
 
-        broadcast(new PedidoCreado($pedido));
+                if ($mesa) {
+                    broadcast(new MesaActualizada($mesa));
+                }
+            }
+
+            return $orders;
+        });
+
+        $orders->each(fn (Pedido $order) => broadcast(new PedidoCreado($order)));
 
         return redirect()->back()->with('success', 'Pedido creado correctamente');
     }
 
-    public function show(Pedido $pedido)
+    public function show(Pedido $pedido): RedirectResponse
     {
-        return Inertia::render('pedidos/show', [
-            'pedido' => $pedido->load('mesa'),
-        ]);
+        $mesaNumero = $pedido->mesa()->value('numero');
+
+        return to_route('ventas', $mesaNumero ? ['mesa' => $mesaNumero] : []);
     }
 
     public function update(Request $request, Pedido $pedido)

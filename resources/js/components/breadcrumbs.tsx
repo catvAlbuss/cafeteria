@@ -34,6 +34,11 @@ export function Breadcrumbs({
     const permissions = auth?.permissions ?? [];
     const canListenToProduction = permissions.includes('visualizar comandas');
     const canListenToSalon = permissions.includes('crear pedidos');
+    const productionAreas = permissions.includes('ver bar')
+        ? ['bar']
+        : permissions.includes('ver cocina')
+          ? ['cocina', 'horno', 'postres']
+          : [];
     const currentTitle = breadcrumbs.at(-1)?.title ?? 'Panel';
     const [now, setNow] = useState<Date | null>(null);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -113,8 +118,12 @@ export function Breadcrumbs({
 
     useSedeChannel('produccion', {
         'pedido.creado': (payload: any) => {
+            if (!productionAreas.includes(payload.area)) {
+                return;
+            }
+
             addNotification({
-                title: `Nuevo pedido ${payload.numero ?? ''}`.trim(),
+                title: `Nuevo pedido ${payload.numero ?? ''} · ${payload.area === 'bar' ? 'Bar' : 'Cocina'}`.trim(),
                 description: payload.mesa?.numero
                     ? `Mesa ${payload.mesa.numero} - ${payload.cliente ?? 'Cliente'}`
                     : `${payload.tipo === 'delivery' ? 'Delivery' : 'Pedido'} - ${payload.cliente ?? 'Cliente'}`,
