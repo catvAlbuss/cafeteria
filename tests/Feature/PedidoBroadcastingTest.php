@@ -94,3 +94,38 @@ test('a waiter can create a table order without a broadcasting failure rolling i
 
     expect(Pedido::query()->where('user_id', $waiter->id)->where('mesa_id', $table->id)->exists())->toBeTrue();
 });
+
+test('historical order number formats do not cause duplicate numbers for new waiter orders', function () {
+    $waiter = User::query()->where('usuario', 'mesero')->firstOrFail();
+    Caja::query()->create([
+        'team_id' => $waiter->current_team_id,
+        'user_id' => $waiter->id,
+        'caja' => 'Caja Principal',
+        'turno' => 'Todo el día',
+        'monto_inicial' => 100,
+        'fecha_apertura' => now(),
+        'estado' => 'Abierta',
+    ]);
+    $historicalOrder = Pedido::query()->create([
+        'team_id' => $waiter->current_team_id,
+        'user_id' => $waiter->id,
+        'numero' => 'PEDIDO-LEGACY',
+        'cliente' => 'Histórico',
+        'productos' => [['nombre' => 'Producto', 'cantidad' => 1, 'precio' => 1, 'subtotal' => 1]],
+        'total' => 1,
+        'estado' => 'pagado',
+        'area' => 'cocina',
+        'hora_pedido' => now(),
+    ]);
+
+    $this->actingAs($waiter)->post(route('pedidos.store'), [
+        'cliente' => 'Nuevo cliente',
+        'productos' => [
+            ['nombre' => 'Café americano', 'categoria' => 'Bebidas', 'cantidad' => 1, 'precio' => 7, 'subtotal' => 7],
+        ],
+        'total' => 7,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(Pedido::query()->where('cliente', 'Nuevo cliente')->value('numero'))
+        ->toBe('#'.str_pad((string) ($historicalOrder->id + 1), 4, '0', STR_PAD_LEFT));
+});

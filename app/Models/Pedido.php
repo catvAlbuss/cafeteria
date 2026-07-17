@@ -28,7 +28,6 @@ class Pedido extends Model
         'caja_id',
         'metodo_pago',
 
-
         'subtotal',
         'igv',
         // Campos de delivery
@@ -76,9 +75,18 @@ class Pedido extends Model
      */
     public static function generarNumero(): string
     {
-        $ultimo = self::withoutGlobalScopes()->orderBy('id', 'desc')->first();
-        $numero = $ultimo ? intval(substr($ultimo->numero, 1)) + 1 : 1;
+        $lastOrder = self::withoutGlobalScopes()
+            ->select(['id'])
+            ->latest('id')
+            ->lockForUpdate()
+            ->first();
+        $number = $lastOrder ? $lastOrder->id + 1 : 1;
 
-        return '#'.str_pad($numero, 4, '0', STR_PAD_LEFT);
+        do {
+            $orderNumber = '#'.str_pad((string) $number, 4, '0', STR_PAD_LEFT);
+            $number++;
+        } while (self::withoutGlobalScopes()->where('numero', $orderNumber)->exists());
+
+        return $orderNumber;
     }
 }

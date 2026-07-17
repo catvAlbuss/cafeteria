@@ -331,7 +331,7 @@ class PedidoController extends Controller
             }
 
             return [$orders, $updatedTable];
-        });
+        }, 3);
 
         if ($updatedTable) {
             broadcast(new MesaActualizada($updatedTable));
