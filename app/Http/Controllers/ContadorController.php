@@ -101,7 +101,7 @@ class ContadorController extends Controller
 
         broadcast(new CajaActualizada($caja));
 
-        return back()->with('success', 'Jornada abierta. La sede ya puede operar.');
+        return to_route('contador.index')->with('success', 'Jornada abierta. La sede ya puede operar.');
     }
 
     public function cerrar(Request $request, int $id): RedirectResponse

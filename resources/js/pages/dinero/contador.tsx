@@ -72,6 +72,7 @@ export default function Contador() {
         movimientos = [],
         ingresosDetalle = [],
         estadisticas = { totalPedidosHoy: 0, totalCajasAbiertas: 0, totalCajasCerradas: 0 },
+        puedeAbrir = false,
         auth,
     } = usePage().props as any;
     const empleadoActual = auth?.user?.name ?? 'Usuario actual';
@@ -162,7 +163,6 @@ export default function Contador() {
         router.post('/contador/abrir', formApertura, {
             onSuccess: () => {
                 setModalAperturaAbierto(false);
-                router.reload();
             },
             onError: (errors) => {
                 alert('Error al abrir caja: ' + Object.values(errors).join(' '));
@@ -254,11 +254,11 @@ export default function Contador() {
     return (
         <>
             <Head title="Turno de caja - Dolce Cafe" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-3xl p-6 bg-[#FBF3E7]">
+            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-3xl bg-[#FBF3E7] p-6 text-[#2D1B1A] transition-colors dark:bg-[#180F09] dark:text-[#F5E6D3]">
 
                 <div className="flex justify-end">
                     <div className="flex flex-wrap gap-3">
-                        {!cajaActiva ? (
+                        {!cajaActiva ? puedeAbrir && (
                             <button
                                 onClick={abrirModalApertura}
                                 className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold hover:shadow-lg active:scale-95"
@@ -266,7 +266,7 @@ export default function Contador() {
                                 <Plus className="w-4 h-4" />
                                 Abrir Caja
                             </button>
-                        ) : (
+                        ) : puedeAbrir && (
                             <>
                                 <button onClick={() => setModalMovimientoAbierto(true)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white shadow-md transition hover:bg-emerald-700">
                                     <Plus className="w-4 h-4" /> Movimiento
@@ -318,12 +318,12 @@ export default function Contador() {
                     {tarjetasResumen.map((tarjeta, index) => (
                         <div
                             key={index}
-                            className="group bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default"
+                            className="group cursor-default rounded-2xl border border-[#F3E1C8] bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-white/10 dark:bg-[#241811]"
                         >
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <p className="text-sm text-[#5A3D2B] font-medium">{tarjeta.titulo}</p>
-                                    <p className="text-2xl font-bold text-[#2D1B1A] mt-1">{tarjeta.valor}</p>
+                                    <p className="text-sm font-medium text-[#5A3D2B] dark:text-[#D8C0A8]">{tarjeta.titulo}</p>
+                                    <p className="mt-1 text-2xl font-bold text-[#2D1B1A] dark:text-[#F5E6D3]">{tarjeta.valor}</p>
                                 </div>
                                 <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${tarjeta.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                                     {tarjeta.icono}
@@ -341,7 +341,7 @@ export default function Contador() {
                         { label: 'Cajas Cerradas', value: cajasCerradas, color: 'text-red-600' },
                         { label: 'Total Movido', value: formatCurrency(montoTotal), color: 'text-[#C9A96E]' },
                     ].map((item, idx) => (
-                        <div key={idx} className="bg-white rounded-2xl p-4 shadow-sm border border-[#F3E1C8] hover:shadow-md transition">
+                        <div key={idx} className="rounded-2xl border border-[#F3E1C8] bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-[#241811]">
                             <p className="text-xs font-semibold text-gray-400 uppercase">{item.label}</p>
                             <p className={`text-2xl font-bold ${item.color} mt-1`}>{item.value}</p>
                         </div>
@@ -349,7 +349,7 @@ export default function Contador() {
                 </div>
 
                 {/* FILTROS */}
-                <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#F3E1C8]">
+                <div className="rounded-2xl border border-[#F3E1C8] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#241811]">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div>
                             <label className="text-xs text-gray-500 font-medium">Estado</label>
@@ -395,9 +395,9 @@ export default function Contador() {
                 </div>
 
                 {/* TABLA HISTORIAL */}
-                <div className="bg-white rounded-2xl shadow-sm border border-[#F3E1C8] overflow-hidden">
+                <div className="overflow-hidden rounded-2xl border border-[#F3E1C8] bg-white shadow-sm dark:border-white/10 dark:bg-[#241811]">
                     <div className="flex justify-between items-center p-5 border-b border-[#F3E1C8]">
-                        <h2 className="text-xl font-bold text-[#2D1B1A] flex items-center gap-2">
+                        <h2 className="flex items-center gap-2 text-xl font-bold text-[#2D1B1A] dark:text-[#F5E6D3]">
                             <Clock className="w-5 h-5 text-[#C9A96E]" />
                             Historial de Aperturas y Cierres
                         </h2>
@@ -486,7 +486,7 @@ export default function Contador() {
                 </div>
 
                 {/* INGRESOS DEL DÍA */}
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8]">
+                <div className="rounded-2xl border border-[#F3E1C8] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-[#241811]">
                     <h2 className="text-xl font-bold text-[#2D1B1A] mb-5 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-green-500" />
                         Ingresos del día
@@ -506,7 +506,7 @@ export default function Contador() {
                 </div>
 
                 {/* MOVIMIENTOS RECIENTES */}
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8]">
+                <div className="rounded-2xl border border-[#F3E1C8] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-[#241811]">
                     <div className="flex justify-between items-center mb-5">
                         <h2 className="text-xl font-bold text-[#2D1B1A] flex items-center gap-2">
                             <Receipt className="w-5 h-5 text-amber-500" />
@@ -598,7 +598,7 @@ export default function Contador() {
                 {/* ===== MODALES ===== */}
                 {modalMovimientoAbierto && cajaActiva && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-                        <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl">
+                        <div className="w-full max-w-lg rounded-3xl bg-white p-6 text-[#2D1B1A] shadow-xl dark:bg-[#241811] dark:text-[#F5E6D3]">
                             <h2 className="text-xl font-bold text-[#2D1B1A]">Registrar movimiento</h2>
                             <div className="mt-5 space-y-4">
                                 <select className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3" value={formMovimiento.tipo} onChange={(e) => setFormMovimiento({ ...formMovimiento, tipo: e.target.value })}>
@@ -617,9 +617,9 @@ export default function Contador() {
                 {/* Modal Apertura */}
                 {modalAperturaAbierto && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                        <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg">
+                        <div className="w-full max-w-lg rounded-3xl bg-white text-[#2D1B1A] shadow-xl dark:bg-[#241811] dark:text-[#F5E6D3]">
                             <div className="flex justify-between items-center p-6 border-b border-[#F3E1C8]">
-                                <h2 className="text-2xl font-bold text-[#2D1B1A] flex items-center gap-2">
+                                <h2 className="flex items-center gap-2 text-2xl font-bold text-[#2D1B1A] dark:text-[#F5E6D3]">
                                     <Wallet className="w-6 h-6 text-[#C9A96E]" />
                                     Nueva Apertura
                                 </h2>
@@ -628,30 +628,30 @@ export default function Contador() {
                             <div className="p-6 space-y-4">
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Empleado</label>
-                                    <p className="mt-1 w-full border border-gray-200 rounded-xl p-3 bg-gray-50 text-[#2D1B1A] font-medium">{empleadoActual}</p>
+                                    <p className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 font-medium text-[#2D1B1A] dark:border-white/10 dark:bg-white/5 dark:text-[#F5E6D3]">{empleadoActual}</p>
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Caja</label>
-                                    <input type="text" className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 transition" value={formApertura.caja} onChange={(e) => setFormApertura({ ...formApertura, caja: e.target.value })} />
+                                    <input type="text" className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E] dark:border-white/10 dark:bg-white/5 dark:text-[#F5E6D3]" value={formApertura.caja} onChange={(e) => setFormApertura({ ...formApertura, caja: e.target.value })} />
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Turno</label>
-                                    <select className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 transition" value={formApertura.turno} onChange={(e) => setFormApertura({ ...formApertura, turno: e.target.value as 'Mañana' | 'Tarde' | 'Noche' })}>
+                                    <select className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E] dark:border-white/10 dark:bg-[#2F2119] dark:text-[#F5E6D3]" value={formApertura.turno} onChange={(e) => setFormApertura({ ...formApertura, turno: e.target.value as 'Mañana' | 'Tarde' | 'Noche' })}>
                                         <option value="Mañana">Mañana</option><option value="Tarde">Tarde</option><option value="Noche">Noche</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Monto Inicial (S/)</label>
-                                    <input type="number" step="0.01" className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 transition" value={formApertura.montoInicial} onChange={(e) => setFormApertura({ ...formApertura, montoInicial: parseFloat(e.target.value) || 0 })} placeholder="0.00" />
+                                    <input type="number" step="0.01" className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E] dark:border-white/10 dark:bg-white/5 dark:text-[#F5E6D3]" value={formApertura.montoInicial} onChange={(e) => setFormApertura({ ...formApertura, montoInicial: parseFloat(e.target.value) || 0 })} placeholder="0.00" />
                                     {ultimaCaja && <p className="mt-2 text-xs text-gray-500">Ultimo cierre: {formatCurrency(ultimaCaja.monto_final)}. Si modifica el monto, indique el motivo.</p>}
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Justificación del ajuste</label>
-                                    <textarea rows={2} className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none focus:ring-2 focus:ring-[#C9A96E]" value={formApertura.justificacionApertura} onChange={(e) => setFormApertura({ ...formApertura, justificacionApertura: e.target.value })} placeholder="Solo necesaria si difiere del cierre anterior" />
+                                    <textarea rows={2} className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none focus:ring-2 focus:ring-[#C9A96E] dark:border-white/10 dark:bg-white/5 dark:text-[#F5E6D3] dark:placeholder:text-[#F5E6D3]/40" value={formApertura.justificacionApertura} onChange={(e) => setFormApertura({ ...formApertura, justificacionApertura: e.target.value })} placeholder="Solo necesaria si difiere del cierre anterior" />
                                 </div>
                             </div>
                             <div className="border-t border-[#F3E1C8] p-6 flex justify-end gap-3">
-                                <button onClick={() => setModalAperturaAbierto(false)} className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-xl font-semibold transition">Cancelar</button>
+                                <button onClick={() => setModalAperturaAbierto(false)} className="rounded-xl bg-gray-100 px-5 py-2.5 font-semibold transition hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15">Cancelar</button>
                                 <button onClick={guardarApertura} className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl font-semibold transition">Abrir Caja</button>
                             </div>
                         </div>
