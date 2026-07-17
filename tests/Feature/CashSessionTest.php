@@ -1,10 +1,15 @@
 <?php
 
 use App\Enums\TeamRole;
+use App\Events\CajaActualizada;
+use App\Http\Middleware\EnsureOpenCashSession;
 use App\Models\Caja;
 use App\Models\Pedido;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldRescue;
+use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -70,6 +75,35 @@ test('cashiers, venue administrators, and management can open the cash session',
 
     expect(Caja::query()->where('user_id', $user->id)->where('estado', 'Abierta')->exists())->toBeTrue();
 })->with(['cashier', 'administrator', 'management']);
+
+test('an all-day cash session opened by one employee unlocks the venue for the rest of the team', function () {
+    $team = Team::factory()->create();
+    $manager = cashSessionUser($team);
+    $waiter = User::factory()->create(['current_team_id' => $team->id]);
+    $team->members()->attach($waiter, ['role' => TeamRole::Member->value]);
+
+    $this->actingAs($manager)->post(route('contador.abrir'), [
+        'caja' => 'Caja Principal',
+        'turno' => 'Todo el día',
+        'montoInicial' => 100,
+    ])->assertRedirect(route('contador.index'));
+
+    $request = Request::create('/pedidos', 'POST');
+    $request->setUserResolver(fn () => $waiter);
+    $response = app(EnsureOpenCashSession::class)->handle($request, fn () => response('operación habilitada'));
+    $caja = Caja::query()->where('estado', 'Abierta')->firstOrFail();
+    $event = new CajaActualizada($caja);
+
+    expect($response->isSuccessful())->toBeTrue()
+        ->and($caja->turno)->toBe('Todo el día')
+        ->and($event)->toBeInstanceOf(ShouldBroadcastNow::class)
+        ->and($event)->toBeInstanceOf(ShouldRescue::class)
+        ->and($event->broadcastWith())->toMatchArray([
+            'id' => $caja->id,
+            'estado' => 'Abierta',
+            'turno' => 'Todo el día',
+        ]);
+});
 
 test('cash reconciliation excludes card and yape payments and stores the blind count difference', function () {
     $team = Team::factory()->create();

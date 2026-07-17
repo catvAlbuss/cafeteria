@@ -53,7 +53,7 @@ interface RegistroCaja {
     id: number;
     caja: string;
     empleado: string;
-    turno: 'Mañana' | 'Tarde' | 'Noche';
+    turno: 'Todo el día' | 'Mañana' | 'Tarde' | 'Noche';
     monto_inicial: number;
     fecha_apertura: string;
     monto_final: number | null;
@@ -87,7 +87,7 @@ export default function Contador() {
 
     const [formApertura, setFormApertura] = useState({
         caja: 'Caja 01',
-        turno: 'Mañana' as 'Mañana' | 'Tarde' | 'Noche',
+        turno: 'Todo el día' as RegistroCaja['turno'],
         montoInicial: 0,
         justificacionApertura: '',
     });
@@ -109,8 +109,15 @@ export default function Contador() {
     }, [cajas, cajaActual]);
 
     useSedeChannel('caja', {
-        'caja.actualizada': () => {
-            router.reload({ only: ['cajas', 'cajaActual', 'estadisticas'] });
+        'caja.actualizada': (caja: RegistroCaja) => {
+            setCajaActiva(caja.estado === 'Abierta' ? caja : null);
+            setRegistros((current) => {
+                const exists = current.some((registro) => registro.id === caja.id);
+
+                return exists
+                    ? current.map((registro) => registro.id === caja.id ? { ...registro, ...caja } : registro)
+                    : [caja, ...current];
+            });
         },
     });
 
@@ -147,7 +154,7 @@ export default function Contador() {
     const abrirModalApertura = () => {
         setFormApertura({
             caja: 'Caja 01',
-            turno: 'Mañana',
+            turno: 'Todo el día',
             montoInicial: ultimaCaja?.monto_final ? Number(ultimaCaja.monto_final) : 0,
             justificacionApertura: '',
         });
@@ -636,8 +643,8 @@ export default function Contador() {
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Turno</label>
-                                    <select className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E] dark:border-white/10 dark:bg-[#2F2119] dark:text-[#F5E6D3]" value={formApertura.turno} onChange={(e) => setFormApertura({ ...formApertura, turno: e.target.value as 'Mañana' | 'Tarde' | 'Noche' })}>
-                                        <option value="Mañana">Mañana</option><option value="Tarde">Tarde</option><option value="Noche">Noche</option>
+                                    <select className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E] dark:border-white/10 dark:bg-[#2F2119] dark:text-[#F5E6D3]" value={formApertura.turno} onChange={(e) => setFormApertura({ ...formApertura, turno: e.target.value as 'Todo el día' | 'Mañana' | 'Tarde' | 'Noche' })}>
+                                        <option value="Todo el día">Todo el día</option>
                                     </select>
                                 </div>
                                 <div>

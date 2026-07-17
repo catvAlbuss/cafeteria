@@ -1,17 +1,24 @@
 import { useSedeChannel } from '@/hooks/useSedeChannel';
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { LockKeyhole } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 type JornadaCaja = { abierta: boolean; puedeAbrir: boolean };
 
 export function CashSessionGuard({ children }: { children: ReactNode }) {
     const page = usePage<{ jornadaCaja?: JornadaCaja }>();
-    const jornada = page.props.jornadaCaja;
+    const jornadaProp = page.props.jornadaCaja;
+    const [jornada, setJornada] = useState(jornadaProp);
     const isCashSessionPage = page.url.startsWith('/contador');
 
+    useEffect(() => {
+        setJornada(jornadaProp);
+    }, [jornadaProp]);
+
     useSedeChannel('caja', {
-        'caja.actualizada': () => router.reload({ only: ['jornadaCaja'] }),
+        'caja.actualizada': (caja: { estado: 'Abierta' | 'Cerrada' }) => {
+            setJornada((current) => current ? { ...current, abierta: caja.estado === 'Abierta' } : current);
+        },
     });
 
     if (!jornada || jornada.abierta || isCashSessionPage) {

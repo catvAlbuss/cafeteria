@@ -60,7 +60,7 @@ class ContadorController extends Controller
 
         $validated = $request->validate([
             'caja' => ['required', 'string', 'max:50'],
-            'turno' => ['required', 'in:Mañana,Tarde,Noche'],
+            'turno' => ['required', 'in:Todo el día,Mañana,Tarde,Noche'],
             'montoInicial' => ['required', 'numeric', 'min:0'],
             'justificacionApertura' => ['nullable', 'string', 'max:1000'],
         ]);

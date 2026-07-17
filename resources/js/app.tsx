@@ -7,6 +7,7 @@ import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import '@/echo';
 import axios from 'axios';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
@@ -22,8 +23,6 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
     initializeTheme();
 
-    // Inicializa Laravel Echo (Reverb) para los canales en tiempo real
-    import('@/echo');
 }
 
 // Cargar todas las páginas eager

@@ -9,13 +9,10 @@
     "isEntry": true
   },
   "resources/js/app.tsx": {
-    "file": "assets/app-BENbdrPS.js",
+    "file": "assets/app-B6DRwdTV.js",
     "name": "app",
     "src": "resources/js/app.tsx",
     "isEntry": true,
-    "dynamicImports": [
-      "resources/js/app.tsx"
-    ],
     "css": [
       "assets/app-DmHed3W8.css"
     ]
