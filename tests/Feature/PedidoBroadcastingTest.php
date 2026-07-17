@@ -2,6 +2,7 @@
 
 use App\Events\PedidoCreado;
 use App\Models\Caja;
+use App\Models\Mesa;
 use App\Models\Pedido;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -65,4 +66,31 @@ test('opening an order URL redirects to the existing sales page', function () {
     $this->actingAs($manager)
         ->get(route('pedidos.show', $order))
         ->assertRedirect(route('ventas'));
+});
+
+test('a waiter can create a table order without a broadcasting failure rolling it back', function () {
+    $waiter = User::query()->where('usuario', 'mesero')->firstOrFail();
+    $table = Mesa::query()->firstOrFail();
+    Caja::query()->create([
+        'team_id' => $waiter->current_team_id,
+        'user_id' => $waiter->id,
+        'caja' => 'Caja Principal',
+        'turno' => 'Todo el día',
+        'monto_inicial' => 100,
+        'fecha_apertura' => now(),
+        'estado' => 'Abierta',
+    ]);
+
+    $response = $this->actingAs($waiter)->post(route('pedidos.store'), [
+        'mesa_id' => $table->id,
+        'cliente' => 'Cliente del mozo',
+        'productos' => [
+            ['id' => 1, 'nombre' => 'Lomo saltado', 'categoria' => 'Platos fuertes', 'cantidad' => 1, 'precio' => 25, 'subtotal' => 25],
+        ],
+        'total' => 25,
+    ]);
+
+    $response->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(Pedido::query()->where('user_id', $waiter->id)->where('mesa_id', $table->id)->exists())->toBeTrue();
 });

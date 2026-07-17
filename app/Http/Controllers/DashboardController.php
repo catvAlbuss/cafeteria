@@ -7,13 +7,14 @@ use App\Models\Mesa;
 use App\Models\Pedido;
 use App\Models\TeamInvitation;
 use App\Services\ProductionSummary;
+use App\Services\WaiterSummary;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, ProductionSummary $productionSummary): Response
+    public function __invoke(Request $request, ProductionSummary $productionSummary, WaiterSummary $waiterSummary): Response
     {
         $user = $request->user();
         $email = strtolower($user->email);
@@ -65,6 +66,9 @@ class DashboardController extends Controller
                 ->where('estado', 'Abierta')
                 ->first(['id', 'caja', 'turno', 'monto_inicial', 'fecha_apertura']),
         ] : null;
+        $waiterSummaryData = $user->hasRole('Mesero')
+            ? $waiterSummary->forUser((int) $user->current_team_id, (int) $user->id)
+            : null;
 
         return Inertia::render('dashboard', [
             'pendingInvitations' => $pendingInvitations,
@@ -73,6 +77,7 @@ class DashboardController extends Controller
                 ? $productionSummary->forTeamAndAreas((int) $user->current_team_id, $productionAreas)
                 : null,
             'cashierSummary' => $cashierSummary,
+            'waiterSummary' => $waiterSummaryData,
         ]);
     }
 }

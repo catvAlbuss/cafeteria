@@ -52,6 +52,17 @@ interface CashierSummary {
     } | null;
 }
 
+interface WaiterSummary {
+    salesToday: number;
+    ordersToday: number;
+    activeTables: number;
+    readyOrders: number;
+    topProducts: Array<{ name: string; quantity: number; total: number }>;
+    topCategories: Array<{ name: string; quantity: number; total: number }>;
+    mostFrequentTable: { numero: string; visits: number } | null;
+    topCustomer: { name: string; total: number; orders: number } | null;
+}
+
 const formatCurrency = (amount: number): string => {
     return `S/ ${amount.toLocaleString('es-PE')}`;
 };
@@ -61,10 +72,11 @@ const formatNumber = (num: number): string => {
 };
 
 export default function Dashboard() {
-    const { productionArea, productionSummary, cashierSummary } = usePage().props as unknown as {
+    const { productionArea, productionSummary, cashierSummary, waiterSummary } = usePage().props as unknown as {
         productionArea: 'cocina' | 'bar' | null;
         productionSummary: ProductionSummary | null;
         cashierSummary: CashierSummary | null;
+        waiterSummary: WaiterSummary | null;
     };
 
     if (productionArea && productionSummary) {
@@ -73,6 +85,10 @@ export default function Dashboard() {
 
     if (cashierSummary) {
         return <CashierHome summary={cashierSummary} />;
+    }
+
+    if (waiterSummary) {
+        return <WaiterHome summary={waiterSummary} />;
     }
 
     //   Datos
@@ -302,6 +318,71 @@ export default function Dashboard() {
 
             </div>
         </>
+    );
+}
+
+function WaiterHome({ summary }: { summary: WaiterSummary }) {
+    return (
+        <>
+            <Head title="Inicio del Mozo" />
+            <main className="min-h-full space-y-5 bg-[#FBF7F0] p-4 md:p-6">
+                <section className="flex flex-col gap-4 rounded-2xl bg-neutral-950 p-5 text-white md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <p className="text-sm font-bold text-orange-300">Panel personal del mozo</p>
+                        <h1 className="mt-1 text-2xl font-black">Tu servicio de hoy</h1>
+                        <p className="mt-1 text-sm font-medium text-white/60">Pedidos, mesas y preferencias de tus clientes.</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={() => router.visit('/mesas')} className="rounded-xl bg-white/10 px-5 py-3 font-black hover:bg-white/20">Ver mesas</button>
+                        <button type="button" onClick={() => router.visit('/ventas')} className="rounded-xl bg-orange-500 px-5 py-3 font-black hover:bg-orange-600">Nuevo pedido</button>
+                    </div>
+                </section>
+
+                <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <CashierMetric icon={DollarSign} label="Tus ventas hoy" value={formatCurrency(summary.salesToday)} color="bg-emerald-50 text-emerald-700" />
+                    <CashierMetric icon={Receipt} label="Pedidos enviados" value={formatNumber(summary.ordersToday)} color="bg-blue-50 text-blue-700" />
+                    <CashierMetric icon={Armchair} label="Mesas activas" value={formatNumber(summary.activeTables)} color="bg-violet-50 text-violet-700" />
+                    <CashierMetric icon={Coffee} label="Listos para servir" value={formatNumber(summary.readyOrders)} color="bg-orange-50 text-orange-700" />
+                </section>
+
+                <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <WaiterRanking title="Productos más vendidos · 30 días" items={summary.topProducts} />
+                    <WaiterRanking title="Categorías preferidas · 30 días" items={summary.topCategories} />
+                </section>
+
+                <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <article className="rounded-xl border border-violet-200 bg-white p-5 shadow-sm">
+                        <Armchair className="h-6 w-6 text-violet-600" />
+                        <p className="mt-3 text-sm font-bold text-neutral-500">Mesa más recurrente</p>
+                        <p className="mt-1 text-2xl font-black text-neutral-950">{summary.mostFrequentTable ? `Mesa ${summary.mostFrequentTable.numero}` : 'Sin información'}</p>
+                        <p className="mt-1 text-sm font-semibold text-violet-700">{summary.mostFrequentTable ? `${summary.mostFrequentTable.visits} pedidos atendidos` : 'Aún no hay pedidos terminados'}</p>
+                    </article>
+                    <article className="rounded-xl border border-emerald-200 bg-white p-5 shadow-sm">
+                        <Users className="h-6 w-6 text-emerald-600" />
+                        <p className="mt-3 text-sm font-bold text-neutral-500">Cliente de mayor consumo</p>
+                        <p className="mt-1 text-2xl font-black text-neutral-950">{summary.topCustomer?.name ?? 'Sin información'}</p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-700">{summary.topCustomer ? `${formatCurrency(summary.topCustomer.total)} en ${summary.topCustomer.orders} pedidos` : 'Registra el nombre del cliente para medirlo'}</p>
+                    </article>
+                </section>
+            </main>
+        </>
+    );
+}
+
+function WaiterRanking({ title, items }: { title: string; items: Array<{ name: string; quantity: number; total: number }> }) {
+    return (
+        <article className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
+            <h2 className="flex items-center gap-2 text-lg font-black text-neutral-950"><Trophy className="h-5 w-5 text-amber-500" /> {title}</h2>
+            <div className="mt-4 space-y-2">
+                {items.length === 0 ? <p className="rounded-lg bg-neutral-50 p-4 text-sm font-semibold text-neutral-500">Aún no hay ventas terminadas.</p> : items.map((item, index) => (
+                    <div key={item.name} className="flex items-center gap-3 rounded-lg bg-neutral-50 p-3">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-100 text-sm font-black text-amber-800">{index + 1}</span>
+                        <span className="min-w-0 flex-1 truncate font-bold text-neutral-900">{item.name}</span>
+                        <span className="text-right text-sm font-black text-neutral-700">{item.quantity} u.<br /><span className="text-xs text-emerald-700">{formatCurrency(item.total)}</span></span>
+                    </div>
+                ))}
+            </div>
+        </article>
     );
 }
 

@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Insumo;
+use App\Models\Mesa;
+use App\Models\Pedido;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -91,6 +93,53 @@ test('cashiers receive a role specific home dashboard', function () {
             ->has('cashierSummary.readyToCharge')
             ->has('cashierSummary.activeTables')
             ->has('cashierSummary.openRegister'));
+});
+
+test('waiters receive a personal dashboard scoped to their own sales and tables', function () {
+    $waiter = User::query()->where('usuario', 'mesero')->firstOrFail();
+    $otherWaiter = User::query()->where('usuario', 'mesera.ana')->firstOrFail();
+    $table = Mesa::query()->firstOrFail();
+    $table->update(['user_id' => $waiter->id, 'estado' => 'ocupada', 'cliente' => 'Cliente frecuente']);
+
+    Pedido::query()->create([
+        'team_id' => $waiter->current_team_id,
+        'user_id' => $waiter->id,
+        'mesa_id' => $table->id,
+        'numero' => Pedido::generarNumero(),
+        'cliente' => 'Cliente frecuente',
+        'productos' => [['nombre' => 'Café americano', 'categoria' => 'Bebidas', 'cantidad' => 3, 'precio' => 7, 'subtotal' => 21]],
+        'total' => 21,
+        'estado' => 'pagado',
+        'area' => 'bar',
+        'hora_pedido' => now(),
+    ]);
+    Pedido::query()->create([
+        'team_id' => $otherWaiter->current_team_id,
+        'user_id' => $otherWaiter->id,
+        'numero' => Pedido::generarNumero(),
+        'cliente' => 'No debe aparecer',
+        'productos' => [['nombre' => 'Producto ajeno', 'categoria' => 'Bebidas', 'cantidad' => 99, 'precio' => 10, 'subtotal' => 990]],
+        'total' => 990,
+        'estado' => 'pagado',
+        'area' => 'bar',
+        'hora_pedido' => now(),
+    ]);
+
+    $this->actingAs($waiter)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('dashboard')
+            ->where('waiterSummary.salesToday', 21)
+            ->where('waiterSummary.ordersToday', 1)
+            ->where('waiterSummary.activeTables', 1)
+            ->where('waiterSummary.topProducts.0.name', 'Café americano')
+            ->where('waiterSummary.topProducts.0.quantity', 3)
+            ->where('waiterSummary.topCategories.0.name', 'Bebidas')
+            ->where('waiterSummary.mostFrequentTable.numero', $table->numero)
+            ->where('waiterSummary.topCustomer.name', 'Cliente frecuente')
+            ->where('cashierSummary', null)
+            ->where('productionSummary', null));
 });
 
 test('operational inventory is isolated by area without exposing the area label', function (string $username, string $visibleArea, string $hiddenArea) {

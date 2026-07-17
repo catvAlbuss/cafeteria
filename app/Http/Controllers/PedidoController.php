@@ -298,7 +298,7 @@ class PedidoController extends Controller
             ? $this->productionAreaClassifier->group($validated['productos'], $validated['area'] ?? 'cocina')
             : [($validated['area'] ?? 'cocina') => $validated['productos']];
 
-        $orders = DB::transaction(function () use ($validated, $estado, $userId, $productsByArea) {
+        [$orders, $updatedTable] = DB::transaction(function () use ($validated, $estado, $userId, $productsByArea) {
             $orders = collect($productsByArea)->map(function (array $products, string $area) use ($validated, $estado, $userId) {
                 return Pedido::create([
                     'numero' => Pedido::generarNumero(),
@@ -318,6 +318,7 @@ class PedidoController extends Controller
                 ]);
             })->values();
 
+            $updatedTable = null;
             if ($estado === 'pendiente' && ! empty($validated['mesa_id'])) {
                 $mesa = Mesa::query()->find($validated['mesa_id']);
                 if ($mesa && $mesa->estado !== 'ocupada') {
@@ -326,13 +327,15 @@ class PedidoController extends Controller
                     $mesa->save();
                 }
 
-                if ($mesa) {
-                    broadcast(new MesaActualizada($mesa));
-                }
+                $updatedTable = $mesa;
             }
 
-            return $orders;
+            return [$orders, $updatedTable];
         });
+
+        if ($updatedTable) {
+            broadcast(new MesaActualizada($updatedTable));
+        }
 
         $orders->each(fn (Pedido $order) => broadcast(new PedidoCreado($order)));
 
