@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { router } from '@inertiajs/react';
-import { X, CheckCircle, CreditCard, Banknote, Smartphone, Printer } from 'lucide-react';
+import { X, CheckCircle, CreditCard, Banknote, Smartphone, Printer, KeyRound } from 'lucide-react';
 
 // ============================================================
 // INTERFACES
@@ -46,6 +46,7 @@ interface ModalCobroProps {
 export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }: ModalCobroProps) {
     const [metodoPago, setMetodoPago] = useState<string>('efectivo');
     const [montoRecibido, setMontoRecibido] = useState<string>('');
+    const [authorizationPin, setAuthorizationPin] = useState('');
     const [cargando, setCargando] = useState(false);
     const [exito, setExito] = useState(false);
     const ticketRef = useRef<HTMLDivElement>(null);
@@ -56,6 +57,7 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
             setCargando(false);
             setMetodoPago('efectivo');
             setMontoRecibido('');
+            setAuthorizationPin('');
         }
     }, [isOpen, mesa?.id]);
 
@@ -77,24 +79,14 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
     setCargando(true);
 
         const ventaData = {
-            mesa_id: mesa.id,
-            mesa: `Mesa ${mesa.numero}`,
-            cliente: 'Anónimo',
-            productos: productos.map((item: ProductoPedido) => ({
-                nombre: item.nombre,
-                cantidad: item.cantidad,
-                precio: item.precio,
-                subtotal: item.subtotal
-            })),
-            total: total,
             metodo_pago: metodoPago,
-            tipo: 'mesa',
-            estado: 'pagado',
+            pedido_ids: pedidosArray.map(pedidoActivo => pedidoActivo.id),
+            authorization_pin: authorizationPin,
         };
 
         console.log('📤 Registrando venta:', ventaData);
 
-        router.post('/pedidos', ventaData, {
+        router.patch(`/mesas/${mesa.id}/cobrar`, ventaData, {
             onSuccess: () => {
                 console.log('✅ Venta registrada correctamente');
 
@@ -249,22 +241,12 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                     }
                 }
 
-                router.patch(`/mesas/${mesa.id}`, { estado: 'libre' }, {
-                    onSuccess: () => {
-                        setCargando(false);
-                        setExito(true);
+                setCargando(false);
+                setExito(true);
 
-
-                        setTimeout(() => {
-                            onSuccess(); // el padre hace router.reload({ only: ['mesas','pedidos'] })
-                        }, 1200);
-                    },
-                    onError: (error) => {
-                        console.log('❌ Error al liberar mesa:', error);
-                        setCargando(false);
-                        alert('La venta se registró pero hubo un error al liberar la mesa.');
-                    }
-                });
+                setTimeout(() => {
+                    onSuccess();
+                }, 1200);
             },
             onError: (errors) => {
                 console.log('❌ Error al registrar la venta:', errors);
@@ -533,10 +515,29 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                             </div>
                         )}
 
+                        <div className="flex-shrink-0">
+                            <label className="mb-1 block text-xs font-medium text-gray-600">
+                                PIN de Caja, Administración o Gerencia
+                            </label>
+                            <div className="relative">
+                                <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                <input
+                                    type="password"
+                                    inputMode="numeric"
+                                    maxLength={4}
+                                    autoComplete="off"
+                                    placeholder="••••"
+                                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-center text-sm tracking-[0.5em] text-gray-900 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                    value={authorizationPin}
+                                    onChange={event => setAuthorizationPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
+                                />
+                            </div>
+                        </div>
+
                         {/* ===== BOTÓN COBRAR ===== */}
                         <button
                             onClick={handleCobrar}
-                            disabled={cargando || (metodoPago === 'efectivo' && montoRecibidoNum < total)}
+                            disabled={cargando || authorizationPin.length !== 4 || (metodoPago === 'efectivo' && montoRecibidoNum < total)}
                             className={`w-full py-2.5 rounded-xl font-semibold transition flex items-center justify-center gap-2 text-sm flex-shrink-0 ${cargando || (metodoPago === 'efectivo' && montoRecibidoNum < total)
                                 ? 'bg-gray-300 cursor-not-allowed'
                                 : 'bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white'

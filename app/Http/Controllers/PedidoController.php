@@ -12,6 +12,7 @@ use App\Models\Insumo;
 use App\Models\Mesa;
 use App\Models\Pedido;
 use App\Models\Plato;
+use App\Models\User;
 use App\Services\ProductionAreaClassifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -225,29 +226,56 @@ class PedidoController extends Controller
             'metodo_pago' => 'required|in:efectivo,tarjeta,yape',
             'pedido_ids' => 'required|array|min:1',
             'pedido_ids.*' => 'exists:pedidos,id',
+            'authorization_pin' => 'required|string|size:4',
         ]);
 
-        $caja = Caja::query()->where('estado', 'Abierta')->firstOrFail();
+        $authorizer = $request->user()->currentTeam?->members()
+            ->active()
+            ->where('pin', $validated['authorization_pin'])
+            ->first();
 
-        $pedidos = Pedido::whereIn('id', $validated['pedido_ids'])
-            ->where('mesa_id', $mesa->id)
-            ->whereNotIn('estado', ['pagado', 'cancelado'])
-            ->get();
-
-        foreach ($pedidos as $pedido) {
-            $pedido->estado = 'pagado';
-            $pedido->metodo_pago = $validated['metodo_pago'];
-            $pedido->caja_id = $caja->id;
-            $pedido->save();
-            broadcast(new PedidoActualizado($pedido));
+        if (! $authorizer instanceof User || ! $authorizer->hasPermissionTo('procesar pagos')) {
+            return redirect()->back()->withErrors([
+                'authorization_pin' => 'PIN inválido. Solo Caja, Administración o Gerencia pueden confirmar el pago.',
+            ]);
         }
 
-        $mesa->estado = 'libre';
-        $mesa->user_id = null;
-        $mesa->cliente = null;
-        $mesa->personas = null;
-        $mesa->save();
-        broadcast(new MesaActualizada($mesa));
+        $pedidos = DB::transaction(function () use ($mesa, $validated) {
+            $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
+            $pedidos = Pedido::query()
+                ->where('mesa_id', $mesa->id)
+                ->whereNotIn('estado', ['pagado', 'cancelado'])
+                ->lockForUpdate()
+                ->get();
+
+            if ($pedidos->isEmpty()) {
+                abort(422, 'Esta mesa no tiene pedidos por cobrar.');
+            }
+
+            if ($pedidos->pluck('id')->sort()->values()->all() !== collect($validated['pedido_ids'])->sort()->values()->all()) {
+                abort(422, 'La cuenta cambió. Actualiza la mesa antes de cobrar.');
+            }
+
+            foreach ($pedidos as $pedido) {
+                $pedido->update([
+                    'estado' => 'pagado',
+                    'metodo_pago' => $validated['metodo_pago'],
+                    'caja_id' => $caja->id,
+                ]);
+            }
+
+            $mesa->estado = 'libre';
+            $mesa->user_id = null;
+            $mesa->cliente = null;
+            $mesa->personas = null;
+            $mesa->pedido_listo = false;
+            $mesa->save();
+
+            return $pedidos;
+        });
+
+        $pedidos->each(fn (Pedido $pedido) => broadcast(new PedidoActualizado($pedido)));
+        broadcast(new MesaActualizada($mesa->refresh()));
 
         return redirect()->back()->with('success', 'Mesa cobrada y liberada correctamente');
     }

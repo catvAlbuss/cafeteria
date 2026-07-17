@@ -520,15 +520,9 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
             {mesa.pedido_listo && (
                 <button
                     onClick={() => {
-
-                        const pedido = pedidos.find(p => p.mesa_id === mesa.id);
-                        if (!pedido || pedido.estado !== 'listo') {
-                            alert('⚠️ El pedido debe estar en estado "Listo" para entregar.');
-                            return;
-                        }
-
                         router.post(`/mesas/${mesa.id}/entregar`, {}, {
-                            onSuccess: () => router.reload()
+                            onSuccess: () => router.reload(),
+                            onError: (errors) => swalError('No se pudo confirmar la entrega', errorsToText(errors)),
                         });
                     }}
                     className="mt-2 flex w-full items-center justify-center rounded-lg bg-orange-400 py-2 text-xs font-extrabold text-white transition hover:bg-orange-500"

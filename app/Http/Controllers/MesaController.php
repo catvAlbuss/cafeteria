@@ -59,6 +59,17 @@ class MesaController extends Controller
         }
 
         if ($validated['estado'] === 'libre') {
+            $hasUnpaidOrders = $mesa->pedidos()
+                ->withoutGlobalScopes()
+                ->whereNotIn('estado', ['pagado', 'cancelado'])
+                ->exists();
+
+            if ($hasUnpaidOrders) {
+                return redirect()->back()->withErrors([
+                    'estado' => 'La mesa solo puede liberarse al registrar el pago con un PIN autorizado.',
+                ]);
+            }
+
             $validated['user_id'] = null;
             $validated['cliente'] = null;
             $validated['personas'] = null;
@@ -100,21 +111,25 @@ class MesaController extends Controller
     //  Entregar pedido: libera la bandera de la mesa Y marca los pedidos como entregados
     public function entregar(Request $request, Mesa $mesa)
     {
-        $mesa->pedido_listo = false;
-        $mesa->estado = 'ocupada';
-        $mesa->save();
-        broadcast(new MesaActualizada($mesa));
-
-        //  Antes esto no pasaba: los pedidos quedaban en "listo" para siempre,
-        //  nunca llegaban a "entregado" aunque el mesero ya los hubiera servido.
         $pedidosEntregados = Pedido::where('mesa_id', $mesa->id)
             ->where('estado', 'listo')
             ->get();
+
+        if ($pedidosEntregados->isEmpty()) {
+            return redirect()->back()->withErrors([
+                'pedido' => 'No hay pedidos listos pendientes de entrega en esta mesa.',
+            ]);
+        }
 
         foreach ($pedidosEntregados as $pedidoEntregado) {
             $pedidoEntregado->update(['estado' => 'entregado', 'hora_entrega' => now()]);
             broadcast(new PedidoActualizado($pedidoEntregado));
         }
+
+        $mesa->pedido_listo = false;
+        $mesa->estado = 'ocupada';
+        $mesa->save();
+        broadcast(new MesaActualizada($mesa));
 
         return redirect()->back()->with('success', 'Pedido entregado');
     }
