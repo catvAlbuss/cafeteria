@@ -229,6 +229,8 @@ export default function Caja() {
                                             src={producto.imagen}
                                             alt={producto.nombre}
                                             className="h-28 w-28 object-cover rounded-xl group-hover:scale-105 transition duration-300"
+                                            loading="lazy"
+                                            decoding="async"
                                             onError={(e) => {
                                                 (e.target as HTMLImageElement).src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150"><rect width="150" height="150" rx="18" fill="%23C9A96E"/><text x="50%25" y="54%25" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="Arial" font-size="20" font-weight="700">Cafe</text></svg>';
                                             }}

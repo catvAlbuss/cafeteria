@@ -100,6 +100,8 @@ const ProductImage = ({
             alt={alt}
             className={className}
             onError={handleImageError}
+            loading="lazy"
+            decoding="async"
         />
     );
 };

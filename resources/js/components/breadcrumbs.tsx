@@ -1,4 +1,4 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { Bell, CalendarClock, ChevronRight, Radio } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -18,6 +18,7 @@ interface LiveNotification {
     description: string;
     createdAt: Date;
     tone: 'pedido' | 'listo';
+    href: string;
 }
 
 export function Breadcrumbs({
@@ -40,15 +41,13 @@ export function Breadcrumbs({
           ? ['cocina', 'horno', 'postres']
           : [];
     const currentTitle = breadcrumbs.at(-1)?.title ?? 'Panel';
-    const [now, setNow] = useState<Date | null>(null);
+    const [now, setNow] = useState<Date>(() => new Date());
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const [notifications, setNotifications] = useState<LiveNotification[]>([]);
     const visibleCount = unreadCount || notifications.length;
 
     useEffect(() => {
-        setNow(new Date());
-
         const timer = window.setInterval(() => setNow(new Date()), 1000);
 
         return () => window.clearInterval(timer);
@@ -123,6 +122,26 @@ export function Breadcrumbs({
         setNotifications(prev => [nextNotification, ...prev].slice(0, 8));
         setUnreadCount(prev => prev + 1);
         playBell(notification.tone);
+
+        if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+            const deduplicationKey = `live-notification-${notification.tone}-${notification.href}`;
+            const lastNotificationAt = Number(localStorage.getItem(deduplicationKey) || 0);
+
+            if (Date.now() - lastNotificationAt > 3000) {
+                localStorage.setItem(deduplicationKey, String(Date.now()));
+                const browserNotification = new Notification(notification.title, {
+                    body: notification.description,
+                    icon: '/logo.png',
+                    tag: deduplicationKey,
+                });
+
+                browserNotification.onclick = () => {
+                    window.focus();
+                    router.visit(notification.href);
+                    browserNotification.close();
+                };
+            }
+        }
     }, [playBell]);
 
     useSedeChannel('produccion', {
@@ -137,6 +156,7 @@ export function Breadcrumbs({
                     ? `Mesa ${payload.mesa.numero} - ${payload.cliente ?? 'Cliente'}`
                     : `${payload.tipo === 'delivery' ? 'Delivery' : 'Pedido'} - ${payload.cliente ?? 'Cliente'}`,
                 tone: 'pedido',
+                href: '/produccion',
             });
         },
     }, canListenToProduction);
@@ -158,6 +178,7 @@ export function Breadcrumbs({
                 title: `Pedido listo ${payload.numero ?? ''}`.trim(),
                 description: `${mozo}${message}`,
                 tone: 'listo',
+                href: '/mesas',
             });
         },
     }, canListenToSalon);
@@ -177,6 +198,10 @@ export function Breadcrumbs({
     }, [isNotificationsOpen]);
 
     const openNotifications = () => {
+        if ('Notification' in window && Notification.permission === 'default') {
+            void Notification.requestPermission();
+        }
+
         setIsNotificationsOpen(prev => !prev);
         setUnreadCount(0);
         playBell('pedido');
@@ -266,7 +291,15 @@ export function Breadcrumbs({
                                     </div>
                                 ) : (
                                     notifications.map(notification => (
-                                        <div key={notification.id} className="mb-2 rounded-lg border border-orange-100 bg-orange-50 p-3 last:mb-0">
+                                        <button
+                                            key={notification.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setIsNotificationsOpen(false);
+                                                router.visit(notification.href);
+                                            }}
+                                            className="mb-2 block w-full rounded-lg border border-orange-100 bg-orange-50 p-3 text-left transition hover:border-orange-300 hover:bg-orange-100 last:mb-0"
+                                        >
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
                                                     <p className="truncate text-sm font-extrabold text-neutral-950">{notification.title}</p>
@@ -281,7 +314,7 @@ export function Breadcrumbs({
                                                 </div>
                                                 <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-orange-500" />
                                             </div>
-                                        </div>
+                                        </button>
                                     ))
                                 )}
                             </div>

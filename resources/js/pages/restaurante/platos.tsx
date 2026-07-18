@@ -64,6 +64,8 @@ export default function Platos() {
     const [modalEtiquetaAbierto, setModalEtiquetaAbierto] = useState(false);
     const [etiquetaActual, setEtiquetaActual] = useState<Plato | null>(null);
     const [previewImagen, setPreviewImagen] = useState<string>('');
+    //  Archivo real de la imagen a subir (se envía como multipart, nunca como base64)
+    const [imagenFile, setImagenFile] = useState<File | null>(null);
 
     //  Filtros
     const [filtroCategoria, setFiltroCategoria] = useState('');
@@ -118,6 +120,7 @@ export default function Platos() {
 
         });
         setPreviewImagen('');
+        setImagenFile(null);
         setModalAbierto(true);
     };
 
@@ -125,6 +128,7 @@ export default function Platos() {
         setEsEdicion(true);
         setFormulario({ ...plato });
         setPreviewImagen(plato.imagen || '');
+        setImagenFile(null);
         setModalAbierto(true);
     };
 
@@ -136,8 +140,18 @@ export default function Platos() {
         }
 
         const url = esEdicion ? `/platos/${formulario.id}` : '/platos';
+        // Nunca mandamos 'imagen' como string: o va el archivo real (multipart),
+        // o no se manda y el backend conserva la imagen existente.
+        const { imagen: _imagen, ...datosSinImagen } = formulario;
+        void _imagen;
+        const datos: Record<string, unknown> = { ...datosSinImagen };
+        if (imagenFile) {
+            datos.imagen = imagenFile;
+        }
+
         const opciones = {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: () => {
                 setModalAbierto(false);
                 router.reload({ only: ['platos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
@@ -148,9 +162,11 @@ export default function Platos() {
         } as Parameters<typeof router.post>[2];
 
         if (esEdicion) {
-            router.put(url, formulario, opciones);
+            // Las requests con archivos no soportan PUT nativo: se manda por POST
+            // con spoofing de método (recomendación oficial de Inertia).
+            router.post(url, { ...datos, _method: 'put' }, opciones);
         } else {
-            router.post(url, formulario, opciones);
+            router.post(url, datos, opciones);
         }
     };
 
@@ -313,6 +329,8 @@ export default function Platos() {
                                             src={plato.imagen}
                                             alt={plato.nombre}
                                             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                                            loading="lazy"
+                                            decoding="async"
                                             onError={(e) => {
                                                 (e.target as HTMLImageElement).style.display = 'none';
                                                 (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
@@ -638,13 +656,8 @@ export default function Platos() {
                                                             if (item.type.startsWith('image/')) {
                                                                 const file = item.getAsFile();
                                                                 if (file) {
-                                                                    const reader = new FileReader();
-                                                                    reader.onloadend = () => {
-                                                                        const base64 = reader.result as string;
-                                                                        setPreviewImagen(base64);
-                                                                        setFormulario({ ...formulario, imagen: base64 });
-                                                                    };
-                                                                    reader.readAsDataURL(file);
+                                                                    setImagenFile(file);
+                                                                    setPreviewImagen(URL.createObjectURL(file));
                                                                 }
                                                                 break;
                                                             }
@@ -677,6 +690,7 @@ export default function Platos() {
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setPreviewImagen('');
+                                                                    setImagenFile(null);
                                                                     setFormulario({ ...formulario, imagen: '' });
                                                                 }}
                                                                 className="text-red-500 hover:text-red-700 p-1"
@@ -709,13 +723,8 @@ export default function Platos() {
                                                     onChange={(e) => {
                                                         const file = e.target.files?.[0];
                                                         if (file) {
-                                                            const reader = new FileReader();
-                                                            reader.onloadend = () => {
-                                                                const base64 = reader.result as string;
-                                                                setPreviewImagen(base64);
-                                                                setFormulario({ ...formulario, imagen: base64 });
-                                                            };
-                                                            reader.readAsDataURL(file);
+                                                            setImagenFile(file);
+                                                            setPreviewImagen(URL.createObjectURL(file));
                                                         }
                                                     }}
                                                 />

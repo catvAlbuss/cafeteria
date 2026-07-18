@@ -540,11 +540,13 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
 // -----------------------------------------------------------------------
 export default function MesasDistribucion() {
 
-    const { mesas: mesasIniciales, pedidos: pedidosIniciales, flash } = usePage<{
+    const { mesas: mesasIniciales, pedidos: pedidosIniciales, flash, auth } = usePage<{
         mesas?: Mesa[] | { data?: Mesa[] } | Record<string, Mesa>;
         pedidos?: any[] | { data?: any[] } | Record<string, any>;
-        flash?: FlashProps
+        flash?: FlashProps;
+        auth?: { permissions?: string[] };
     }>().props;
+    const canManageTables = auth?.permissions?.includes('gestionar mesas') ?? false;
 
     const [mesas, setMesas] = useState<Mesa[]>(() => toArray<Mesa>(mesasIniciales));
 
@@ -772,13 +774,15 @@ export default function MesasDistribucion() {
 
                 <div className="flex justify-end gap-3">
                     <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                        <button
-                            onClick={crearMesa}
-                            className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 sm:px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm active:scale-95"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Nueva Mesa
-                        </button>
+                        {canManageTables && (
+                            <button
+                                onClick={crearMesa}
+                                className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 sm:px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm active:scale-95"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Nueva Mesa
+                            </button>
+                        )}
                         <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-2 bg-white/80 rounded-xl border border-[#8D6B53]/20 text-xs">
                             <span className="flex items-center gap-1 text-gray-700"><span className="w-3 h-3 rounded-full bg-green-400" /> Libre</span>
                             <span className="flex items-center gap-1 text-gray-700"><span className="w-3 h-3 rounded-full bg-yellow-400" /> Pendiente</span>

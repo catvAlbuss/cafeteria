@@ -51,6 +51,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'modificar precios emergencia',
             'visualizar reportes diarios',
             'reabrir mesas',
+            'gestionar mesas',
             // Gerente
             'gestion inventarios',
             'configuracion sistema',
@@ -153,6 +154,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'modificar precios emergencia',
             'visualizar reportes diarios',
             'reabrir mesas',
+            'gestionar mesas',
             'ver mesas',
             'ver ventas',
             'ver caja',

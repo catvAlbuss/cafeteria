@@ -25,23 +25,14 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
 }
 
-// Cargar todas las páginas eager
-const pages = import.meta.glob('./pages/**/*.tsx', { eager: true }) as Record<string, { default: any }>;
+// Cada página se carga bajo demanda (code-splitting): la primera visita a una
+// vista descarga solo su chunk, en vez de que TODAS las páginas del sistema
+// viajen en el bundle inicial. Esto es lo que más pesaba en la navegación.
+const pages = import.meta.glob('./pages/**/*.tsx');
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
-    resolve: (name) => {
-        // Buscar la página en el objeto pages
-        const pageKey = `./pages/${name}.tsx`;
-        const page = pages[pageKey];
-        
-        if (page) {
-            return page.default;
-        }
-        
-        // Fallback si no encuentra
-        throw new Error(`Page not found: ${name}`);
-    },
+    resolve: (name) => resolvePageComponent(`./pages/${name}.tsx`, pages),
     layout: (name) => {
         switch (true) {
             case name === 'welcome':

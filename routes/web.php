@@ -141,7 +141,8 @@ Route::middleware(['auth'])->group(function () {
     // MESAS
     Route::resource('mesas', MesaController::class)
         ->middlewareFor('index', 'can:ver mesas')
-        ->middlewareFor(['store', 'update', 'destroy'], 'cash.session');
+        ->middlewareFor(['store', 'update', 'destroy'], 'cash.session')
+        ->middlewareFor(['store', 'destroy'], 'can:gestionar mesas');
     Route::patch('/mesas/{mesa}/estado', [MesaController::class, 'update'])->middleware('cash.session')->name('mesas.estado');
     Route::get('/api/mesas/{numero}', [MesaController::class, 'getByNumero'])->name('api.mesas.byNumero');
     Route::post('/mesas/{mesa}/pedido-listo', [MesaController::class, 'marcarPedidoListo'])->middleware('cash.session')->name('mesas.pedido-listo');

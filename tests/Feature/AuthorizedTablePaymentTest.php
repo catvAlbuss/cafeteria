@@ -94,3 +94,25 @@ test('an occupied table with unpaid orders cannot be released manually', functio
 
     expect($mesa->fresh()->estado)->toBe('ocupada');
 });
+
+test('a waiter cannot create tables but management can', function () {
+    $waiter = User::query()->where('usuario', 'mesero')->firstOrFail();
+    $manager = User::query()->where('usuario', 'admin')->firstOrFail();
+    Caja::query()->create([
+        'team_id' => $waiter->current_team_id,
+        'user_id' => $manager->id,
+        'caja' => 'Caja Principal',
+        'turno' => 'Todo el día',
+        'monto_inicial' => 100,
+        'fecha_apertura' => now(),
+        'estado' => 'Abierta',
+    ]);
+
+    $tableData = ['numero' => '99', 'capacidad' => 4, 'sillas' => 4];
+
+    $this->actingAs($waiter)->post(route('mesas.store'), $tableData)->assertForbidden();
+    expect(Mesa::query()->where('numero', '99')->exists())->toBeFalse();
+
+    $this->actingAs($manager)->post(route('mesas.store'), $tableData)->assertRedirect();
+    expect(Mesa::query()->where('numero', '99')->exists())->toBeTrue();
+});
