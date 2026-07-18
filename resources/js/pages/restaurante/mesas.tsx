@@ -527,12 +527,13 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
                         <button
                             key={value}
                             type="button"
+                            title={label}
+                            aria-label={`Cambiar mesa ${mesa.numero} a ${label}`}
+                            aria-pressed={isActive}
                             onClick={() => {
                                 if (!isActive) onCambiarEstado(mesa.id, value);
                             }}
-                            className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 
-                                ${isActive ? activeClass : idleClass}`}
-                            title={label}
+                            className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${isActive ? activeClass : idleClass}`}
                         >
                             <Icon className="h-4 w-4" />
                         </button>
@@ -574,24 +575,6 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
             {/* Botones de cambio de estado (solo para roles con acceso completo) */}
             {renderEstadoActions()}
 
-                    return (
-                        <button
-                            key={value}
-                            type="button"
-                            title={label}
-                            aria-label={`Cambiar mesa ${mesa.numero} a ${label}`}
-                            aria-pressed={isActive}
-                            onClick={() => {
-                                if (!isActive) onCambiarEstado(mesa.id, value);
-                            }}
-                            className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${isActive ? activeClass : idleClass}`}
-                        >
-                            <Icon className="h-4 w-4" />
-                        </button>
-                    );
-                })}
-            </div>
-
             {mesa.pedido_listo && (
                 <button
                     onClick={() => {
@@ -626,8 +609,11 @@ export default function MesasDistribucion() {
     const { mesas: mesasIniciales, pedidos: pedidosIniciales, flash, auth } = usePage<{
         mesas?: Mesa[] | { data?: Mesa[] } | Record<string, Mesa>;
         pedidos?: any[] | { data?: any[] } | Record<string, any>;
-        flash?: FlashProps
+        flash?: FlashProps;
+        auth?: { roles?: string[]; permissions?: string[] };
     }>().props;
+    const userRole = auth?.roles?.[0];
+    const canManageTables = auth?.permissions?.includes('gestionar mesas') ?? false;
 
     const [mesas, setMesas] = useState<Mesa[]>(() => toArray<Mesa>(mesasIniciales));
 

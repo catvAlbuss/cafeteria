@@ -144,10 +144,10 @@ export default function Platos() {
         // o no se manda y el backend conserva la imagen existente.
         const { imagen: _imagen, ...datosSinImagen } = formulario;
         void _imagen;
-        const datos: Record<string, unknown> = { ...datosSinImagen };
-        if (imagenFile) {
-            datos.imagen = imagenFile;
-        }
+        const datos = {
+            ...datosSinImagen,
+            ...(imagenFile ? { imagen: imagenFile } : {}),
+        } as Parameters<typeof router.post>[1];
 
         const opciones = {
             preserveScroll: true,

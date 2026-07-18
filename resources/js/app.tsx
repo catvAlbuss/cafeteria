@@ -1,5 +1,6 @@
 import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
+import type { ComponentType } from 'react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -28,11 +29,11 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 // Cada página se carga bajo demanda (code-splitting): la primera visita a una
 // vista descarga solo su chunk, en vez de que TODAS las páginas del sistema
 // viajen en el bundle inicial. Esto es lo que más pesaba en la navegación.
-const pages = import.meta.glob('./pages/**/*.tsx');
+const pages = import.meta.glob<{ default: ComponentType }>('./pages/**/*.tsx');
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
-    resolve: (name) => resolvePageComponent(`./pages/${name}.tsx`, pages),
+    resolve: (name) => resolvePageComponent(`./pages/${name}.tsx`, pages).then((module) => module.default),
     layout: (name) => {
         switch (true) {
             case name === 'welcome':
