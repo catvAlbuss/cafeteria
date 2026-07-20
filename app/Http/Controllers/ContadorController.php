@@ -198,7 +198,7 @@ class ContadorController extends Controller
 
         if ($request->empleado) {
             $query->whereHas('empleadoUser', function ($q) use ($request) {
-                $q->where('name', 'LIKE', '%' . $request->empleado . '%');
+                $q->where('name', 'LIKE', '%'.$request->empleado.'%');
             });
         }
 
@@ -217,7 +217,7 @@ class ContadorController extends Controller
         ]);
 
         $historial = $query->get();
-        $movimientos = $cajaActual?->movimientos->map(fn ($movimiento) => [
+        $movimientos = $cajaActual?->movimientos->map(fn ($movimiento) => (object) [
             'id' => $movimiento->id,
             'tipo' => $movimiento->tipo,
             'descripcion' => $movimiento->concepto,
@@ -228,21 +228,21 @@ class ContadorController extends Controller
 
         // Exportar hoja específica si se solicita
         if ($request->hoja === 'ingresos') {
-            return Excel::download(new IngresosSheetExport($ingresos), 'ingresos_dia_' . now()->format('Y-m-d') . '.xlsx');
+            return Excel::download(new IngresosSheetExport($ingresos), 'ingresos_dia_'.now()->format('Y-m-d').'.xlsx');
         }
 
         if ($request->hoja === 'historial') {
-            return Excel::download(new HistorialSheetExport($historial), 'historial_caja_' . now()->format('Y-m-d') . '.xlsx');
+            return Excel::download(new HistorialSheetExport($historial), 'historial_caja_'.now()->format('Y-m-d').'.xlsx');
         }
 
         if ($request->hoja === 'movimientos') {
-            return Excel::download(new MovimientosSheetExport($movimientos), 'movimientos_' . now()->format('Y-m-d') . '.xlsx');
+            return Excel::download(new MovimientosSheetExport($movimientos), 'movimientos_'.now()->format('Y-m-d').'.xlsx');
         }
 
         // Exportar todo
         return Excel::download(
             new ContadorExport($ingresos, $historial, $movimientos),
-            'reporte_contador_' . now()->format('Y-m-d') . '.xlsx'
+            'reporte_contador_'.now()->format('Y-m-d').'.xlsx'
         );
     }
 
