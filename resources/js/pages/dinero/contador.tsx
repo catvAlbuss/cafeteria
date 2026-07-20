@@ -10,43 +10,9 @@ import {
     Printer,
     FileSpreadsheet,
     Plus,
-    X,
     Eye,
-    Trash2,
-    Search,
-    User,
-    Calendar,
-    Banknote,
-    CreditCard,
-    Smartphone,
-    Landmark,
     Receipt,
-    Store,
-    Package,
-    ChevronRight,
-    ArrowUp,
-    ArrowDown,
-    DollarSign,
-    Users,
-    Truck,
-    Coffee,
-    Pizza,
-    Cake,
-    IceCream,
-    Sandwich,
-    Soup,
-    Salad,
-    Beef,
-    Fish,
-    Egg,
-    CupSoda,
-    GlassWater,
-    Martini,
-    ChefHat,
-    Cookie,
-    Croissant,
-    Utensils,
-    Lock
+    Lock,
 } from 'lucide-react';
 
 interface RegistroCaja {
@@ -71,7 +37,6 @@ export default function Contador() {
         resumen = { ingresos: 0, cajaActual: 0 },
         movimientos = [],
         ingresosDetalle = [],
-        estadisticas = { totalPedidosHoy: 0, totalCajasAbiertas: 0, totalCajasCerradas: 0 },
         puedeAbrir = false,
         auth,
     } = usePage().props as any;
@@ -113,7 +78,6 @@ export default function Contador() {
             setCajaActiva(caja.estado === 'Abierta' ? caja : null);
             setRegistros((current) => {
                 const exists = current.some((registro) => registro.id === caja.id);
-
                 return exists
                     ? current.map((registro) => registro.id === caja.id ? { ...registro, ...caja } : registro)
                     : [caja, ...current];
@@ -166,14 +130,9 @@ export default function Contador() {
             alert('Complete todos los campos correctamente.');
             return;
         }
-
         router.post('/contador/abrir', formApertura, {
-            onSuccess: () => {
-                setModalAperturaAbierto(false);
-            },
-            onError: (errors) => {
-                alert('Error al abrir caja: ' + Object.values(errors).join(' '));
-            }
+            onSuccess: () => setModalAperturaAbierto(false),
+            onError: (errors) => alert('Error al abrir caja: ' + Object.values(errors).join(' ')),
         });
     };
 
@@ -194,15 +153,12 @@ export default function Contador() {
             alert('Complete los campos correctamente.');
             return;
         }
-
         router.post(`/contador/cerrar/${registroSeleccionado.id}`, formCierre, {
             onSuccess: () => {
                 setModalCierreAbierto(false);
                 router.reload();
             },
-            onError: (errors) => {
-                alert('Error al cerrar caja: ' + Object.values(errors).join(' '));
-            }
+            onError: (errors) => alert('Error al cerrar caja: ' + Object.values(errors).join(' ')),
         });
     };
 
@@ -225,9 +181,7 @@ export default function Contador() {
         if (!confirm('¿Seguro que deseas eliminar este registro?')) return;
         router.delete(`/contador/${id}`, {
             onSuccess: () => router.reload(),
-            onError: (errors) => {
-                alert('Error al eliminar: ' + Object.values(errors).join(' '));
-            }
+            onError: (errors) => alert('Error al eliminar: ' + Object.values(errors).join(' ')),
         });
     };
 
@@ -237,31 +191,32 @@ export default function Contador() {
             valor: formatCurrency(resumen.ingresos || 0),
             icono: <TrendingUp className="w-6 h-6" />,
             color: 'from-green-500 to-emerald-500',
-            bg: 'bg-green-50',
-            textColor: 'text-green-600',
         },
         {
             titulo: 'Ventas totales',
             valor: formatCurrency(resumen.ingresos || 0),
             icono: <Calculator className="w-6 h-6" />,
             color: 'from-amber-500 to-orange-500',
-            bg: 'bg-amber-50',
-            textColor: 'text-amber-600',
         },
         {
             titulo: 'Caja actual',
             valor: formatCurrency(resumen.cajaActual || 0),
             icono: <Wallet className="w-6 h-6" />,
             color: 'from-purple-500 to-indigo-500',
-            bg: 'bg-purple-50',
-            textColor: 'text-purple-600',
         },
+    ];
+
+    const estadisticasRapidas = [
+        { label: 'Total Registros', value: totalRegistros },
+        { label: 'Cajas Abiertas', value: cajasAbiertas },
+        { label: 'Cajas Cerradas', value: cajasCerradas },
+        { label: 'Total Movido', value: formatCurrency(montoTotal) },
     ];
 
     return (
         <>
             <Head title="Turno de caja - Dolce Cafe" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-3xl bg-[#FBF3E7] p-6 text-[#2D1B1A] transition-colors dark:bg-[#180F09] dark:text-[#F5E6D3]">
+            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-3xl bg-[#FBF3E7] p-6">
 
                 <div className="flex justify-end">
                     <div className="flex flex-wrap gap-3">
@@ -294,24 +249,24 @@ export default function Contador() {
                     </div>
                 </div>
 
-                {/* CAJA ACTIVA */}
+                {/* CAJA ACTIVA - BLANCA */}
                 {cajaActiva && (
-                    <div className="bg-gradient-to-r from-[#C9A96E] to-[#E8D5A3] rounded-2xl p-5 text-[#2D1B1A] flex flex-wrap items-center justify-between gap-3 shadow-sm border border-[#F3E1C8]">
+                    <div className="bg-white rounded-2xl p-5 text-[#2D1B1A] flex flex-wrap items-center justify-between gap-3 shadow-sm border border-[#F3E1C8]">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-white/30 flex items-center justify-center">
-                                <Wallet className="w-6 h-6" />
+                            <div className="w-12 h-12 rounded-2xl bg-[#C9A96E]/10 flex items-center justify-center">
+                                <Wallet className="w-6 h-6 text-[#C9A96E]" />
                             </div>
                             <div>
-                                <p className="text-sm font-bold">Caja abierta</p>
-                                <p className="text-xs opacity-80">
+                                <p className="text-sm font-bold text-[#2D1B1A]">Caja abierta</p>
+                                <p className="text-xs text-[#5A3D2B]">
                                     {cajaActiva.empleado} · {cajaActiva.turno} · {new Date(cajaActiva.fecha_apertura).toLocaleString()}
                                 </p>
                             </div>
                         </div>
                         <div className="flex items-center gap-6">
                             <div className="text-right">
-                                <p className="text-xs opacity-80">Saldo inicial</p>
-                                <p className="font-bold text-lg">{formatCurrency(cajaActiva.monto_inicial)}</p>
+                                <p className="text-xs text-[#5A3D2B]">Saldo inicial</p>
+                                <p className="font-bold text-lg text-[#2D1B1A]">{formatCurrency(cajaActiva.monto_inicial)}</p>
                             </div>
                             <span className="px-4 py-1.5 bg-green-600 text-white rounded-full text-xs font-bold shadow-md">
                                 Activa
@@ -320,17 +275,17 @@ export default function Contador() {
                     </div>
                 )}
 
-                {/* TARJETAS RESUMEN */}
+                {/* TARJETAS RESUMEN - BLANCAS */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                     {tarjetasResumen.map((tarjeta, index) => (
                         <div
                             key={index}
-                            className="group cursor-default rounded-2xl border border-[#F3E1C8] bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-white/10 dark:bg-[#241811]"
+                            className="group cursor-default rounded-2xl border border-[#F3E1C8] bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
                         >
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <p className="text-sm font-medium text-[#5A3D2B] dark:text-[#D8C0A8]">{tarjeta.titulo}</p>
-                                    <p className="mt-1 text-2xl font-bold text-[#2D1B1A] dark:text-[#F5E6D3]">{tarjeta.valor}</p>
+                                    <p className="text-sm font-medium text-[#5A3D2B]">{tarjeta.titulo}</p>
+                                    <p className="mt-1 text-2xl font-bold text-[#2D1B1A]">{tarjeta.valor}</p>
                                 </div>
                                 <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${tarjeta.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                                     {tarjeta.icono}
@@ -340,23 +295,18 @@ export default function Contador() {
                     ))}
                 </div>
 
-                {/* ESTADÍSTICAS RÁPIDAS */}
+                {/* ESTADÍSTICAS RÁPIDAS - BLANCAS */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                    {[
-                        { label: 'Total Registros', value: totalRegistros, color: 'text-[#2D1B1A]' },
-                        { label: 'Cajas Abiertas', value: cajasAbiertas, color: 'text-green-600' },
-                        { label: 'Cajas Cerradas', value: cajasCerradas, color: 'text-red-600' },
-                        { label: 'Total Movido', value: formatCurrency(montoTotal), color: 'text-[#C9A96E]' },
-                    ].map((item, idx) => (
-                        <div key={idx} className="rounded-2xl border border-[#F3E1C8] bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-[#241811]">
+                    {estadisticasRapidas.map((item, idx) => (
+                        <div key={idx} className="rounded-2xl border border-[#F3E1C8] bg-white p-4 shadow-sm transition hover:shadow-md">
                             <p className="text-xs font-semibold text-gray-400 uppercase">{item.label}</p>
-                            <p className={`text-2xl font-bold ${item.color} mt-1`}>{item.value}</p>
+                            <p className="text-2xl font-bold text-[#2D1B1A] mt-1">{item.value}</p>
                         </div>
                     ))}
                 </div>
 
-                {/* FILTROS */}
-                <div className="rounded-2xl border border-[#F3E1C8] bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#241811]">
+                {/* FILTROS - BLANCO */}
+                <div className="rounded-2xl border border-[#F3E1C8] bg-white p-4 shadow-sm">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div>
                             <label className="text-xs text-gray-500 font-medium">Estado</label>
@@ -384,7 +334,7 @@ export default function Contador() {
                             <label className="text-xs text-gray-500 font-medium">Desde</label>
                             <input
                                 type="date"
-                                className="mt-1 w-full border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-white transition [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:grayscale(0) [&::-webkit-calendar-picker-indicator]:filter-none"
+                                className="mt-1 w-full border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-white transition"
                                 value={fechaInicio}
                                 onChange={(e) => setFechaInicio(e.target.value)}
                             />
@@ -393,7 +343,7 @@ export default function Contador() {
                             <label className="text-xs text-gray-500 font-medium">Hasta</label>
                             <input
                                 type="date"
-                                className="mt-1 w-full border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-white transition [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:grayscale(0) [&::-webkit-calendar-picker-indicator]:filter-none"
+                                className="mt-1 w-full border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-white transition"
                                 value={fechaFin}
                                 onChange={(e) => setFechaFin(e.target.value)}
                             />
@@ -401,10 +351,10 @@ export default function Contador() {
                     </div>
                 </div>
 
-                {/* TABLA HISTORIAL */}
-                <div className="overflow-hidden rounded-2xl border border-[#F3E1C8] bg-white shadow-sm dark:border-white/10 dark:bg-[#241811]">
+                {/* TABLA HISTORIAL - BLANCA */}
+                <div className="overflow-hidden rounded-2xl border border-[#F3E1C8] bg-white shadow-sm">
                     <div className="flex justify-between items-center p-5 border-b border-[#F3E1C8]">
-                        <h2 className="flex items-center gap-2 text-xl font-bold text-[#2D1B1A] dark:text-[#F5E6D3]">
+                        <h2 className="flex items-center gap-2 text-xl font-bold text-[#2D1B1A]">
                             <Clock className="w-5 h-5 text-[#C9A96E]" />
                             Historial de Aperturas y Cierres
                         </h2>
@@ -445,13 +395,13 @@ export default function Contador() {
                                             <td className="px-4 py-3 font-medium text-[#2D1B1A]">{r.caja}</td>
                                             <td className="px-4 py-3 text-[#5A3D2B]">{r.empleado}</td>
                                             <td className="px-4 py-3">
-                                                <span className="inline-flex items-center gap-1.5 bg-[#F3E1C8] px-3 py-1 rounded-lg text-xs font-medium">
+                                                <span className="inline-flex items-center gap-1.5 bg-[#F3E1C8] text-[#5A3D2B] px-3 py-1 rounded-lg text-xs font-medium">
                                                     <Clock className="w-3 h-3" />
                                                     {r.turno}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 font-semibold text-[#C9A96E]">{formatCurrency(r.monto_inicial)}</td>
-                                            <td className="px-4 py-3">{r.monto_final !== null ? formatCurrency(r.monto_final) : '-'}</td>
+                                            <td className="px-4 py-3 text-[#2D1B1A]">{r.monto_final !== null ? formatCurrency(r.monto_final) : '-'}</td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${r.estado === 'Abierta'
                                                     ? 'bg-green-100 text-green-700'
@@ -492,8 +442,8 @@ export default function Contador() {
                     </div>
                 </div>
 
-                {/* INGRESOS DEL DÍA */}
-                <div className="rounded-2xl border border-[#F3E1C8] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-[#241811]">
+                {/* INGRESOS DEL DÍA - BLANCO */}
+                <div className="rounded-2xl border border-[#F3E1C8] bg-white p-6 shadow-sm">
                     <h2 className="text-xl font-bold text-[#2D1B1A] mb-5 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-green-500" />
                         Ingresos del día
@@ -512,8 +462,8 @@ export default function Contador() {
                     </div>
                 </div>
 
-                {/* MOVIMIENTOS RECIENTES */}
-                <div className="rounded-2xl border border-[#F3E1C8] bg-white p-6 shadow-sm dark:border-white/10 dark:bg-[#241811]">
+                {/* MOVIMIENTOS RECIENTES - BLANCO */}
+                <div className="rounded-2xl border border-[#F3E1C8] bg-white p-6 shadow-sm">
                     <div className="flex justify-between items-center mb-5">
                         <h2 className="text-xl font-bold text-[#2D1B1A] flex items-center gap-2">
                             <Receipt className="w-5 h-5 text-amber-500" />
@@ -555,8 +505,7 @@ export default function Contador() {
                                             </td>
                                             <td className="py-3 px-4 text-sm font-medium text-[#2D1B1A]">{mov.descripcion}</td>
                                             <td className="py-3 px-4 text-sm text-[#5A3D2B]">{mov.cliente || 'Anónimo'}</td>
-                                            <td className={`py-3 px-4 text-sm font-semibold ${mov.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'
-                                                }`}>
+                                            <td className={`py-3 px-4 text-sm font-semibold ${mov.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'}`}>
                                                 {mov.tipo === 'ingreso' ? '+' : '-'} {formatCurrency(mov.monto)}
                                             </td>
                                             <td className="py-3 px-4 text-sm text-[#5A3D2B] flex items-center gap-1.5">
@@ -571,7 +520,7 @@ export default function Contador() {
                     </div>
                 </div>
 
-                {/* ACCIONES RÁPIDAS */}
+                {/* ACCIONES RÁPIDAS - BLANCAS */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <button
                         onClick={cajaActiva ? abrirModalCierre : abrirModalApertura}
@@ -605,28 +554,49 @@ export default function Contador() {
                 {/* ===== MODALES ===== */}
                 {modalMovimientoAbierto && cajaActiva && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-                        <div className="w-full max-w-lg rounded-3xl bg-white p-6 text-[#2D1B1A] shadow-xl dark:bg-[#241811] dark:text-[#F5E6D3]">
+                        <div className="w-full max-w-lg rounded-3xl bg-white p-6 text-[#2D1B1A] shadow-xl">
                             <h2 className="text-xl font-bold text-[#2D1B1A]">Registrar movimiento</h2>
                             <div className="mt-5 space-y-4">
-                                <select className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3" value={formMovimiento.tipo} onChange={(e) => setFormMovimiento({ ...formMovimiento, tipo: e.target.value })}>
-                                    <option value="ingreso">Ingreso</option><option value="aporte">Aporte</option><option value="egreso">Gasto</option><option value="retiro">Retiro</option>
+                                <select
+                                    className="w-full rounded-xl border border-gray-200 bg-gray-50 text-[#2D1B1A] p-3"
+                                    value={formMovimiento.tipo}
+                                    onChange={(e) => setFormMovimiento({ ...formMovimiento, tipo: e.target.value })}
+                                >
+                                    <option value="ingreso">Ingreso</option>
+                                    <option value="aporte">Aporte</option>
+                                    <option value="egreso">Gasto</option>
+                                    <option value="retiro">Retiro</option>
                                 </select>
-                                <input className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3" value={formMovimiento.concepto} onChange={(e) => setFormMovimiento({ ...formMovimiento, concepto: e.target.value })} placeholder="Concepto y motivo" />
-                                <input type="number" min="0.01" step="0.01" className="w-full rounded-xl border border-gray-200 bg-gray-50 p-3" value={formMovimiento.monto} onChange={(e) => setFormMovimiento({ ...formMovimiento, monto: Number(e.target.value) })} placeholder="Monto" />
+                                <input
+                                    className="w-full rounded-xl border border-gray-200 bg-gray-50 text-[#2D1B1A] placeholder-gray-400 p-3"
+                                    value={formMovimiento.concepto}
+                                    onChange={(e) => setFormMovimiento({ ...formMovimiento, concepto: e.target.value })}
+                                    placeholder="Concepto y motivo"
+                                />
+                                <input
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    className="w-full rounded-xl border border-gray-200 bg-gray-50 text-[#2D1B1A] placeholder-gray-400 p-3"
+                                    value={formMovimiento.monto}
+                                    onChange={(e) => setFormMovimiento({ ...formMovimiento, monto: Number(e.target.value) })}
+                                    placeholder="Monto"
+                                />
                             </div>
                             <div className="mt-6 flex justify-end gap-3">
-                                <button onClick={() => setModalMovimientoAbierto(false)} className="rounded-xl bg-gray-100 px-5 py-2.5 font-semibold">Cancelar</button>
+                                <button onClick={() => setModalMovimientoAbierto(false)} className="rounded-xl bg-gray-100 text-[#2D1B1A] px-5 py-2.5 font-semibold hover:bg-gray-200 transition">Cancelar</button>
                                 <button onClick={guardarMovimiento} disabled={!formMovimiento.concepto || formMovimiento.monto <= 0} className="rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white disabled:opacity-50">Registrar</button>
                             </div>
                         </div>
                     </div>
                 )}
-                {/* Modal Apertura */}
+
+                {/* Modal Apertura - BLANCO */}
                 {modalAperturaAbierto && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                        <div className="w-full max-w-lg rounded-3xl bg-white text-[#2D1B1A] shadow-xl dark:bg-[#241811] dark:text-[#F5E6D3]">
+                        <div className="w-full max-w-lg rounded-3xl bg-white text-[#2D1B1A] shadow-xl">
                             <div className="flex justify-between items-center p-6 border-b border-[#F3E1C8]">
-                                <h2 className="flex items-center gap-2 text-2xl font-bold text-[#2D1B1A] dark:text-[#F5E6D3]">
+                                <h2 className="flex items-center gap-2 text-2xl font-bold text-[#2D1B1A]">
                                     <Wallet className="w-6 h-6 text-[#C9A96E]" />
                                     Nueva Apertura
                                 </h2>
@@ -635,37 +605,59 @@ export default function Contador() {
                             <div className="p-6 space-y-4">
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Empleado</label>
-                                    <p className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 font-medium text-[#2D1B1A] dark:border-white/10 dark:bg-white/5 dark:text-[#F5E6D3]">{empleadoActual}</p>
+                                    <p className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 font-medium text-[#2D1B1A]">{empleadoActual}</p>
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Caja</label>
-                                    <input type="text" className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E] dark:border-white/10 dark:bg-white/5 dark:text-[#F5E6D3]" value={formApertura.caja} onChange={(e) => setFormApertura({ ...formApertura, caja: e.target.value })} />
+                                    <input
+                                        type="text"
+                                        className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        value={formApertura.caja}
+                                        onChange={(e) => setFormApertura({ ...formApertura, caja: e.target.value })}
+                                    />
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Turno</label>
-                                    <select className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E] dark:border-white/10 dark:bg-[#2F2119] dark:text-[#F5E6D3]" value={formApertura.turno} onChange={(e) => setFormApertura({ ...formApertura, turno: e.target.value as 'Todo el día' | 'Mañana' | 'Tarde' | 'Noche' })}>
+                                    <select
+                                        className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        value={formApertura.turno}
+                                        onChange={(e) => setFormApertura({ ...formApertura, turno: e.target.value as 'Todo el día' | 'Mañana' | 'Tarde' | 'Noche' })}
+                                    >
                                         <option value="Todo el día">Todo el día</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Monto Inicial (S/)</label>
-                                    <input type="number" step="0.01" className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E] dark:border-white/10 dark:bg-white/5 dark:text-[#F5E6D3]" value={formApertura.montoInicial} onChange={(e) => setFormApertura({ ...formApertura, montoInicial: parseFloat(e.target.value) || 0 })} placeholder="0.00" />
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none transition focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        value={formApertura.montoInicial}
+                                        onChange={(e) => setFormApertura({ ...formApertura, montoInicial: parseFloat(e.target.value) || 0 })}
+                                        placeholder="0.00"
+                                    />
                                     {ultimaCaja && <p className="mt-2 text-xs text-gray-500">Ultimo cierre: {formatCurrency(ultimaCaja.monto_final)}. Si modifica el monto, indique el motivo.</p>}
                                 </div>
                                 <div>
                                     <label className="text-sm text-gray-500 font-medium">Justificación del ajuste</label>
-                                    <textarea rows={2} className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none focus:ring-2 focus:ring-[#C9A96E] dark:border-white/10 dark:bg-white/5 dark:text-[#F5E6D3] dark:placeholder:text-[#F5E6D3]/40" value={formApertura.justificacionApertura} onChange={(e) => setFormApertura({ ...formApertura, justificacionApertura: e.target.value })} placeholder="Solo necesaria si difiere del cierre anterior" />
+                                    <textarea
+                                        rows={2}
+                                        className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 p-3 outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                        value={formApertura.justificacionApertura}
+                                        onChange={(e) => setFormApertura({ ...formApertura, justificacionApertura: e.target.value })}
+                                        placeholder="Solo necesaria si difiere del cierre anterior"
+                                    />
                                 </div>
                             </div>
                             <div className="border-t border-[#F3E1C8] p-6 flex justify-end gap-3">
-                                <button onClick={() => setModalAperturaAbierto(false)} className="rounded-xl bg-gray-100 px-5 py-2.5 font-semibold transition hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15">Cancelar</button>
+                                <button onClick={() => setModalAperturaAbierto(false)} className="rounded-xl bg-gray-100 text-[#2D1B1A] px-5 py-2.5 font-semibold transition hover:bg-gray-200">Cancelar</button>
                                 <button onClick={guardarApertura} className="bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl font-semibold transition">Abrir Caja</button>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* Modal Cierre */}
+                {/* Modal Cierre - BLANCO */}
                 {modalCierreAbierto && registroSeleccionado && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                         <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg">
@@ -683,19 +675,38 @@ export default function Contador() {
                                     <div><label className="text-xs text-gray-500">Turno</label><p className="font-semibold text-[#2D1B1A]">{registroSeleccionado.turno}</p></div>
                                     <div><label className="text-xs text-gray-500">Monto Inicial</label><p className="font-semibold text-[#C9A96E]">{formatCurrency(registroSeleccionado.monto_inicial)}</p></div>
                                 </div>
-                                <div><label className="text-sm text-gray-500 font-medium">Monto Final (S/)</label><input type="number" step="0.01" className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 transition" value={formCierre.montoFinal} onChange={(e) => setFormCierre({ ...formCierre, montoFinal: parseFloat(e.target.value) || 0 })} placeholder="0.00" /></div>
+                                <div>
+                                    <label className="text-sm text-gray-500 font-medium">Monto Final (S/)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 text-[#2D1B1A] transition"
+                                        value={formCierre.montoFinal}
+                                        onChange={(e) => setFormCierre({ ...formCierre, montoFinal: parseFloat(e.target.value) || 0 })}
+                                        placeholder="0.00"
+                                    />
+                                </div>
                                 <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Arqueo ciego: ingrese el efectivo contado. El sistema calculará la diferencia después de confirmar.</p>
-                                <div><label className="text-sm text-gray-500 font-medium">Observaciones</label><textarea rows={3} className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 transition" value={formCierre.observaciones} onChange={(e) => setFormCierre({ ...formCierre, observaciones: e.target.value })} placeholder="Observaciones del cierre..." /></div>
+                                <div>
+                                    <label className="text-sm text-gray-500 font-medium">Observaciones</label>
+                                    <textarea
+                                        rows={3}
+                                        className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 text-[#2D1B1A] transition"
+                                        value={formCierre.observaciones}
+                                        onChange={(e) => setFormCierre({ ...formCierre, observaciones: e.target.value })}
+                                        placeholder="Observaciones del cierre..."
+                                    />
+                                </div>
                             </div>
                             <div className="border-t border-[#F3E1C8] p-6 flex justify-end gap-3">
-                                <button onClick={() => setModalCierreAbierto(false)} className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-xl font-semibold transition">Cancelar</button>
+                                <button onClick={() => setModalCierreAbierto(false)} className="bg-gray-100 text-[#2D1B1A] hover:bg-gray-200 px-5 py-2.5 rounded-xl font-semibold transition">Cancelar</button>
                                 <button onClick={guardarCierre} className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl font-semibold transition">Confirmar Cierre</button>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* Modal Detalle */}
+                {/* Modal Detalle - BLANCO */}
                 {modalDetalleAbierto && registroSeleccionado && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                         <div className="bg-white rounded-3xl shadow-xl w-full max-w-xl">
@@ -708,22 +719,25 @@ export default function Contador() {
                             </div>
                             <div className="p-6 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div><p className="text-xs text-gray-400">Caja</p><p className="font-semibold">{registroSeleccionado.caja}</p></div>
-                                    <div><p className="text-xs text-gray-400">Empleado</p><p className="font-semibold">{registroSeleccionado.empleado}</p></div>
-                                    <div><p className="text-xs text-gray-400">Turno</p><p className="font-semibold">{registroSeleccionado.turno}</p></div>
-                                    <div><p className="text-xs text-gray-400">Estado</p><span className={`px-3 py-0.5 rounded-full text-xs font-bold ${registroSeleccionado.estado === 'Abierta' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{registroSeleccionado.estado}</span></div>
+                                    <div><p className="text-xs text-gray-400">Caja</p><p className="font-semibold text-[#2D1B1A]">{registroSeleccionado.caja}</p></div>
+                                    <div><p className="text-xs text-gray-400">Empleado</p><p className="font-semibold text-[#2D1B1A]">{registroSeleccionado.empleado}</p></div>
+                                    <div><p className="text-xs text-gray-400">Turno</p><p className="font-semibold text-[#2D1B1A]">{registroSeleccionado.turno}</p></div>
+                                    <div>
+                                        <p className="text-xs text-gray-400">Estado</p>
+                                        <span className={`px-3 py-0.5 rounded-full text-xs font-bold ${registroSeleccionado.estado === 'Abierta' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{registroSeleccionado.estado}</span>
+                                    </div>
                                     <div><p className="text-xs text-gray-400">Monto Inicial</p><p className="font-semibold text-[#C9A96E]">{formatCurrency(registroSeleccionado.monto_inicial)}</p></div>
-                                    <div><p className="text-xs text-gray-400">Monto Final</p><p className="font-semibold">{registroSeleccionado.monto_final !== null ? formatCurrency(registroSeleccionado.monto_final) : '-'}</p></div>
-                                    <div><p className="text-xs text-gray-400">Ventas del Día</p><p className="font-semibold">{registroSeleccionado.ventas_dia !== null ? formatCurrency(registroSeleccionado.ventas_dia) : '-'}</p></div>
-                                    <div><p className="text-xs text-gray-400">Fecha Apertura</p><p className="font-semibold text-sm">{new Date(registroSeleccionado.fecha_apertura).toLocaleString()}</p></div>
+                                    <div><p className="text-xs text-gray-400">Monto Final</p><p className="font-semibold text-[#2D1B1A]">{registroSeleccionado.monto_final !== null ? formatCurrency(registroSeleccionado.monto_final) : '-'}</p></div>
+                                    <div><p className="text-xs text-gray-400">Ventas del Día</p><p className="font-semibold text-[#2D1B1A]">{registroSeleccionado.ventas_dia !== null ? formatCurrency(registroSeleccionado.ventas_dia) : '-'}</p></div>
+                                    <div><p className="text-xs text-gray-400">Fecha Apertura</p><p className="font-semibold text-sm text-[#2D1B1A]">{new Date(registroSeleccionado.fecha_apertura).toLocaleString()}</p></div>
                                     {registroSeleccionado.fecha_cierre && (
-                                        <div className="col-span-2"><p className="text-xs text-gray-400">Fecha Cierre</p><p className="font-semibold text-sm">{new Date(registroSeleccionado.fecha_cierre).toLocaleString()}</p></div>
+                                        <div className="col-span-2"><p className="text-xs text-gray-400">Fecha Cierre</p><p className="font-semibold text-sm text-[#2D1B1A]">{new Date(registroSeleccionado.fecha_cierre).toLocaleString()}</p></div>
                                     )}
-                                    <div className="col-span-2"><p className="text-xs text-gray-400">Observaciones</p><p className="font-semibold">{registroSeleccionado.observaciones || '-'}</p></div>
+                                    <div className="col-span-2"><p className="text-xs text-gray-400">Observaciones</p><p className="font-semibold text-[#2D1B1A]">{registroSeleccionado.observaciones || '-'}</p></div>
                                 </div>
                             </div>
                             <div className="border-t border-[#F3E1C8] p-6 flex justify-end">
-                                <button onClick={() => setModalDetalleAbierto(false)} className="bg-gray-100 hover:bg-gray-200 px-5 py-2.5 rounded-xl font-semibold transition">Cerrar</button>
+                                <button onClick={() => setModalDetalleAbierto(false)} className="bg-gray-100 text-[#2D1B1A] hover:bg-gray-200 px-5 py-2.5 rounded-xl font-semibold transition">Cerrar</button>
                             </div>
                         </div>
                     </div>

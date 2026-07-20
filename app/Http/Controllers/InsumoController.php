@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\InsumosExport;
 use App\Models\Insumo;
 use App\Models\MovimientoInventario;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
 
 class InsumoController extends Controller
 {
@@ -42,18 +44,21 @@ class InsumoController extends Controller
         ]);
     }
 
-    public function index()
-    {
-        $teamId = auth()->user()->current_team_id;
+  public function index()
+{
+    $user = auth()->user(); 
+    $teamId = $user->current_team_id;
+    $userRole = $user->roles->first()?->name;
 
-        $insumos = Insumo::where('team_id', $teamId)
-            ->orderBy('nombre')
-            ->get();
+    $insumos = Insumo::where('team_id', $teamId)
+        ->orderBy('nombre')
+        ->get();
 
-        return Inertia::render('inventario/insumos', [
-            'insumos' => $insumos,
-        ]);
-    }
+    return Inertia::render('inventario/insumos', [
+        'insumos' => $insumos,
+        'userRole' => $userRole,
+    ]);
+}
 
     public function store(Request $request)
     {
@@ -85,7 +90,6 @@ class InsumoController extends Controller
             'activo' => true,
         ]);
 
-        // Registrar entrada en Cardex si se creó con stock inicial
         if (($validated['stock'] ?? 0) > 0) {
             MovimientoInventario::create([
                 'team_id' => $teamId,
@@ -124,7 +128,6 @@ class InsumoController extends Controller
 
     public function destroy(Insumo $insumo)
     {
-        // Verificar si tiene movimientos en Cardex
         $movimientos = MovimientoInventario::where('item_type', 'insumo')
             ->where('item_id', $insumo->id)
             ->count();
@@ -176,6 +179,7 @@ class InsumoController extends Controller
 
         $validated = $request->validate([
             'cantidad' => 'required|numeric|min:0.01',
+            'motivo' => 'required|string',
             'observaciones' => 'nullable|string',
         ]);
 
@@ -196,11 +200,21 @@ class InsumoController extends Controller
             'cantidad' => $validated['cantidad'],
             'stock_resultante' => $nuevoStock,
             'motivo' => 'merma',
+            'submotivo' => $validated['motivo'],
             'referencia_type' => 'merma',
             'user_id' => auth()->id(),
-            'observaciones' => $validated['observaciones'] ?? 'Merma de insumo',
+            'observaciones' => $validated['observaciones'] ?? null,
         ]);
 
         return redirect()->back()->with('success', 'Merma registrada correctamente');
+    }
+
+    public function export(Request $request)
+    {
+        $teamId = auth()->user()->current_team_id;
+
+        $insumos = Insumo::where('team_id', $teamId)->orderBy('nombre')->get();
+
+        return Excel::download(new InsumosExport($insumos), 'insumos_'.now()->format('Y-m-d_His').'.xlsx');
     }
 }

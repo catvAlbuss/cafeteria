@@ -38,8 +38,8 @@ export function Breadcrumbs({
     const productionAreas = permissions.includes('ver bar')
         ? ['bar']
         : permissions.includes('ver cocina')
-          ? ['cocina', 'horno', 'postres']
-          : [];
+            ? ['cocina', 'horno', 'postres']
+            : [];
     const currentTitle = breadcrumbs.at(-1)?.title ?? 'Panel';
     const [now, setNow] = useState<Date>(() => new Date());
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -171,8 +171,8 @@ export function Breadcrumbs({
             const message = payload.mesa_numero
                 ? `la mesa ${payload.mesa_numero} está lista para atender`
                 : payload.mesa_id
-                  ? `la mesa ${payload.mesa_id} está lista para atender`
-                  : 'el pedido está listo para entregar';
+                    ? `la mesa ${payload.mesa_id} está lista para atender`
+                    : 'el pedido está listo para entregar';
 
             addNotification({
                 title: `Pedido listo ${payload.numero ?? ''}`.trim(),
@@ -324,7 +324,7 @@ export function Breadcrumbs({
 
                 <div className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 text-xs font-bold text-neutral-800 shadow-sm sm:px-3">
                     <CalendarClock className="h-4 w-4 text-orange-600" />
-                    <span className="truncate whitespace-nowrap">{currentDateTime}</span>
+                    <span suppressHydrationWarning className="truncate whitespace-nowrap">{currentDateTime}</span>
                 </div>
             </div>
         </div>

@@ -11,20 +11,21 @@ class MovimientoInventario extends Model
 {
     protected $table = 'movimientos_inventario';
 
-    protected $fillable = [
-        'team_id',
-        'item_type',
-        'item_id',
-        'tipo',
-        'cantidad',
-        'stock_resultante',
-        'motivo',
-        'referencia_type',
-        'referencia_id',
-        'proveedor',
-        'user_id',
-        'observaciones',
-    ];
+protected $fillable = [
+    'team_id',
+    'item_type',
+    'item_id',
+    'tipo',
+    'cantidad',
+    'stock_resultante',
+    'motivo',
+    'submotivo',
+    'referencia_type',
+    'referencia_id',
+    'proveedor',
+    'user_id',
+    'observaciones',
+];
 
     protected $casts = [
         'cantidad' => 'decimal:2',

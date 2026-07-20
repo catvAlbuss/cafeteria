@@ -1,939 +1,736 @@
 import { Head, usePage, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
-import Swal from 'sweetalert2';
-import 'sweetalert2/dist/sweetalert2.min.css';
-import ModalCobro from '@/components/modals/ModalCobro';
-import { useSedeChannel } from '@/hooks/useSedeChannel';
-import { swalError, swalSuccess, errorsToText } from '@/lib/swal';
-
+import { useState, useEffect, useRef } from 'react';
 import {
-    DndContext,
-    PointerSensor,
-    TouchSensor,
-    useSensor,
-    useSensors,
-    useDraggable,
-    useDroppable,
-    type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-    Armchair,
-    Search,
+    AlertTriangle,
+    Trash2,
     Plus,
-    User,
-    X,
-    ClipboardList,
-    Users,
-    Utensils,
-    Receipt,
+    Search,
+    DollarSign,
     Package,
-    ChefHat,
-    CircleCheck,
-    CircleX,
-    ShoppingCart,
-    Calendar,
-    AlertCircle,
-    Eye
+    TrendingDown,
+    Clock,
+    XCircle,
+    Download,
+    Save,
+    X
 } from 'lucide-react';
-// ============================================================
-// COMPONENTE MODAL DE PIN (identificación rápida del mesero)
-// ============================================================
+import { toast } from 'sonner';
 
-interface ModalPinProps {
-    isOpen: boolean;
-    mesa: Mesa | null;
-    onClose: () => void;
-    onConfirm: (userId: number) => void;
-}
-
-function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
-    const [pin, setPin] = useState('');
-    const [error, setError] = useState('');
-    const [verificando, setVerificando] = useState(false);
-
-    if (!isOpen || !mesa) return null;
-
-    const handleClose = () => {
-        setPin('');
-        setError('');
-        onClose();
-    };
-
-    const agregarDigito = (digito: string) => {
-        if (pin.length >= 4) return;
-        setError('');
-        setPin(prev => prev + digito);
-    };
-
-    const borrarDigito = () => setPin(prev => prev.slice(0, -1));
-
-    const confirmar = async () => {
-        if (pin.length !== 4) {
-            setError('Ingresa los 4 dígitos de tu PIN');
-            return;
-        }
-
-        setVerificando(true);
-        setError('');
-
-        try {
-            const { data } = await axios.post('/pin/verificar', { pin });
-            setPin('');
-            onClose();
-            await swalSuccess(`¡Hola, ${data.user.name}!`, 'PIN verificado correctamente');
-            onConfirm(data.user.id);
-        } catch {
-            setPin('');
-            swalError('PIN incorrecto', 'Verifica los 4 dígitos e intenta nuevamente');
-        } finally {
-            setVerificando(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="bg-gradient-to-r from-[#2D1B1A] to-[#4A2C2A] px-5 py-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-[#C9A96E] rounded-full flex items-center justify-center">
-                                <User className="w-4 h-4 text-white" />
-                            </div>
-                            <div>
-                                <h3 className="text-white font-semibold text-sm">Tomar Pedido</h3>
-                                <p className="text-gray-300 text-[10px]">Mesa #{mesa.numero} · Ingresa tu PIN</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={handleClose}
-                            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/10 transition text-white/60 hover:text-white"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-
-                <div className="p-5">
-                    <div className="flex justify-center gap-3 mb-4">
-                        {[0, 1, 2, 3].map((i) => (
-                            <span
-                                key={i}
-                                className={`w-4 h-4 rounded-full border-2 ${i < pin.length ? 'bg-[#C9A96E] border-[#C9A96E]' : 'border-gray-300'
-                                    }`}
-                            />
-                        ))}
-                    </div>
-
-                    {error && (
-                        <p className="text-center text-xs text-red-500 mb-3 flex items-center justify-center gap-1">
-                            <span>⚠</span> {error}
-                        </p>
-                    )}
-
-                    <div className="grid grid-cols-3 gap-2">
-                        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((n) => (
-                            <button
-                                key={n}
-                                type="button"
-                                onClick={() => agregarDigito(n)}
-                                className="py-3 rounded-xl bg-gray-50 hover:bg-[#C9A96E]/10 border border-gray-200 text-lg font-semibold text-[#2D1B1A] transition active:scale-95"
-                            >
-                                {n}
-                            </button>
-                        ))}
-                        <button
-                            type="button"
-                            onClick={borrarDigito}
-                            className="py-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-sm font-medium text-gray-500 transition active:scale-95"
-                        >
-                            Borrar
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => agregarDigito('0')}
-                            className="py-3 rounded-xl bg-gray-50 hover:bg-[#C9A96E]/10 border border-gray-200 text-lg font-semibold text-[#2D1B1A] transition active:scale-95"
-                        >
-                            0
-                        </button>
-                        <button
-                            type="button"
-                            onClick={confirmar}
-                            disabled={verificando}
-                            className="py-3 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white text-sm font-semibold transition active:scale-95 disabled:opacity-50"
-                        >
-                            {verificando ? '...' : 'OK'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ============================================================
-// COMPONENTE TARJETA DE PEDIDO (MODAL FLOTANTE)
-// ============================================================
-
-interface TarjetaPedidoProps {
-    pedido: any;
-    mesaNumero: string;
-    mesero: string;
-    onClose: () => void;
-}
-
-function TarjetaPedido({ pedido, mesaNumero, mesero, onClose }: TarjetaPedidoProps) {
-    const productos = typeof pedido.productos === 'string'
-        ? JSON.parse(pedido.productos)
-        : pedido.productos;
-
-    const total = typeof pedido.total === 'number'
-        ? pedido.total
-        : parseFloat(pedido.total) || 0;
-
-    const fecha = new Date(pedido.created_at).toLocaleString('es-PE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-
-    return (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-[#2D1B1A] to-[#4A2C2A] px-5 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#C9A96E] rounded-full flex items-center justify-center">
-                            <span className="text-lg">📋</span>
-                        </div>
-                        <div>
-                            <h3 className="text-white font-semibold text-base">Detalle del Pedido</h3>
-                            <p className="text-gray-300 text-xs">Mesa #{mesaNumero} · {fecha}</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition text-white/60 hover:text-white"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-
-                {/* Body */}
-                <div className="p-5 max-h-[60vh] overflow-y-auto">
-                    {/* Mesero */}
-                    <div className="flex items-center gap-2 bg-[#FBF7F0] rounded-lg px-3 py-2 mb-4">
-                        <User className="w-4 h-4 text-[#C9A96E]" />
-                        <span className="text-sm text-[#2D1B1A]">
-                            <span className="font-medium">Mesero:</span> {mesero || 'No asignado'}
-                        </span>
-                    </div>
-
-                    {/* Productos */}
-                    <div className="space-y-2">
-                        <p className="text-xs font-bold uppercase text-[#8D6B53] tracking-wider">Productos</p>
-                        <div className="border-t border-[#8D6B53]/20 pt-2">
-                            {productos && productos.length > 0 ? (
-                                productos.map((item: any, index: number) => (
-                                    <div key={index} className="flex justify-between py-2 border-b border-[#8D6B53]/10 last:border-0">
-                                        <div>
-                                            <p className="text-sm font-medium text-[#2D1B1A]">
-                                                {item.cantidad}x {item.nombre}
-                                            </p>
-                                            <p className="text-xs text-[#8D6B53]">S/ {item.precio.toFixed(2)} c/u</p>
-                                        </div>
-                                        <p className="text-sm font-bold text-[#C9A96E]">S/ {item.subtotal.toFixed(2)}</p>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-sm text-gray-400 text-center py-4">Sin productos en este pedido</p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Total */}
-                    <div className="mt-4 pt-4 border-t-2 border-dashed border-[#C9A96E]/30">
-                        <div className="flex justify-between items-center">
-                            <span className="text-base font-bold text-[#2D1B1A] uppercase">Total</span>
-                            <span className="text-xl font-bold text-[#C9A96E]">S/ {total.toFixed(2)}</span>
-                        </div>
-                    </div>
-
-                    {/* Estado */}
-                    {pedido.estado && (
-                        <div className="mt-3 flex items-center gap-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${pedido.estado === 'entregado' ? 'bg-green-100 text-green-700' :
-                                pedido.estado === 'cocina' ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-gray-100 text-gray-700'
-                                }`}>
-                                {pedido.estado === 'cocina' ? '👨‍🍳 En cocina' :
-                                    pedido.estado === 'entregado' ? '✅ Entregado' :
-                                        pedido.estado || 'Pendiente'}
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="px-5 py-4 border-t border-gray-200 flex gap-2">
-                    <button
-                        onClick={() => {
-                            window.location.href = `/ventas?mesa=${mesaNumero}`;
-                        }}
-                        className="flex-1 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-medium text-sm transition"
-                    >
-                        ✏️ Editar pedido
-                    </button>
-                    <button
-                        onClick={onClose}
-                        className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition"
-                    >
-                        Cerrar
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-interface Mesa {
+interface Plato {
     id: number;
-    numero: string;
-    capacidad: number;
-    sillas: number;
-    estado: 'libre' | 'pendiente' | 'ocupada' | 'reserva' | 'listo_cobrar';
-    cliente?: string | null;
-    personas?: number | null;
-    mesero?: string | null;
-    pedido_listo?: boolean;
+    nombre: string;
+    stock: number;
+    precio: number;
+    categoria: string;
 }
 
-const toArray = <T,>(value: T[] | { data?: T[] } | Record<string, T> | null | undefined): T[] => {
-    if (Array.isArray(value)) return value;
-    if (value && Array.isArray((value as { data?: T[] }).data)) return (value as { data: T[] }).data;
-    if (value && typeof value === 'object') return Object.values(value as Record<string, T>);
-    return [];
+interface Insumo {
+    id: number;
+    nombre: string;
+    stock: number;
+    precio: number;
+    unidad: string;
+    categoria: string;
+}
+
+interface Merma {
+    id: number;
+    item_id: number;
+    item_type: string;
+    cantidad: number;
+    stock_resultante: number;
+    motivo: string;
+    submotivo: string;
+    observaciones: string | null;
+    user: { name: string };
+    item?: { nombre: string; precio?: number };
+    created_at: string;
+}
+
+interface PaginatedMermas {
+    data: Merma[];
+    links: { url: string | null; label: string; active: boolean }[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+}
+
+interface Stats {
+    total_perdidas: number;
+    total_registros: number;
+    promedio: number;
+    ultima_merma: string | null;
+}
+
+interface ItemFormulario {
+    id: number;
+    tipo: 'producto' | 'insumo';
+    nombre: string;
+    cantidad: number;
+    motivo: string;
+    detalle?: string;
+    stock: number;
+    precio: number;
+    unidad?: string;
+}
+
+const MOTIVOS_PRODUCTO = [
+    { value: 'quemado', label: '🔥 Quemado / mal preparado' },
+    { value: 'sobreproduccion', label: '📈 Sobreproducción' },
+    { value: 'devolucion', label: '🔄 Devolución de cliente' },
+    { value: 'caducado', label: '📅 Caducado en vitrina' },
+    { value: 'otro', label: '📝 Otro' },
+];
+
+const MOTIVOS_INSUMO = [
+    { value: 'caducado', label: '📅 Vencido / caducado' },
+    { value: 'rotura', label: '💔 Derrame o rotura' },
+    { value: 'refrigeracion', label: '❄️ Falla de refrigeración' },
+    { value: 'mala_preparacion', label: '👨‍🍳 Merma de preparación' },
+    { value: 'otro', label: '📝 Otro' },
+];
+
+const getMotivoConfig = (submotivo: string) => {
+    const motivos: Record<string, any> = {
+        'caducado': { bg: 'bg-red-100', text: 'text-red-700', label: 'Caducado', icon: XCircle },
+        'quemado': { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Quemado', icon: AlertTriangle },
+        'sobreproduccion': { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Sobreproducción', icon: TrendingDown },
+        'devolucion': { bg: 'bg-indigo-100', text: 'text-indigo-700', label: 'Devolución', icon: XCircle },
+        'rotura': { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Rotura/Derrame', icon: AlertTriangle },
+        'refrigeracion': { bg: 'bg-cyan-100', text: 'text-cyan-700', label: 'Falla refrigeración', icon: AlertTriangle },
+        'mala_preparacion': { bg: 'bg-pink-100', text: 'text-pink-700', label: 'Merma de prep.', icon: AlertTriangle },
+        'otro': { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Otro', icon: AlertTriangle },
+    };
+    return motivos[submotivo] || { bg: 'bg-gray-100', text: 'text-gray-700', label: submotivo || 'Sin especificar', icon: AlertTriangle };
 };
 
-
-interface FlashProps {
-    success?: string;
-    error?: string;
-    aviso_capacidad?: {
-        mesero_origen_id: number;
-        mesa_destino_id: number;
-        mensaje: string;
+export default function Mermas() {
+    const {
+        platos = [],
+        insumos = [],
+        mermas,
+        stats,
+        filtros: filtrosIniciales = {},
+    } = usePage().props as unknown as {
+        platos: Plato[];
+        insumos: Insumo[];
+        mermas: PaginatedMermas;
+        stats: Stats;
+        filtros: Record<string, string>;
     };
-}
 
+    const [formAbierto, setFormAbierto] = useState(false);
+    const [cargando, setCargando] = useState(false);
 
-// -----------------------------------------------------------------------
-// Config visual por estado (colores + etiqueta)
-// -----------------------------------------------------------------------
-const getEstadoConfig = (estado: string) => {
-    switch (estado) {
-        case 'libre': return { bg: 'bg-green-50', border: 'border-green-400', text: 'text-green-600', chip: 'bg-green-400', label: 'Libre' };
-        case 'pendiente': return { bg: 'bg-yellow-50', border: 'border-yellow-400', text: 'text-yellow-600', chip: 'bg-yellow-400', label: 'Pendiente' };
-        case 'ocupada': return { bg: 'bg-orange-50', border: 'border-orange-400', text: 'text-orange-600', chip: 'bg-orange-400', label: 'Ocupada' };
-        case 'reserva': return { bg: 'bg-blue-50', border: 'border-blue-400', text: 'text-blue-600', chip: 'bg-blue-400', label: 'Reserva' };
-        case 'listo_cobrar': return { bg: 'bg-purple-50', border: 'border-purple-400', text: 'text-purple-600', chip: 'bg-purple-400', label: 'Cobrar' };
-        default: return { bg: 'bg-gray-50', border: 'border-gray-400', text: 'text-gray-600', chip: 'bg-gray-400', label: 'Estado' };
-    }
-};
+    const [tipoMerma, setTipoMerma] = useState<'producto' | 'insumo'>('producto');
+    const [items, setItems] = useState<ItemFormulario[]>([]);
+    const [busquedaItem, setBusquedaItem] = useState('');
+    const [observaciones, setObservaciones] = useState('');
 
-// -----------------------------------------------------------------------
-// Silla arrastrable. id único: chair-{mesaId}-{index}
-// -----------------------------------------------------------------------
-function SillaDraggable({ mesaId, index, colorClass, disabled }: { mesaId: number; index: number; colorClass: string; disabled: boolean }) {
-    const id = `chair-${mesaId}-${index}`;
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-        id,
-        data: { mesaOrigenId: mesaId },
-        disabled,
+    // ===== FILTROS (sincronizados con el backend) =====
+    const [filtros, setFiltros] = useState({
+        busqueda: filtrosIniciales.busqueda || '',
+        motivo: filtrosIniciales.motivo || '',
+        fecha_inicio: filtrosIniciales.fecha_inicio || '',
+        fecha_fin: filtrosIniciales.fecha_fin || '',
     });
 
-    const style = transform
-        ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 }
-        : undefined;
+    const [mermaAEliminar, setMermaAEliminar] = useState<Merma | null>(null);
 
-    return (
-        <button
-            ref={setNodeRef}
-            style={style}
-            {...listeners}
-            {...attributes}
-            disabled={disabled}
-            title={disabled ? 'Solo se pueden mover sillas entre mesas libres' : 'Arrastra para mover esta silla a otra mesa'}
-            className={`touch-none p-1 rounded-md transition
-                ${isDragging ? 'opacity-40 scale-110' : 'opacity-100'}
-                ${disabled ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing hover:scale-110'}
-            `}
-        >
-            <Armchair className={`w-5 h-5 sm:w-4 sm:h-4 ${colorClass}`} />
-        </button>
-    );
-}
-
-// -----------------------------------------------------------------------
-// Layout de sillas alrededor de la mesa (plano tipo "vista de arriba")
-// -----------------------------------------------------------------------
-function PlanoMesa({ mesa, colorClass, disabled }: { mesa: Mesa; colorClass: string; disabled: boolean }) {
-    const total = Math.min(mesa.sillas, 8); // tope visual razonable
-    const arriba = Math.ceil(total / 2);
-    const abajo = total - arriba;
-
-    return (
-        <div className="flex min-h-[104px] flex-col items-center justify-center gap-1">
-            <div className="flex gap-1 justify-center flex-wrap">
-                {Array.from({ length: arriba }).map((_, i) => (
-                    <SillaDraggable key={i} mesaId={mesa.id} index={i} colorClass={colorClass} disabled={disabled} />
-                ))}
-            </div>
-            <div className={`flex h-12 w-16 items-center justify-center rounded-xl border-2 ${getEstadoConfig(mesa.estado).border} ${getEstadoConfig(mesa.estado).bg} shadow-inner`}>
-                <span className={`text-lg font-extrabold ${getEstadoConfig(mesa.estado).text}`}>{mesa.capacidad}</span>
-            </div>
-            <div className="flex gap-1 justify-center flex-wrap">
-                {Array.from({ length: abajo }).map((_, i) => (
-                    <SillaDraggable key={arriba + i} mesaId={mesa.id} index={arriba + i} colorClass={colorClass} disabled={disabled} />
-                ))}
-            </div>
-        </div>
-    );
-}
-
-// -----------------------------------------------------------------------
-// Tarjeta de mesa (también es zona "droppable" para recibir sillas)
-// -----------------------------------------------------------------------
-function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onVerPedido, pedidos, userRole }: {
-    mesa: Mesa;
-    onCambiarEstado: (id: number, estado: string) => void;
-    onTomarPedido: (mesa: Mesa) => void;
-    onAbrirModalCobro: (mesa: Mesa) => void;
-    onVerPedido?: (mesa: Mesa) => void;
-    pedidos: any[];
-    userRole?: string;
-}) {
-    const config = getEstadoConfig(mesa.estado);
-    const { setNodeRef, isOver } = useDroppable({ id: `mesa-${mesa.id}`, data: { mesaId: mesa.id } });
-    const colorSilla =
-        mesa.estado === 'ocupada' ? 'text-orange-500' :
-            mesa.estado === 'pendiente' ? 'text-yellow-500' :
-                mesa.estado === 'reserva' ? 'text-blue-500' :
-                    mesa.estado === 'listo_cobrar' ? 'text-purple-500' :
-                        'text-green-500';
-
-    const dragDisabled = mesa.estado !== 'libre';
-
-    // Verificar si el usuario es Mesero
-    const isMesero = userRole === 'Mesero';
-
-    // Roles que tienen acceso completo (Administración, Gerencia, Caja)
-    const rolesAccesoCompleto = ['Administración', 'Gerencia', 'Caja', 'Administrador', 'Gerente', 'Cajero'];
-    const tieneAccesoCompleto = userRole && rolesAccesoCompleto.includes(userRole);
-
-    // Renderizar los botones principales en una fila
-    const renderButtonsRow = () => {
-        // Para meseros: siempre mostrar los 2 botones
-        if (isMesero) {
-            return (
-                <div className="mt-2 flex gap-2">
-                    {/* Botón Tomar pedido / Ver pedido - más delgado */}
-                    {mesa.estado === 'ocupada' ? (
-                        <button
-                            onClick={() => onVerPedido?.(mesa)}
-                            className="flex-1 flex items-center justify-center rounded-md bg-[#C9A96E] py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#B8975D] active:scale-95 whitespace-nowrap"
-                        >
-                            Ver pedido
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => onTomarPedido(mesa)}
-                            className="flex-1 flex items-center justify-center rounded-md bg-[#C9A96E] py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#B8975D] active:scale-95 whitespace-nowrap"
-                        >
-                            Tomar pedido
-                        </button>
-                    )}
-
-                    {/* Botón Cobrar - solo icono */}
-                    <button
-                        onClick={() => onAbrirModalCobro(mesa)}
-                        className="flex items-center justify-center rounded-lg bg-purple-600 px-3 py-1.5 text-white transition hover:bg-purple-700 active:scale-95"
-                        title="Cobrar"
-                    >
-                        <Receipt className="w-4 h-4" />
-                    </button>
-                </div>
-            );
-        }
-
-        // Para otros roles: mantener el diseño original
-        return (
-            <div className="mt-2">
-                {renderPrimaryAction()}
-            </div>
-        );
-    };
-
-    const renderPrimaryAction = () => {
-        if (mesa.estado === 'listo_cobrar') {
-            return (
-                <button
-                    onClick={() => onAbrirModalCobro(mesa)}
-                    className="mt-2 flex w-full items-center justify-center rounded-lg bg-purple-600 py-1.5 text-[11px] font-semibold text-white transition hover:bg-purple-700"
-                >
-                    Cobrar
-                </button>
-            );
-        }
-
-        if (mesa.estado === 'ocupada') {
-            return (
-                <button
-                    onClick={() => onVerPedido?.(mesa)}
-                    className="mt-2 flex w-full items-center justify-center rounded-lg bg-[#C9A96E] py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#B8975D] active:scale-95"
-                >
-                    Ver pedido
-                </button>
-            );
-        }
-
-        return (
-            <button
-                onClick={() => onTomarPedido(mesa)}
-                className="mt-2 flex w-full items-center justify-center rounded-lg bg-[#C9A96E] py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#B8975D] active:scale-95"
-            >
-                Tomar pedido
-            </button>
-        );
-    };
-
-    // Botones de cambio de estado - SOLO para roles con acceso completo
-    const renderEstadoActions = () => {
-        if (!tieneAccesoCompleto) return null;
-
-        const estadoActions = [
-            { value: 'libre', label: 'Libre', icon: CircleCheck, activeClass: 'bg-green-500 text-white border-green-500', idleClass: 'bg-white/90 text-green-600 border-green-200 hover:bg-green-50' },
-            { value: 'reserva', label: 'Reserva', icon: Calendar, activeClass: 'bg-blue-500 text-white border-blue-500', idleClass: 'bg-white/90 text-blue-600 border-blue-200 hover:bg-blue-50' },
-            { value: 'listo_cobrar', label: 'Cobrar', icon: Receipt, activeClass: 'bg-purple-500 text-white border-purple-500', idleClass: 'bg-white/90 text-purple-600 border-purple-200 hover:bg-purple-50' },
-        ];
-
-        return (
-            <div className="mt-3 grid grid-cols-3 gap-1">
-                {estadoActions.map(({ value, label, icon: Icon, activeClass, idleClass }) => {
-                    const isActive = mesa.estado === value;
-                    return (
-                        <button
-                            key={value}
-                            type="button"
-                            title={label}
-                            aria-label={`Cambiar mesa ${mesa.numero} a ${label}`}
-                            aria-pressed={isActive}
-                            onClick={() => {
-                                if (!isActive) onCambiarEstado(mesa.id, value);
-                            }}
-                            className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${isActive ? activeClass : idleClass}`}
-                        >
-                            <Icon className="h-4 w-4" />
-                        </button>
-                    );
-                })}
-            </div>
-        );
-    };
-
-    return (
-        <div
-            ref={setNodeRef}
-            className={`group relative rounded-xl border-2 ${config.border} ${config.bg} p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${isOver ? 'scale-[1.02] ring-4 ring-[#C9A96E]' : ''}`}
-        >
-            {mesa.pedido_listo && (
-                <div className="absolute -right-2 -top-2 z-10 rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-extrabold text-[#2D1B1A] shadow-lg">
-                    Listo
-                </div>
-            )}
-
-            <div className="mb-2 flex items-center justify-between gap-2">
-                <span className={`min-w-0 truncate rounded-full border bg-white/90 px-2 py-1 text-[11px] font-extrabold text-gray-800 ${config.border}`}>
-                    Mesa #{mesa.numero}
-                </span>
-                <span className={`h-3 w-3 shrink-0 rounded-full ${config.chip}`} />
-            </div>
-
-            <PlanoMesa mesa={mesa} colorClass={colorSilla} disabled={dragDisabled} />
-
-            <div className="mt-2 text-center">
-                <p className={`text-xs font-extrabold uppercase tracking-wide ${config.text}`}>{config.label}</p>
-                {mesa.estado === 'ocupada' && mesa.mesero && (
-                    <p className="mt-0.5 flex items-center justify-center gap-1 truncate text-[11px] font-semibold text-[#5A3D2B]">
-                        <User className="h-3 w-3" /> {mesa.mesero}
-                    </p>
-                )}
-            </div>
-
-            {/* Botones de cambio de estado (solo para roles con acceso completo) */}
-            {renderEstadoActions()}
-
-            {mesa.pedido_listo && (
-                <button
-                    onClick={() => {
-
-                        const pedido = pedidos.find(p => p.mesa_id === mesa.id);
-                        if (!pedido || pedido.estado !== 'listo') {
-                            alert('⚠️ El pedido debe estar en estado "Listo" para entregar.');
-                            return;
-                        }
-
-                        router.post(`/mesas/${mesa.id}/entregar`, {}, {
-                            onSuccess: () => router.reload(),
-                            onError: (errors) => swalError('No se pudo confirmar la entrega', errorsToText(errors)),
-                        });
-                    }}
-                    className="mt-2 flex w-full items-center justify-center rounded-lg bg-orange-400 py-1.5 text-[11px] font-semibold text-white transition hover:bg-orange-500"
-                >
-                    Entregar
-                </button>
-            )}
-
-            {/* Botones principales en fila para meseros, o el botón completo para otros roles */}
-            {renderButtonsRow()}
-        </div>
-    );
-}
-// -----------------------------------------------------------------------
-// Componente principal
-// -----------------------------------------------------------------------
-export default function MesasDistribucion() {
-
-    const { mesas: mesasIniciales, pedidos: pedidosIniciales, flash, auth } = usePage<{
-        mesas?: Mesa[] | { data?: Mesa[] } | Record<string, Mesa>;
-        pedidos?: any[] | { data?: any[] } | Record<string, any>;
-        flash?: FlashProps;
-        auth?: { roles?: string[]; permissions?: string[] };
-    }>().props;
-    const userRole = auth?.roles?.[0];
-    const canManageTables = auth?.permissions?.includes('gestionar mesas') ?? false;
-
-    const [mesas, setMesas] = useState<Mesa[]>(() => toArray<Mesa>(mesasIniciales));
-
-
-
-    const [modalCobroAbierto, setModalCobroAbierto] = useState(false);
-    const [mesaCobro, setMesaCobro] = useState<Mesa | null>(null);
-    const [pedidoCobro, setPedidoCobro] = useState<any | null>(null);
-    const [modalPinAbierto, setModalPinAbierto] = useState(false);
-    const [mesaSeleccionada, setMesaSeleccionada] = useState<Mesa | null>(null);
-
-    const [modalPedidoAbierto, setModalPedidoAbierto] = useState(false);
-    const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any | null>(null);
-    const pedidos = toArray<any>(pedidosIniciales);
-    const [isClient, setIsClient] = useState(false);
-
-
-    const cambiarEstado = (id: number, nuevoEstado: string) => {
-        const mesasAnteriores = mesas;
-
-        setMesas(prev => prev.map(m =>
-            m.id === id ? { ...m, estado: nuevoEstado as Mesa['estado'] } : m
-        ));
-
-        router.patch(`/mesas/${id}`, { estado: nuevoEstado }, {
-            preserveScroll: true,
-            preserveState: true,
-            onError: (errors) => {
-                setMesas(mesasAnteriores); // revertir solo si falla
-                swalError('Error al cambiar estado', errorsToText(errors));
-            },
-        });
-    };
-
-    const abrirModalCobro = (mesa: Mesa) => {
-        const pedidosDeLaMesa = pedidos.filter(p => p.mesa_id === mesa.id);
-        setPedidoCobro(pedidosDeLaMesa);
-        setMesaCobro(mesa);
-        setModalCobroAbierto(true);
-    };
-    const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-        useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
-    );
+    const primerRender = useRef(true);
 
     useEffect(() => {
-        setMesas(toArray<Mesa>(mesasIniciales));
-    }, [mesasIniciales]);
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
-
-    // Tiempo real: el mapa de mesas se actualiza sin recargar la página
-    useSedeChannel('mesas', {
-        'mesa.actualizada': (payload: any) => {
-            setMesas(prev => prev.map(m => (m.id === payload.id ? { ...m, ...payload } : m)));
-        },
-    });
-
-    // Aviso de capacidad excedida (viene del backend vía flash)
-    useEffect(() => {
-        const aviso = flash?.aviso_capacidad;
-        if (!aviso) return;
-        Swal.fire({
-            icon: 'warning',
-            title: 'Capacidad excedida',
-            text: aviso.mensaje,
-            showCancelButton: true,
-            confirmButtonText: 'Agregar silla',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#C9A96E',
-            cancelButtonColor: '#6B7280',
-        }).then((result) => {
-            if (!result.isConfirmed) return;
-            router.patch(`/mesas/${aviso.mesero_origen_id}/transferir-silla/${aviso.mesa_destino_id}`, { forzar: true }, {
-                preserveScroll: true,
-                onSuccess: () => router.reload({ only: ['mesas'] }),
-            });
-        });
+        if (primerRender.current) {
+            primerRender.current = false;
+            return;
+        }
+        const timeout = setTimeout(() => {
+            router.get('/mermas', {
+                busqueda: filtros.busqueda || undefined,
+                motivo: filtros.motivo || undefined,
+                fecha_inicio: filtros.fecha_inicio || undefined,
+                fecha_fin: filtros.fecha_fin || undefined,
+            }, { preserveState: true, preserveScroll: true, replace: true });
+        }, 400);
+        return () => clearTimeout(timeout);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [flash]);
+    }, [filtros.busqueda, filtros.motivo, filtros.fecha_inicio, filtros.fecha_fin]);
 
-
-
-
-    const tomarPedido = (mesa: Mesa) => {
-        setMesaSeleccionada(mesa);
-        setModalPinAbierto(true);
+    const formatCurrency = (amount: any): string => {
+        const num = typeof amount === 'number' ? amount : parseFloat(amount);
+        if (isNaN(num)) return 'S/ 0.00';
+        return `S/ ${num.toFixed(2)}`;
     };
 
-    const confirmarPin = (userId: number) => {
-        if (!mesaSeleccionada) return;
-        const mesa = mesaSeleccionada;
-
-        router.patch(`/mesas/${mesa.id}`, { estado: 'ocupada', user_id: userId }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setMesas(prev => prev.map(m =>
-                    m.id === mesa.id ? { ...m, estado: 'ocupada' } : m
-                ));
-                window.location.href = `/ventas?mesa=${mesa.numero}`;
-            },
-            onError: (errors) => swalError('Error al tomar pedido', errorsToText(errors)),
-        });
-    };
-
-    const verPedido = (mesa: Mesa) => {
-
-        // Buscar el pedido activo de esta mesa
-        const pedido = pedidos.find(p => p.mesa_id === mesa.id);
-        if (pedido) {
-            // Crear un objeto con los datos necesarios incluyendo el número de mesa
-            const pedidoConMesa = {
-                ...pedido,
-                mesa_numero: mesa.numero,
-                mesero: mesa.mesero || 'No asignado'
-            };
-            // Guardar el pedido seleccionado y abrir la tarjeta
-            setPedidoSeleccionado(pedidoConMesa);
-            setModalPedidoAbierto(true);
-        } else {
-            swalError('Sin pedido activo', 'No hay pedido para esta mesa.');
+    const formatDate = (dateString: string) => {
+        try {
+            return new Date(dateString).toLocaleDateString('es-PE');
+        } catch {
+            return dateString;
         }
     };
 
-    const crearMesa = async () => {
-        const result = await Swal.fire({
-            title: 'Nueva mesa',
-            html: `
-                <div class="text-left space-y-3">
-                    <label class="block text-sm font-semibold text-gray-700">
-                        Numero de mesa
-                        <input id="swal-mesa-numero" class="swal2-input !mx-0 !mt-1 !w-full" placeholder="Ej: 12" />
-                    </label>
-                    <label class="block text-sm font-semibold text-gray-700">
-                        Capacidad
-                        <input id="swal-mesa-capacidad" type="number" min="1" class="swal2-input !mx-0 !mt-1 !w-full" placeholder="Personas" />
-                    </label>
-                </div>
-            `,
-            focusConfirm: false,
-            showCancelButton: true,
-            confirmButtonText: 'Crear mesa',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: '#C9A96E',
-            cancelButtonColor: '#6B7280',
-            preConfirm: () => {
-                const numero = (document.getElementById('swal-mesa-numero') as HTMLInputElement | null)?.value.trim();
-                const capacidadValue = (document.getElementById('swal-mesa-capacidad') as HTMLInputElement | null)?.value;
-                const capacidad = Number.parseInt(capacidadValue || '', 10);
+    const itemsDisponibles: (Plato | Insumo)[] = tipoMerma === 'producto' ? platos : insumos;
+    const itemsFiltrados = itemsDisponibles.filter((i) =>
+        i.nombre.toLowerCase().includes(busquedaItem.toLowerCase()) && i.stock > 0
+    );
 
-                if (!numero) {
-                    Swal.showValidationMessage('Ingresa el numero de mesa');
-                    return false;
-                }
-
-                if (!Number.isInteger(capacidad) || capacidad < 1) {
-                    Swal.showValidationMessage('Ingresa una capacidad valida');
-                    return false;
-                }
-
-                return { numero, capacidad };
-            },
-        });
-
-        if (!result.isConfirmed || !result.value) return;
-
-        const { numero, capacidad } = result.value;
-
-        router.post('/mesas', { numero, capacidad, sillas: capacidad }, {
-            onSuccess: () => {
-                swalSuccess('Mesa creada', `Mesa #${numero} registrada correctamente.`);
-                router.reload({ only: ['mesas'] });
-            },
-            onError: (errors) => swalError('Error al crear mesa', errorsToText(errors)),
-        });
-    };
-
-    const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (!over) return;
-
-        const mesaOrigenId = active.data.current?.mesaOrigenId as number | undefined;
-        const mesaDestinoId = over.data.current?.mesaId as number | undefined;
-        if (!mesaOrigenId || !mesaDestinoId || mesaOrigenId === mesaDestinoId) return;
-
-        const origen = mesas.find(m => m.id === mesaOrigenId);
-        const destino = mesas.find(m => m.id === mesaDestinoId);
-        if (!origen || !destino) return;
-
-        if (origen.estado !== 'libre' || destino.estado !== 'libre') {
-            swalError('Movimiento no permitido', 'Solo puedes mover sillas entre mesas libres.');
+    const agregarItem = (item: Plato | Insumo) => {
+        const yaExiste = items.find(i => i.id === item.id && i.tipo === tipoMerma);
+        if (yaExiste) {
+            toast.info(`${item.nombre} ya está en la lista, ajusta la cantidad ahí`);
             return;
         }
-        if (origen.sillas <= 1) {
-            swalError('Movimiento no permitido', 'La mesa debe tener al menos 1 silla.');
-            return;
-        }
+        setItems(prev => [...prev, {
+            id: item.id,
+            tipo: tipoMerma,
+            nombre: item.nombre,
+            cantidad: tipoMerma === 'insumo' ? 0.1 : 1,
+            motivo: '',
+            detalle: '',
+            stock: item.stock,
+            precio: Number(item.precio) || 0,
+            unidad: (item as Insumo).unidad,
+        }]);
+    };
 
-        // Actualización optimista para que se sienta instantáneo en tablet
-        setMesas(prev => prev.map(m => {
-            if (m.id === mesaOrigenId) return { ...m, sillas: m.sillas - 1 };
-            if (m.id === mesaDestinoId) return { ...m, sillas: m.sillas + 1 };
-            return m;
+    const quitarItem = (id: number, tipo: string) => {
+        setItems(prev => prev.filter(i => !(i.id === id && i.tipo === tipo)));
+    };
+
+    const actualizarItem = (id: number, tipo: string, campo: 'cantidad' | 'motivo' | 'detalle', valor: string | number) => {
+        setItems(prev => prev.map(i => {
+            if (i.id !== id || i.tipo !== tipo) return i;
+            if (campo === 'cantidad') {
+                const cant = Number(valor);
+                if (cant > i.stock) {
+                    toast.error(`Stock insuficiente para ${i.nombre} (disponible: ${i.stock})`);
+                    return i;
+                }
+                return { ...i, cantidad: cant };
+            }
+            if (campo === 'detalle') {
+                return { ...i, detalle: String(valor) };
+            }
+            return { ...i, motivo: String(valor) };
         }));
+    };
 
-        router.patch(`/mesas/${mesaOrigenId}/transferir-silla/${mesaDestinoId}`, {}, {
+    const resetFormulario = () => {
+        setItems([]);
+        setObservaciones('');
+        setBusquedaItem('');
+        setTipoMerma('producto');
+    };
+
+    const guardarMermas = () => {
+        if (items.length === 0) {
+            toast.warning('Agrega al menos un producto o insumo');
+            return;
+        }
+        const sinMotivo = items.find(i => !i.motivo);
+        if (sinMotivo) {
+            toast.warning(`Selecciona el motivo para "${sinMotivo.nombre}"`);
+            return;
+        }
+        const sinCantidad = items.find(i => !i.cantidad || i.cantidad <= 0);
+        if (sinCantidad) {
+            toast.warning(`Ingresa una cantidad válida para "${sinCantidad.nombre}"`);
+            return;
+        }
+
+        setCargando(true);
+
+        router.post('/mermas', {
+            items: items.map(i => ({
+                id: i.id,
+                tipo: i.tipo,
+                nombre: i.nombre,
+                cantidad: i.cantidad,
+                motivo: i.motivo,
+                detalle: i.motivo === 'otro' ? (i.detalle || null) : null,
+            })),
+            observaciones: observaciones || null,
+        }, {
             preserveScroll: true,
-            onError: () => {
-                // revertir si falla
-                setMesas(prev => prev.map(m => {
-                    if (m.id === mesaOrigenId) return { ...m, sillas: m.sillas + 1 };
-                    if (m.id === mesaDestinoId) return { ...m, sillas: m.sillas - 1 };
-                    return m;
-                }));
-                swalError('No se pudo mover la silla');
+            onSuccess: () => {
+                setCargando(false);
+                resetFormulario();
+                setFormAbierto(false);
+                toast.success('✅ Mermas registradas correctamente');
             },
-        });
+            onError: (errors) => {
+                setCargando(false);
+                toast.error('Error: ' + Object.values(errors).join(' '));
+            },
+        } as Parameters<typeof router.post>[2]);
+    };
+
+    const confirmarEliminarMerma = () => {
+        if (!mermaAEliminar) return;
+        router.delete(`/mermas/${mermaAEliminar.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('✅ Merma eliminada y stock restaurado');
+                setMermaAEliminar(null);
+            },
+            onError: (errors) => {
+                toast.error('Error: ' + Object.values(errors).join(' '));
+                setMermaAEliminar(null);
+            },
+        } as Parameters<typeof router.delete>[1]);
+    };
+
+    const exportarExcel = () => {
+        const params = new URLSearchParams();
+        if (filtros.busqueda) params.set('busqueda', filtros.busqueda);
+        if (filtros.motivo) params.set('motivo', filtros.motivo);
+        if (filtros.fecha_inicio) params.set('fecha_inicio', filtros.fecha_inicio);
+        if (filtros.fecha_fin) params.set('fecha_fin', filtros.fecha_fin);
+        window.open(`/mermas/export?${params.toString()}`, '_blank');
+    };
+
+    const irAPagina = (url: string | null) => {
+        if (!url) return;
+        router.get(url, {}, { preserveState: true, preserveScroll: true });
     };
 
     return (
         <>
-            <Head title="Distribución de Mesas" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-3 sm:p-4 bg-[#FBF7F0]">
+            <Head title="Mermas - Dolce Cafe" />
+            <div className="flex h-full flex-1 flex-col gap-6 p-6 bg-[#FBF3E7]">
 
-                <div className="flex justify-end gap-3">
-                    <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                        {canManageTables && (
-                            <button
-                                onClick={crearMesa}
-                                className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-4 sm:px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm active:scale-95"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Nueva Mesa
+                {/* HEADER */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-[#2D1B1A] flex items-center gap-3">
+                            <span className="bg-gradient-to-r from-red-500 to-orange-500 p-2 rounded-xl text-white">🗑️</span>
+                            Mermas
+                        </h1>
+                        <p className="text-[#5A3D2B] text-sm mt-1 ml-1">Control de pérdidas: productos terminados e insumos</p>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                        <button
+                            onClick={() => setFormAbierto(!formAbierto)}
+                            className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Nueva merma
+                        </button>
+                        <button
+                            onClick={exportarExcel}
+                            className="inline-flex items-center gap-2 bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm"
+                        >
+                            <Download className="w-4 h-4" />
+                            Exportar
+                        </button>
+                    </div>
+                </div>
+
+                {/* ===== FORMULARIO ===== */}
+                {formAbierto && (
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8]">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-lg font-bold text-[#2D1B1A] flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-red-500" />
+                                Registrar merma
+                            </h2>
+                            <button onClick={() => setFormAbierto(false)} className="text-gray-400 hover:text-red-500">
+                                <X className="w-5 h-5" />
                             </button>
-                        )}
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-2 bg-white/80 rounded-xl border border-[#8D6B53]/20 text-xs">
-                            <span className="flex items-center gap-1 text-gray-700"><span className="w-3 h-3 rounded-full bg-green-400" /> Libre</span>
-                            <span className="flex items-center gap-1 text-gray-700"><span className="w-3 h-3 rounded-full bg-yellow-400" /> Pendiente</span>
-                            <span className="flex items-center gap-1 text-gray-700"><span className="w-3 h-3 rounded-full bg-orange-400" /> Ocupada</span>
-                            <span className="flex items-center gap-1 text-gray-700"><span className="w-3 h-3 rounded-full bg-blue-400" /> Reserva</span>
-                            <span className="flex items-center gap-1 text-gray-700"><span className="w-3 h-3 rounded-full bg-purple-400" /> Cobrar</span>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="text-xs text-gray-500 font-medium block mb-1.5">¿Qué se perdió?</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={() => { setTipoMerma('producto'); setBusquedaItem(''); }}
+                                    className={`py-3 rounded-xl font-semibold text-sm transition border-2 ${tipoMerma === 'producto'
+                                        ? 'bg-[#C9A96E] border-[#C9A96E] text-white'
+                                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-[#C9A96E]/50'
+                                        }`}
+                                >
+                                    🍽️ Producto (plato ya hecho)
+                                </button>
+                                <button
+                                    onClick={() => { setTipoMerma('insumo'); setBusquedaItem(''); }}
+                                    className={`py-3 rounded-xl font-semibold text-sm transition border-2 ${tipoMerma === 'insumo'
+                                        ? 'bg-[#C9A96E] border-[#C9A96E] text-white'
+                                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-[#C9A96E]/50'
+                                        }`}
+                                >
+                                    🥛 Insumo (materia prima)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs text-gray-500 font-medium">
+                                    Buscar {tipoMerma === 'producto' ? 'producto' : 'insumo'} y agregar
+                                </label>
+                                <div className="mt-1 relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder={`Buscar ${tipoMerma === 'producto' ? 'producto' : 'insumo'}...`}
+                                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8D5C4] text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] outline-none bg-white transition"
+                                        value={busquedaItem}
+                                        onChange={(e) => setBusquedaItem(e.target.value)}
+                                    />
+                                </div>
+                                <div className="mt-2 grid grid-cols-2 gap-2 max-h-[260px] overflow-y-auto">
+                                    {itemsFiltrados.length === 0 ? (
+                                        <p className="col-span-2 text-center text-sm text-gray-400 py-6">
+                                            {busquedaItem ? 'Sin resultados' : `No hay ${tipoMerma === 'producto' ? 'productos' : 'insumos'} con stock`}
+                                        </p>
+                                    ) : (
+                                        itemsFiltrados.map((item) => (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => agregarItem(item)}
+                                                className="p-3 text-left rounded-xl border border-[#E8D5C4] hover:border-[#C9A96E] hover:bg-[#FBF7F0] transition"
+                                            >
+                                                <p className="text-sm font-medium text-[#2D1B1A]">{item.nombre}</p>
+                                                <p className="text-xs text-gray-400">
+                                                    Stock: {item.stock}{(item as Insumo).unidad ? ` ${(item as Insumo).unidad}` : ''}
+                                                </p>
+                                                <p className="text-xs text-[#C9A96E] font-semibold">{formatCurrency(item.precio)}</p>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs text-gray-500 font-medium">Productos a mermar ({items.length})</label>
+                                <div className="mt-1 border border-[#E8D5C4] rounded-xl p-3 min-h-[150px] max-h-[300px] overflow-y-auto space-y-3">
+                                    {items.length === 0 ? (
+                                        <p className="text-sm text-gray-400 text-center py-6">No hay productos agregados</p>
+                                    ) : (
+                                        items.map((item) => (
+                                            <div key={`${item.tipo}-${item.id}`} className="p-3 bg-[#FBF7F0] rounded-lg space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-sm font-semibold text-[#2D1B1A]">{item.nombre}</p>
+                                                    <button onClick={() => quitarItem(item.id, item.tipo)} className="text-red-400 hover:text-red-600">
+                                                        <X className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    <label className="text-[10px] text-gray-500 w-16">Cantidad</label>
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={item.stock}
+                                                        step={item.tipo === 'insumo' ? 0.1 : 1}
+                                                        value={item.cantidad}
+                                                        onChange={(e) => actualizarItem(item.id, item.tipo, 'cantidad', e.target.value)}
+                                                        className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-[#2D1B1A] outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                                    />
+                                                    {item.unidad && <span className="text-xs text-gray-400">{item.unidad}</span>}
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    <label className="text-[10px] text-gray-500 w-16">Motivo</label>
+                                                    <select
+                                                        value={item.motivo}
+                                                        onChange={(e) => actualizarItem(item.id, item.tipo, 'motivo', e.target.value)}
+                                                        className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-[#2D1B1A] outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                                    >
+                                                        <option value="">Seleccionar...</option>
+                                                        {(item.tipo === 'producto' ? MOTIVOS_PRODUCTO : MOTIVOS_INSUMO).map(m => (
+                                                            <option key={m.value} value={m.value}>{m.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                {item.motivo === 'otro' && (
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-[10px] text-gray-500 w-16">Detalle</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Especifica el motivo..."
+                                                            value={item.detalle || ''}
+                                                            onChange={(e) => actualizarItem(item.id, item.tipo, 'detalle', e.target.value)}
+                                                            className="flex-1 px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-[#2D1B1A] outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                <div className="mt-3">
+                                    <label className="text-xs text-gray-500 font-medium">Observaciones generales (opcional)</label>
+                                    <textarea
+                                        className="mt-1 w-full border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] outline-none bg-white transition resize-none"
+                                        rows={2}
+                                        value={observaciones}
+                                        onChange={(e) => setObservaciones(e.target.value)}
+                                        placeholder="Ej: se cayó el bidón en el almacén, contexto adicional..."
+                                    />
+                                </div>
+
+                                <button
+                                    onClick={guardarMermas}
+                                    disabled={cargando || items.length === 0}
+                                    className={`mt-3 w-full py-2.5 rounded-xl font-semibold transition flex items-center justify-center gap-2 ${cargando || items.length === 0
+                                        ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                        : 'bg-red-600 hover:bg-red-700 text-white'
+                                        }`}
+                                >
+                                    {cargando ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            Guardando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="w-4 h-4" />
+                                            Registrar Mermas
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ESTADÍSTICAS (vienen del backend, sobre TODOS los registros filtrados) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8]">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-[#5A3D2B] font-medium">Pérdidas totales</p>
+                                <p className="text-3xl font-bold text-red-600 mt-1">{formatCurrency(stats.total_perdidas)}</p>
+                            </div>
+                            <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                                <DollarSign className="w-6 h-6 text-red-600" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8]">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-[#5A3D2B] font-medium">Registros</p>
+                                <p className="text-3xl font-bold text-[#2D1B1A] mt-1">{stats.total_registros}</p>
+                            </div>
+                            <div className="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
+                                <Package className="w-6 h-6 text-orange-600" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8]">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-[#5A3D2B] font-medium">Última merma</p>
+                                <p className="text-lg font-bold text-blue-600 mt-1 truncate">
+                                    {stats.ultima_merma || '-'}
+                                </p>
+                            </div>
+                            <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                                <Clock className="w-6 h-6 text-blue-600" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#F3E1C8]">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-[#5A3D2B] font-medium">Promedio por registro</p>
+                                <p className="text-3xl font-bold text-[#2D1B1A] mt-1">{formatCurrency(stats.promedio)}</p>
+                            </div>
+                            <div className="w-12 h-12 rounded-xl bg-[#C9A96E]/10 flex items-center justify-center">
+                                <TrendingDown className="w-6 h-6 text-[#C9A96E]" />
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 👇 PLANO DE MESAS - SIN BARRA LATERAL */}
-                <div className="w-full">
-                    <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-sm font-semibold text-[#5A3D2B]">Distribucion de mesas - tiempo real</h2>
-                        <span className="text-xs text-[#8D6B53]">
-                            {mesas.filter(m => m.estado === 'ocupada').length} ocupadas / {mesas.length} total
-                        </span>
+                {/* FILTROS */}
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#F3E1C8]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Buscar producto..."
+                                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E8D5C4] text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] outline-none bg-white transition"
+                                value={filtros.busqueda}
+                                onChange={(e) => setFiltros({ ...filtros, busqueda: e.target.value })}
+                            />
+                        </div>
+                        <select
+                            className="border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] outline-none bg-white transition"
+                            value={filtros.motivo}
+                            onChange={(e) => setFiltros({ ...filtros, motivo: e.target.value })}
+                        >
+                            <option value="">Todos los motivos</option>
+                            {[...MOTIVOS_PRODUCTO, ...MOTIVOS_INSUMO]
+                                .filter((m, i, arr) => arr.findIndex(x => x.value === m.value) === i)
+                                .map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                        </select>
+                        <input
+                            type="date"
+                            className="border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] outline-none bg-white transition"
+                            value={filtros.fecha_inicio}
+                            onChange={(e) => setFiltros({ ...filtros, fecha_inicio: e.target.value })}
+                        />
+                        <input
+                            type="date"
+                            className="border border-[#E8D5C4] rounded-xl p-2.5 text-sm text-[#2D1B1A] focus:ring-2 focus:ring-[#C9A96E] outline-none bg-white transition"
+                            value={filtros.fecha_fin}
+                            onChange={(e) => setFiltros({ ...filtros, fecha_fin: e.target.value })}
+                        />
+                        <button
+                            onClick={() => setFiltros({ busqueda: '', motivo: '', fecha_inicio: '', fecha_fin: '' })}
+                            className="bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white rounded-xl text-sm font-semibold transition py-2.5"
+                        >
+                            Limpiar filtros
+                        </button>
+                    </div>
+                </div>
+
+                {/* TABLA */}
+                <div className="bg-white rounded-2xl shadow-sm border border-[#F3E1C8] overflow-hidden">
+                    <div className="flex justify-between items-center p-5 border-b border-[#F3E1C8]">
+                        <h2 className="text-xl font-bold text-[#2D1B1A] flex items-center gap-2">
+                            <Package className="w-5 h-5 text-red-500" />
+                            Registro de mermas
+                        </h2>
+                        <div className="flex items-center gap-4 text-sm">
+                            <span className="text-[#5A3D2B]">Total pérdidas:</span>
+                            <span className="font-bold text-red-600">{formatCurrency(stats.total_perdidas)}</span>
+                            <span className="text-[#5A3D2B]">| {stats.total_registros} registros</span>
+                        </div>
                     </div>
 
-                    {isClient && (
-                        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-                            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-                                {mesas.map((mesa) => (
-                                    <MesaCard
-                                        key={mesa.id}
-                                        mesa={mesa}
-                                        onCambiarEstado={cambiarEstado}
-                                        onTomarPedido={tomarPedido}
-                                        onAbrirModalCobro={abrirModalCobro}
-                                        onVerPedido={verPedido}
-                                        pedidos={pedidos}
-                                        userRole={userRole}
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="bg-[#FBF7F0] border-b-2 border-[#F3E1C8]">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase">Fecha</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase">Tipo</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase">Producto</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase">Cantidad</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase">Motivo</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase">Costo</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase">Responsable</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-[#5A3D2B] uppercase">Obs.</th>
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-[#5A3D2B] uppercase">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#FBF3E7]">
+                                {mermas.data.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={9} className="text-center text-gray-400 py-12">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Package className="w-10 h-10 text-gray-300" />
+                                                <span>No hay mermas registradas</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    mermas.data.map((m) => {
+                                        const motivoConfig = getMotivoConfig(m.submotivo);
+                                        const MotivoIcon = motivoConfig.icon;
+                                        return (
+                                            <tr key={m.id} className="hover:bg-[#FBF7F0] transition">
+                                                <td className="px-4 py-3 text-sm text-[#5A3D2B]">{formatDate(m.created_at)}</td>
+                                                <td className="px-4 py-3 text-sm">
+                                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                                        {m.item_type === 'plato' ? '🍽️ Producto' : '🥛 Insumo'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm font-medium text-[#2D1B1A]">{m.item?.nombre || '-'}</td>
+                                                <td className="px-4 py-3 text-sm font-semibold text-red-600">{m.cantidad}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${motivoConfig.bg} ${motivoConfig.text}`}>
+                                                        <MotivoIcon className="w-3 h-3" />
+                                                        {motivoConfig.label}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm font-semibold text-red-600">
+                                                    {formatCurrency(m.cantidad * (m.item?.precio || 0))}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-[#5A3D2B]">{m.user?.name || '-'}</td>
+                                                <td className="px-4 py-3 text-sm text-[#5A3D2B] max-w-[160px] truncate" title={m.observaciones || ''}>
+                                                    {m.observaciones || '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <button
+                                                        onClick={() => setMermaAEliminar(m)}
+                                                        className="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1 mx-auto"
+                                                    >
+                                                        <Trash2 className="w-3 h-3" /> Eliminar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {mermas.last_page > 1 && (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-4 border-t border-[#F3E1C8]">
+                            <p className="text-sm text-[#5A3D2B]">
+                                Mostrando {mermas.from}-{mermas.to} de {mermas.total} registros
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                                {mermas.links.map((link, idx) => (
+                                    <button
+                                        key={idx}
+                                        disabled={!link.url}
+                                        onClick={() => irAPagina(link.url)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${link.active
+                                            ? 'bg-[#C9A96E] text-white'
+                                            : link.url
+                                                ? 'bg-white border border-[#E8D5C4] text-[#5A3D2B] hover:bg-[#FBF7F0]'
+                                                : 'text-gray-300 cursor-not-allowed'
+                                            }`}
+                                        dangerouslySetInnerHTML={{ __html: link.label }}
                                     />
                                 ))}
                             </div>
-                        </DndContext>
+                        </div>
                     )}
                 </div>
-
-                {/* TARJETA DE PEDIDO */}
-                {modalPedidoAbierto && pedidoSeleccionado && (
-                    <div className="mt-4">
-                        <TarjetaPedido
-                            pedido={pedidoSeleccionado}
-                            mesaNumero={pedidoSeleccionado.mesa_numero}
-                            mesero={pedidoSeleccionado.mesero || 'No asignado'}
-                            onClose={() => {
-                                setModalPedidoAbierto(false);
-                                setPedidoSeleccionado(null);
-                            }}
-                        />
-                    </div>
-                )}
-
-                {/* MODALES */}
-                <ModalPin
-                    isOpen={modalPinAbierto}
-                    mesa={mesaSeleccionada}
-                    onClose={() => {
-                        setModalPinAbierto(false);
-                        setMesaSeleccionada(null);
-                    }}
-                    onConfirm={confirmarPin}
-                />
-                <ModalCobro
-                    isOpen={modalCobroAbierto}
-                    mesa={mesaCobro}
-                    pedido={pedidoCobro}
-                    onClose={() => setModalCobroAbierto(false)}
-                    onSuccess={() => {
-                        setModalCobroAbierto(false);
-                        router.reload({ only: ['mesas', 'pedidos'], preserveUrl: true });
-                    }}
-                />
             </div>
+
+            {/* ===== MODAL: Confirmar eliminación ===== */}
+            {mermaAEliminar && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center">
+                        <div className="w-14 h-14 mx-auto rounded-full bg-red-100 flex items-center justify-center mb-3">
+                            <Trash2 className="w-6 h-6 text-red-600" />
+                        </div>
+                        <h3 className="text-lg font-bold text-[#2D1B1A]">¿Eliminar este registro?</h3>
+                        <p className="text-sm text-[#5A3D2B] mt-1">
+                            Se eliminará la merma de <strong>{mermaAEliminar.item?.nombre || 'este ítem'}</strong> y el stock
+                            ({mermaAEliminar.cantidad}) se restaurará automáticamente.
+                        </p>
+                        <div className="flex gap-3 mt-5">
+                            <button
+                                onClick={() => setMermaAEliminar(null)}
+                                className="flex-1 px-4 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-100 font-semibold text-sm transition"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmarEliminarMerma}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition"
+                            >
+                                Sí, eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }
-
-MesasDistribucion.layout = {
-    breadcrumbs: [
-        {
-            title: 'Mesas',
-            href: '/mesas',
-        },
-    ],
-};

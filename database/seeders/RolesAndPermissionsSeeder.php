@@ -129,6 +129,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'alertar falta insumos',
             'ver produccion',
             'ver cocina',
+            'ver insumos',
         ]);
 
         $roleBar = Role::firstOrCreate([
@@ -142,6 +143,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'alertar falta insumos',
             'ver produccion',
             'ver bar',
+            'ver insumos',
         ]);
 
         $roleSupervisor = Role::firstOrCreate([

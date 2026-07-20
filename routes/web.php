@@ -89,7 +89,9 @@ Route::middleware(['auth'])->group(function () {
     //  INVENTARIO
     // ----------------------------
     Route::get('/cardex', [CardexController::class, 'index'])->name('cardex.index');
+    Route::get('/mermas/export', [MermaController::class, 'export'])->name('mermas.export');
     Route::get('/mermas', [MermaController::class, 'index'])->name('mermas.index');
+    Route::delete('/mermas/{id}', [MermaController::class, 'destroy'])->name('mermas.destroy');
     Route::post('/mermas', [MermaController::class, 'store'])->middleware('cash.session')->name('mermas.store');
     Route::resource('insumos', InsumoController::class)
         ->only(['index', 'store', 'update', 'destroy'])
@@ -97,6 +99,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/mi-inventario', [InsumoController::class, 'operativo'])
         ->middleware('can:ver produccion')
         ->name('insumos.operativo');
+    Route::get('/insumos/export', [InsumoController::class, 'export'])->name('insumos.export');
     Route::post('/insumos/{insumo}/comprar', [InsumoController::class, 'comprar'])->middleware('cash.session')->name('insumos.comprar');
     Route::post('/insumos/{insumo}/mermar', [InsumoController::class, 'mermar'])->middleware('cash.session')->name('insumos.mermar');
     Route::get('/produccion', [PedidoController::class, 'produccion'])->middleware('can:ver produccion')->name('produccion');
@@ -116,10 +119,6 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/delivery/{delivery}/cocina', [DeliveryController::class, 'cocina'])->middleware('cash.session')->name('delivery.cocina');
     Route::patch('/delivery/{delivery}/listo', [DeliveryController::class, 'listoParaEntregar'])->middleware('cash.session')->name('delivery.listo');
     Route::patch('/delivery/{delivery}/en-ruta', [DeliveryController::class, 'enRuta'])->middleware('cash.session')->name('delivery.en-ruta');
-
-    // ----------------------------
-    //  CONFIGURACIÓN
-    // ----------------------------
 
     // ----------------------------
     // API/RECURSOS (Controladores)

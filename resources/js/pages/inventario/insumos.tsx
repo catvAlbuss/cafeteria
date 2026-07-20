@@ -1,6 +1,7 @@
 import { Head, usePage, router } from '@inertiajs/react';
-import { useState } from 'react';
+
 import ModalInsumo from '@/components/modals/ModalInsumo';
+import { useState, useMemo } from 'react'; 
 import {
     Package,
     Plus,
@@ -69,8 +70,23 @@ const categoriaColores: Record<string, string> = {
 };
 
 export default function Insumos() {
-    const { insumos } = usePage().props as any;
+    const { insumos, userRole } = usePage().props as any; // 
     const [insumosData, setInsumosData] = useState<Insumo[]>(insumos || []);
+
+  
+    const CATEGORIAS_COCINA = ['Panadería', 'Frutas', 'Huevos', 'Dulces', 'Especias', 'Frutas Secas'];
+    const CATEGORIAS_BAR = ['Cafetería', 'Lácteos', 'Bebidas'];
+
+    
+    const insumosFiltradosPorRol = useMemo(() => {
+        if (userRole === 'Cocinero') {
+            return insumosData.filter(i => CATEGORIAS_COCINA.includes(i.categoria));
+        }
+        if (userRole === 'Bar') {
+            return insumosData.filter(i => CATEGORIAS_BAR.includes(i.categoria));
+        }
+        return insumosData; 
+    }, [insumosData, userRole]);
     const [busqueda, setBusqueda] = useState('');
     const [filtroCategoria, setFiltroCategoria] = useState('');
     const [modalAbierto, setModalAbierto] = useState(false);
@@ -118,14 +134,14 @@ export default function Insumos() {
         return categoriaColores[categoria] || 'bg-gray-100 text-gray-700 border-gray-200';
     };
 
-    const insumosFiltrados = insumosData.filter(i => {
-        const busquedaOk = !busqueda ||
-            i.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-            i.categoria.toLowerCase().includes(busqueda.toLowerCase()) ||
-            i.proveedor.toLowerCase().includes(busqueda.toLowerCase());
-        const categoriaOk = !filtroCategoria || i.categoria === filtroCategoria;
-        return busquedaOk && categoriaOk;
-    });
+const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
+    const busquedaOk = !busqueda ||
+        i.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        i.categoria.toLowerCase().includes(busqueda.toLowerCase()) ||
+        i.proveedor.toLowerCase().includes(busqueda.toLowerCase());
+    const categoriaOk = !filtroCategoria || i.categoria === filtroCategoria;
+    return busquedaOk && categoriaOk;
+});
 
     const abrirCompra = (insumo: Insumo) => {
         setInsumoSeleccionado(insumo);
@@ -587,3 +603,11 @@ export default function Insumos() {
 
     );
 }
+Insumos.layout = {
+    breadcrumbs: [
+        {
+            title: 'Insumos',
+            href: '/insumos',
+        },
+    ],
+};
