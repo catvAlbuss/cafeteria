@@ -27,7 +27,7 @@ class EnsureReliableInertiaResponses
             $response->headers->set('Cache-Control', 'private, no-cache, no-store, must-revalidate');
             $response->headers->set('Pragma', 'no-cache');
             $response->headers->set('Expires', '0');
-            $response->headers->set('Vary', 'X-Inertia', false);
+            $response->headers->set('Vary', 'X-Inertia, Accept-Encoding');
         }
 
         return $response;

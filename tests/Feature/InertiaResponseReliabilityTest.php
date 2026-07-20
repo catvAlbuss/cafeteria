@@ -14,7 +14,7 @@ test('a direct page visit returns private non-cacheable html', function () {
     $response->assertOk()
         ->assertHeader('Content-Type', 'text/html; charset=UTF-8')
         ->assertHeader('Cache-Control', 'must-revalidate, no-cache, no-store, private')
-        ->assertHeader('Vary', 'X-Inertia');
+        ->assertHeader('Vary', 'X-Inertia, Accept-Encoding');
 });
 
 test('a document navigation cannot receive raw inertia json', function () {
@@ -45,4 +45,19 @@ test('a genuine inertia request still receives json', function () {
         ->assertHeader('X-Inertia', 'true')
         ->assertHeader('Content-Type', 'application/json')
         ->assertJsonPath('component', 'welcome');
+});
+
+test('an asset version mismatch is not cached', function () {
+    $response = $this->withHeaders([
+        'X-Inertia' => 'true',
+        'X-Requested-With' => 'XMLHttpRequest',
+        'X-Inertia-Version' => 'stale-version',
+        'Sec-Fetch-Mode' => 'cors',
+        'Sec-Fetch-Dest' => 'empty',
+    ])->get('/inertia-reliability-test');
+
+    $response->assertConflict()
+        ->assertHeader('X-Inertia-Location', url('/inertia-reliability-test'))
+        ->assertHeader('Cache-Control', 'must-revalidate, no-cache, no-store, private')
+        ->assertHeader('Vary', 'X-Inertia, Accept-Encoding');
 });
