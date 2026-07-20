@@ -51,7 +51,7 @@ Route::middleware(['auth'])->group(function () {
     //  Solo esta ruta para el contador (con el controlador)
     Route::get('/contador', [ContadorController::class, 'index'])->middleware('can:manage-cash-session')->name('contador.index');
     Route::post('/contador/abrir', [ContadorController::class, 'abrir'])->middleware(['can:manage-cash-session', 'operating.hours'])->name('contador.abrir');
-
+    Route::get('/contador/export', [ContadorController::class, 'export'])->name('contador.export');
     Route::post('/contador/cerrar/{id}', [ContadorController::class, 'cerrar'])->middleware('can:manage-cash-session')->name('contador.cerrar');
     Route::post('/contador/movimientos', [MovimientoCajaController::class, 'store'])->middleware('cash.session')->name('contador.movimientos.store');
     Route::delete('/contador/{id}', [ContadorController::class, 'destroy'])->name('contador.destroy');
