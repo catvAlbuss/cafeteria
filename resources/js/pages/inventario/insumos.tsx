@@ -1,7 +1,7 @@
 import { Head, usePage, router } from '@inertiajs/react';
 
 import ModalInsumo from '@/components/modals/ModalInsumo';
-import { useState, useMemo } from 'react'; 
+import { useState, useMemo } from 'react';
 import {
     Package,
     Plus,
@@ -73,11 +73,11 @@ export default function Insumos() {
     const { insumos, userRole } = usePage().props as any; // 
     const [insumosData, setInsumosData] = useState<Insumo[]>(insumos || []);
 
-  
+
     const CATEGORIAS_COCINA = ['Panadería', 'Frutas', 'Huevos', 'Dulces', 'Especias', 'Frutas Secas'];
     const CATEGORIAS_BAR = ['Cafetería', 'Lácteos', 'Bebidas'];
 
-    
+
     const insumosFiltradosPorRol = useMemo(() => {
         if (userRole === 'Cocinero') {
             return insumosData.filter(i => CATEGORIAS_COCINA.includes(i.categoria));
@@ -85,7 +85,7 @@ export default function Insumos() {
         if (userRole === 'Bar') {
             return insumosData.filter(i => CATEGORIAS_BAR.includes(i.categoria));
         }
-        return insumosData; 
+        return insumosData;
     }, [insumosData, userRole]);
     const [busqueda, setBusqueda] = useState('');
     const [filtroCategoria, setFiltroCategoria] = useState('');
@@ -107,6 +107,8 @@ export default function Insumos() {
 
     const [formCompra, setFormCompra] = useState({ cantidad: 0, observaciones: '' });
     const [formMerma, setFormMerma] = useState({ cantidad: 0, observaciones: '' });
+    const [motivoMerma, setMotivoMerma] = useState('');
+    const [cargandoMerma, setCargandoMerma] = useState(false);
 
     const totalInsumos = insumosData.length;
     const totalStock = insumosData.reduce((sum, i) => sum + i.stock, 0);
@@ -134,14 +136,14 @@ export default function Insumos() {
         return categoriaColores[categoria] || 'bg-gray-100 text-gray-700 border-gray-200';
     };
 
-const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
-    const busquedaOk = !busqueda ||
-        i.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-        i.categoria.toLowerCase().includes(busqueda.toLowerCase()) ||
-        i.proveedor.toLowerCase().includes(busqueda.toLowerCase());
-    const categoriaOk = !filtroCategoria || i.categoria === filtroCategoria;
-    return busquedaOk && categoriaOk;
-});
+    const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
+        const busquedaOk = !busqueda ||
+            i.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+            i.categoria.toLowerCase().includes(busqueda.toLowerCase()) ||
+            i.proveedor.toLowerCase().includes(busqueda.toLowerCase());
+        const categoriaOk = !filtroCategoria || i.categoria === filtroCategoria;
+        return busquedaOk && categoriaOk;
+    });
 
     const abrirCompra = (insumo: Insumo) => {
         setInsumoSeleccionado(insumo);
@@ -211,16 +213,37 @@ const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
             return;
         }
 
-        router.post(`/insumos/${insumoSeleccionado.id}/mermar`, formMerma, {
+        if (!motivoMerma) {
+            toast.warning('Selecciona un motivo para la merma');
+            return;
+        }
+
+        setCargandoMerma(true);
+
+        router.post('/mermas', {
+            items: [{
+                id: insumoSeleccionado.id,
+                tipo: 'insumo',
+                nombre: insumoSeleccionado.nombre,
+                cantidad: formMerma.cantidad,
+                motivo: motivoMerma,
+            }],
+            observaciones: formMerma.observaciones || null,
+        }, {
+            preserveScroll: true,
             onSuccess: () => {
                 setModalMermaAbierto(false);
-                toast.success('✅ Merma registrada');
+                setFormMerma({ cantidad: 0, observaciones: '' });
+                setMotivoMerma('');
+                setCargandoMerma(false);
+                toast.success('✅ Merma registrada correctamente');
                 router.reload();
             },
             onError: (errors) => {
+                setCargandoMerma(false);
                 toast.error('Error: ' + Object.values(errors).join(' '));
-            }
-        });
+            },
+        } as Parameters<typeof router.post>[2]);
     };
 
     return (
@@ -458,9 +481,7 @@ const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
                     });
                 }}
             />
-            {/* ============================================================ */}
-            {/* MODAL: Registrar Compra */}
-            {/* ============================================================ */}
+            {/* ===== MODAL: Registrar Compra ===== */}
             {modalCompraAbierto && insumoSeleccionado && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md">
@@ -486,6 +507,9 @@ const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
                                     Stock actual: <span className="font-bold text-[#C9A96E]">{insumoSeleccionado.stock} {insumoSeleccionado.unidad}</span>
                                 </label>
                             </div>
+
+                            {/* ❌ ELIMINA el selector de motivo de aquí */}
+
                             <div>
                                 <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Cantidad a comprar *</label>
                                 <input
@@ -497,6 +521,7 @@ const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
                                     placeholder="0.00"
                                 />
                             </div>
+
                             <div>
                                 <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Observaciones</label>
                                 <textarea
@@ -529,7 +554,7 @@ const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
             )}
 
             {/* ============================================================ */}
-            {/* MODAL: Registrar Merma */}
+            {/* MODAL: Registrar Merma - CORRECTO */}
             {/* ============================================================ */}
             {modalMermaAbierto && insumoSeleccionado && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -543,7 +568,11 @@ const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
                                 <p className="text-xs text-[#5A3D2B]">{insumoSeleccionado.nombre}</p>
                             </div>
                             <button
-                                onClick={() => setModalMermaAbierto(false)}
+                                onClick={() => {
+                                    setModalMermaAbierto(false);
+                                    setFormMerma({ cantidad: 0, observaciones: '' });
+                                    setMotivoMerma('');
+                                }}
                                 className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 transition text-gray-400 hover:text-gray-600"
                             >
                                 <X className="w-5 h-5" />
@@ -551,11 +580,33 @@ const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
                         </div>
 
                         <div className="p-6 space-y-4">
+                            {/* Stock actual */}
                             <div>
                                 <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
                                     Stock actual: <span className="font-bold text-[#C9A96E]">{insumoSeleccionado.stock} {insumoSeleccionado.unidad}</span>
                                 </label>
                             </div>
+
+                            {/* ✅ Selector de motivo - AQUÍ DEBE ESTAR */}
+                            <div>
+                                <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
+                                    Motivo de la merma *
+                                </label>
+                                <select
+                                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                    value={motivoMerma}
+                                    onChange={(e) => setMotivoMerma(e.target.value)}
+                                >
+                                    <option value="">Seleccionar motivo...</option>
+                                    <option value="caducado">📅 Vencido / caducado</option>
+                                    <option value="rotura">💔 Derrame o rotura</option>
+                                    <option value="refrigeracion">❄️ Falla de refrigeración</option>
+                                    <option value="mala_preparacion">👨‍🍳 Merma de preparación</option>
+                                    <option value="otro">📝 Otro</option>
+                                </select>
+                            </div>
+
+                            {/* Cantidad */}
                             <div>
                                 <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Cantidad a mermar *</label>
                                 <input
@@ -568,6 +619,8 @@ const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
                                     max={insumoSeleccionado.stock}
                                 />
                             </div>
+
+                            {/* Observaciones */}
                             <div>
                                 <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Observaciones</label>
                                 <textarea
@@ -575,24 +628,41 @@ const insumosFiltrados = insumosFiltradosPorRol.filter(i => {
                                     rows={2}
                                     value={formMerma.observaciones}
                                     onChange={(e) => setFormMerma({ ...formMerma, observaciones: e.target.value })}
-                                    placeholder="Motivo de la pérdida..."
+                                    placeholder="Notas adicionales sobre la merma..."
                                 />
                             </div>
                         </div>
 
                         <div className="border-t border-[#F3E1C8] p-6 flex justify-end gap-3">
                             <button
-                                onClick={() => setModalMermaAbierto(false)}
+                                onClick={() => {
+                                    setModalMermaAbierto(false);
+                                    setFormMerma({ cantidad: 0, observaciones: '' });
+                                    setMotivoMerma('');
+                                }}
                                 className="px-6 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-100 font-semibold text-sm transition"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={registrarMerma}
-                                className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition flex items-center gap-2 shadow-md hover:shadow-lg active:scale-95"
+                                disabled={cargandoMerma || formMerma.cantidad <= 0 || !motivoMerma}
+                                className={`px-6 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2 shadow-md hover:shadow-lg active:scale-95 ${cargandoMerma || formMerma.cantidad <= 0 || !motivoMerma
+                                    ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                    : 'bg-red-600 hover:bg-red-700 text-white'
+                                    }`}
                             >
-                                <Check className="w-4 h-4" />
-                                Registrar Merma
+                                {cargandoMerma ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Registrando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="w-4 h-4" />
+                                        Registrar Merma
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>

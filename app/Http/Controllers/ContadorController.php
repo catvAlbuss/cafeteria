@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Events\CajaActualizada;
+use App\Exports\ContadorExport;
+use App\Exports\HistorialSheetExport;
+use App\Exports\IngresosSheetExport;
+use App\Exports\MovimientosSheetExport;
 use App\Models\Caja;
 use App\Models\Team;
 use Illuminate\Http\RedirectResponse;
@@ -12,6 +16,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ContadorController extends Controller
 {
@@ -33,6 +38,9 @@ class ContadorController extends Controller
             'resumen' => [
                 'ingresos' => $resumenCaja['ventas_totales'],
                 'cajaActual' => $resumenCaja['efectivo_esperado'],
+                'ventas_efectivo' => $resumenCaja['ventas_efectivo'],
+                'ventas_tarjeta' => $resumenCaja['ventas_tarjeta'],
+                'ventas_yape' => $resumenCaja['ventas_yape'],
                 ...$resumenCaja,
             ],
             'movimientos' => $cajaActual?->movimientos->map(fn ($movimiento) => [
@@ -161,6 +169,81 @@ class ContadorController extends Controller
         $caja->delete();
 
         return back()->with('success', 'Registro eliminado correctamente.');
+    }
+
+    /**
+     * Exportar reporte de contador
+     */
+    public function export(Request $request)
+    {
+        Gate::authorize('manage-cash-session');
+
+        $teamId = (int) $request->user()->current_team_id;
+
+        // Obtener datos según filtros
+        $query = Caja::query()->with('empleadoUser')
+            ->where('team_id', $teamId);
+
+        if ($request->estado) {
+            $query->where('estado', $request->estado);
+        }
+
+        if ($request->fecha_inicio) {
+            $query->whereDate('fecha_apertura', '>=', $request->fecha_inicio);
+        }
+
+        if ($request->fecha_fin) {
+            $query->whereDate('fecha_apertura', '<=', $request->fecha_fin);
+        }
+
+        if ($request->empleado) {
+            $query->whereHas('empleadoUser', function ($q) use ($request) {
+                $q->where('name', 'LIKE', '%' . $request->empleado . '%');
+            });
+        }
+
+        // Obtener caja actual para movimientos
+        $cajaActual = Caja::query()->with('movimientos.user')
+            ->where('team_id', $teamId)
+            ->where('estado', 'Abierta')
+            ->first();
+
+        // Preparar datos de ingresos
+        $ingresos = collect([
+            ['concepto' => 'Ventas Efectivo', 'monto' => (float) ($request->ingresos_efectivo ?? 0)],
+            ['concepto' => 'Ventas Tarjeta', 'monto' => (float) ($request->ingresos_tarjeta ?? 0)],
+            ['concepto' => 'Ventas Yape', 'monto' => (float) ($request->ingresos_yape ?? 0)],
+            ['concepto' => 'Total Ingresos', 'monto' => (float) ($request->ingresos_total ?? 0)],
+        ]);
+
+        $historial = $query->get();
+        $movimientos = $cajaActual?->movimientos->map(fn ($movimiento) => [
+            'id' => $movimiento->id,
+            'tipo' => $movimiento->tipo,
+            'descripcion' => $movimiento->concepto,
+            'monto' => (float) $movimiento->monto,
+            'cliente' => $movimiento->user?->name,
+            'hora' => $movimiento->created_at->format('h:i A'),
+        ])->values() ?? collect();
+
+        // Exportar hoja específica si se solicita
+        if ($request->hoja === 'ingresos') {
+            return Excel::download(new IngresosSheetExport($ingresos), 'ingresos_dia_' . now()->format('Y-m-d') . '.xlsx');
+        }
+
+        if ($request->hoja === 'historial') {
+            return Excel::download(new HistorialSheetExport($historial), 'historial_caja_' . now()->format('Y-m-d') . '.xlsx');
+        }
+
+        if ($request->hoja === 'movimientos') {
+            return Excel::download(new MovimientosSheetExport($movimientos), 'movimientos_' . now()->format('Y-m-d') . '.xlsx');
+        }
+
+        // Exportar todo
+        return Excel::download(
+            new ContadorExport($ingresos, $historial, $movimientos),
+            'reporte_contador_' . now()->format('Y-m-d') . '.xlsx'
+        );
     }
 
     /** @return array<string, float> */

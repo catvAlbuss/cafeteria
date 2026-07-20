@@ -67,6 +67,7 @@ export default function Contador() {
     const [filtroEmpleado, setFiltroEmpleado] = useState('');
     const [fechaInicio, setFechaInicio] = useState('');
     const [fechaFin, setFechaFin] = useState('');
+    const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
     useEffect(() => {
         setRegistros(cajas);
@@ -84,6 +85,7 @@ export default function Contador() {
             });
         },
     });
+
 
     const formatCurrency = (amount: number | string): string => {
         const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -114,6 +116,7 @@ export default function Contador() {
         }
         return true;
     });
+
 
     const abrirModalApertura = () => {
         setFormApertura({
@@ -184,6 +187,26 @@ export default function Contador() {
             onError: (errors) => alert('Error al eliminar: ' + Object.values(errors).join(' ')),
         });
     };
+    const exportarReporte = (hoja?: string) => {
+        const params = new URLSearchParams();
+
+        if (filtroEstado) params.set('estado', filtroEstado);
+        if (filtroEmpleado) params.set('empleado', filtroEmpleado);
+        if (fechaInicio) params.set('fecha_inicio', fechaInicio);
+        if (fechaFin) params.set('fecha_fin', fechaFin);
+
+        params.set('ingresos_efectivo', String(resumen.ventas_efectivo || 0));
+        params.set('ingresos_tarjeta', String(resumen.ventas_tarjeta || 0));
+        params.set('ingresos_yape', String(resumen.ventas_yape || 0));
+        params.set('ingresos_total', String(resumen.ingresos || 0));
+
+        if (hoja) {
+            params.set('hoja', hoja);
+        }
+
+        window.open(`/contador/export?${params.toString()}`, '_blank');
+        setExportMenuOpen(false);
+    };
 
     const tarjetasResumen = [
         {
@@ -242,10 +265,51 @@ export default function Contador() {
                                 </button>
                             </>
                         )}
-                        <button className="inline-flex items-center gap-2 bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm hover:shadow-lg active:scale-95">
-                            <FileSpreadsheet className="w-4 h-4" />
-                            Exportar reporte
-                        </button>
+                        <div className="relative">
+                            <button
+                                onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                                className="inline-flex items-center gap-2 bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm hover:shadow-lg active:scale-95"
+                            >
+                                <FileSpreadsheet className="w-4 h-4" />
+                                Exportar
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+
+                            {exportMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-56 rounded-xl bg-white shadow-lg border border-[#F3E1C8] overflow-hidden z-50">
+                                    <button
+                                        onClick={() => exportarReporte()}
+                                        className="w-full px-4 py-3 text-left text-sm text-[#2D1B1A] hover:bg-[#FBF7F0] transition flex items-center gap-2 border-b border-[#F3E1C8]"
+                                    >
+                                        <FileSpreadsheet className="w-4 h-4 text-[#C9A96E]" />
+                                        Exportar todo (todas las tablas)
+                                    </button>
+                                    <button
+                                        onClick={() => exportarReporte('ingresos')}
+                                        className="w-full px-4 py-3 text-left text-sm text-[#2D1B1A] hover:bg-[#FBF7F0] transition flex items-center gap-2 border-b border-[#F3E1C8]"
+                                    >
+                                        <TrendingUp className="w-4 h-4 text-green-500" />
+                                        Solo Ingresos del día
+                                    </button>
+                                    <button
+                                        onClick={() => exportarReporte('historial')}
+                                        className="w-full px-4 py-3 text-left text-sm text-[#2D1B1A] hover:bg-[#FBF7F0] transition flex items-center gap-2 border-b border-[#F3E1C8]"
+                                    >
+                                        <Clock className="w-4 h-4 text-blue-500" />
+                                        Solo Historial de Caja
+                                    </button>
+                                    <button
+                                        onClick={() => exportarReporte('movimientos')}
+                                        className="w-full px-4 py-3 text-left text-sm text-[#2D1B1A] hover:bg-[#FBF7F0] transition flex items-center gap-2"
+                                    >
+                                        <Receipt className="w-4 h-4 text-amber-500" />
+                                        Solo Movimientos
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -259,7 +323,10 @@ export default function Contador() {
                             <div>
                                 <p className="text-sm font-bold text-[#2D1B1A]">Caja abierta</p>
                                 <p className="text-xs text-[#5A3D2B]">
-                                    {cajaActiva.empleado} · {cajaActiva.turno} · {new Date(cajaActiva.fecha_apertura).toLocaleString()}
+                                    {cajaActiva.empleado} · {cajaActiva.turno} ·
+                                    <span suppressHydrationWarning>
+                                        {new Date(cajaActiva.fecha_apertura).toLocaleString()}
+                                    </span>
                                 </p>
                             </div>
                         </div>
@@ -358,12 +425,7 @@ export default function Contador() {
                             <Clock className="w-5 h-5 text-[#C9A96E]" />
                             Historial de Aperturas y Cierres
                         </h2>
-                        <button
-                            onClick={() => window.print()}
-                            className="bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-4 py-2 rounded-xl text-sm font-semibold transition hover:shadow-md active:scale-95"
-                        >
-                            Imprimir
-                        </button>
+
                     </div>
 
                     <div className="overflow-x-auto">
@@ -518,37 +580,6 @@ export default function Contador() {
                             </tbody>
                         </table>
                     </div>
-                </div>
-
-                {/* ACCIONES RÁPIDAS - BLANCAS */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <button
-                        onClick={cajaActiva ? abrirModalCierre : abrirModalApertura}
-                        className={`p-4 rounded-2xl shadow-md transition flex items-center justify-center gap-2 font-semibold hover:shadow-lg active:scale-95 ${cajaActiva
-                            ? 'bg-red-600 hover:bg-red-700 text-white'
-                            : 'bg-[#C9A96E] hover:bg-[#B8975D] text-white'
-                            }`}
-                    >
-                        {cajaActiva ? (
-                            <>
-                                <CheckCircle className="w-5 h-5" />
-                                Cerrar caja
-                            </>
-                        ) : (
-                            <>
-                                <Plus className="w-5 h-5" />
-                                Abrir caja
-                            </>
-                        )}
-                    </button>
-                    <button className="bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white p-4 rounded-2xl shadow-md transition flex items-center justify-center gap-2 font-semibold hover:shadow-lg active:scale-95">
-                        <Printer className="w-5 h-5" />
-                        Imprimir balance
-                    </button>
-                    <button className="bg-white hover:bg-[#FBF7F0] text-[#2D1B1A] p-4 rounded-2xl shadow-md border border-[#F3E1C8] transition flex items-center justify-center gap-2 font-semibold hover:shadow-lg active:scale-95">
-                        <Eye className="w-5 h-5" />
-                        Ver detalle completo
-                    </button>
                 </div>
 
                 {/* ===== MODALES ===== */}
