@@ -89,5 +89,4 @@ class Pedido extends Model
 
         return $orderNumber;
     }
-  
 }
