@@ -18,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Illuminate\Http\JsonResponse;
 
 class PedidoController extends Controller
 {
@@ -220,65 +221,82 @@ class PedidoController extends Controller
         ];
     }
 
-    public function cobrarMesa(Request $request, Mesa $mesa)
-    {
-        $validated = $request->validate([
-            'metodo_pago' => 'required|in:efectivo,tarjeta,yape',
-            'pedido_ids' => 'required|array|min:1',
-            'pedido_ids.*' => 'exists:pedidos,id',
-            'authorization_pin' => 'required|string|size:4',
+public function cobrarMesa(Request $request, Mesa $mesa)
+{
+    $validated = $request->validate([
+        'metodo_pago' => 'required|in:efectivo,tarjeta,yape',
+        'pedido_ids' => 'required|array|min:1',
+        'pedido_ids.*' => 'exists:pedidos,id',
+        'authorization_pin' => 'required|string|size:4',
+    ]);
+
+    $authorizer = $request->user()->currentTeam?->members()
+        ->active()
+        ->where('pin', $validated['authorization_pin'])
+        ->first();
+
+    if (! $authorizer instanceof User || ! $authorizer->hasPermissionTo('procesar pagos')) {
+        return redirect()->back()->withErrors([
+            'authorization_pin' => 'PIN inválido. Solo Caja, Administración o Gerencia pueden confirmar el pago.',
         ]);
+    }
 
-        $authorizer = $request->user()->currentTeam?->members()
-            ->active()
-            ->where('pin', $validated['authorization_pin'])
-            ->first();
+    $pedidos = DB::transaction(function () use ($mesa, $validated) {
+        $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
+        
+        $pedidosActuales = Pedido::query()
+            ->where('mesa_id', $mesa->id)
+            ->whereNotIn('estado', ['pagado', 'cancelado'])
+            ->lockForUpdate()
+            ->get();
 
-        if (! $authorizer instanceof User || ! $authorizer->hasPermissionTo('procesar pagos')) {
-            return redirect()->back()->withErrors([
-                'authorization_pin' => 'PIN inválido. Solo Caja, Administración o Gerencia pueden confirmar el pago.',
+        if ($pedidosActuales->isEmpty()) {
+            abort(422, 'Esta mesa no tiene pedidos por cobrar.');
+        }
+
+        $idsEnviados = collect($validated['pedido_ids']);
+        $pedidosACobrar = $pedidosActuales->filter(function ($pedido) use ($idsEnviados) {
+            return $idsEnviados->contains($pedido->id);
+        });
+
+        if ($pedidosACobrar->isEmpty()) {
+            abort(422, 'No se encontraron pedidos válidos para cobrar.');
+        }
+
+        foreach ($pedidosACobrar as $pedido) {
+            $pedido->update([
+                'estado' => 'pagado',
+                'metodo_pago' => $validated['metodo_pago'],
+                'caja_id' => $caja->id,
             ]);
         }
 
-        $pedidos = DB::transaction(function () use ($mesa, $validated) {
-            $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
-            $pedidos = Pedido::query()
-                ->where('mesa_id', $mesa->id)
-                ->whereNotIn('estado', ['pagado', 'cancelado'])
-                ->lockForUpdate()
-                ->get();
+        $quedanPedidos = $pedidosActuales->filter(function ($pedido) use ($idsEnviados) {
+            return !$idsEnviados->contains($pedido->id);
+        });
 
-            if ($pedidos->isEmpty()) {
-                abort(422, 'Esta mesa no tiene pedidos por cobrar.');
-            }
-
-            if ($pedidos->pluck('id')->sort()->values()->all() !== collect($validated['pedido_ids'])->sort()->values()->all()) {
-                abort(422, 'La cuenta cambió. Actualiza la mesa antes de cobrar.');
-            }
-
-            foreach ($pedidos as $pedido) {
-                $pedido->update([
-                    'estado' => 'pagado',
-                    'metodo_pago' => $validated['metodo_pago'],
-                    'caja_id' => $caja->id,
-                ]);
-            }
-
+        if ($quedanPedidos->isEmpty()) {
+         
             $mesa->estado = 'libre';
             $mesa->user_id = null;
             $mesa->cliente = null;
             $mesa->personas = null;
             $mesa->pedido_listo = false;
             $mesa->save();
+        } else {
+           
+            $mesa->pedido_listo = false;
+            $mesa->save();
+        }
 
-            return $pedidos;
-        });
+        return $pedidosACobrar;
+    });
 
-        $pedidos->each(fn (Pedido $pedido) => broadcast(new PedidoActualizado($pedido)));
-        broadcast(new MesaActualizada($mesa->refresh()));
+    $pedidos->each(fn (Pedido $pedido) => broadcast(new PedidoActualizado($pedido)));
+    broadcast(new MesaActualizada($mesa->refresh()));
 
-        return redirect()->back()->with('success', 'Mesa cobrada y liberada correctamente');
-    }
+    return redirect()->back()->with('success', 'Pedido(s) cobrado(s) correctamente');
+}
 
     public function caja()
     {
@@ -325,15 +343,18 @@ class PedidoController extends Controller
 
 [$orders, $updatedTable] = DB::transaction(function () use ($validated, $estado, $userId) {
     $orders = collect($validated['productos'])->map(function (array $producto) use ($validated, $estado, $userId) {
-      
-        $area = $producto['area'] ?? $validated['area'] ?? 'cocina';
-        
-      
+    
+        $area = $this->productionAreaClassifier->detect($producto, 'cocina');
+     
         if (!empty($producto['categoria'])) {
             $categoria = strtolower($producto['categoria']);
             if (in_array($categoria, ['bar', 'cocina', 'horno', 'postres'])) {
                 $area = $categoria;
             }
+        }
+        
+        if (!empty($producto['area'])) {
+            $area = $producto['area'];
         }
 
         return Pedido::create([
@@ -464,7 +485,10 @@ if ($request->has('estado')) {
     return redirect()->back()->with('success', 'Estado del pedido actualizado');
 }
 
-        return redirect()->back()->with('error', 'No se realizaron cambios');
+        return response()->json([
+    'success' => false,
+    'message' => 'No se puede entregar. Faltan items por marcar como listos.'
+], 422);
     }
 
     //  NUEVO: Cancelar un pedido activo (desde el modal de edición en Ventas)
@@ -581,14 +605,9 @@ public function entregarTicket($id)
 {
     $pedido = Pedido::findOrFail($id);
     
-    // ✅ Verificar que todos los productos del ticket están listos
-    // Los productos están en el campo 'productos' como JSON
-    $productos = is_array($pedido->productos) ? $pedido->productos : json_decode($pedido->productos, true) ?? [];
-    
-    $itemsNoListos = collect($productos)->filter(fn($item) => ($item['estado'] ?? 'pendiente') !== 'listo');
-    
-    if ($itemsNoListos->count() > 0) {
-        return redirect()->back()->with('error', 'No se puede entregar. Faltan items por marcar como listos.');
+    // ✅ Verificar que el pedido esté en estado 'listo' (no verificar productos individuales)
+    if ($pedido->estado !== 'listo') {
+        return redirect()->back()->with('error', 'Este pedido no está listo para entregar. Estado actual: ' . $pedido->estado);
     }
     
     DB::beginTransaction();
@@ -601,9 +620,7 @@ public function entregarTicket($id)
         
         // Verificar si la mesa ya no tiene tickets pendientes
         $ticketsPendientes = Pedido::where('mesa_id', $pedido->mesa_id)
-            ->where('estado', '!=', 'entregado')
-            ->where('estado', '!=', 'pagado')
-            ->where('estado', '!=', 'cancelado')
+            ->whereNotIn('estado', ['entregado', 'pagado', 'cancelado'])
             ->count();
         
         if ($pedido->mesa_id) {
@@ -617,7 +634,7 @@ public function entregarTicket($id)
                     $mesa->save();
                     broadcast(new MesaActualizada($mesa));
                 } else {
-                    // Aún hay tickets pendientes, actualizar estado de la mesa
+                    // Aún hay tickets pendientes
                     $mesa->pedido_listo = false;
                     $mesa->save();
                     broadcast(new MesaActualizada($mesa));

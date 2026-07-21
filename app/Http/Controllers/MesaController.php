@@ -16,7 +16,6 @@ public function index()
 {
     $mesas = Mesa::with('meseroUser')->orderBy('numero')->get()->values();
 
-   
     $pedidos = Pedido::whereNotIn('estado', ['pagado', 'cancelado'])->get()->values();
 
     return Inertia::render('restaurante/mesas', [
@@ -82,22 +81,27 @@ public function update(Request $request, Mesa $mesa)
         $validated['user_id'] = auth()->id();
     }
 
-    if ($validated['estado'] === 'libre') {
-        $hasUnpaidOrders = $mesa->pedidos()
-            ->whereNotIn('estado', ['pagado', 'cancelado'])
-            ->exists();
+if ($validated['estado'] === 'libre') {
 
-        if ($hasUnpaidOrders) {
-            return redirect()->back()->withErrors([
-                'estado' => 'La mesa solo puede liberarse al registrar el pago con un PIN autorizado.',
-            ]);
-        }
+    $hasUnpaidOrders = $mesa->pedidos()
+        ->whereNotIn('estado', ['pagado', 'cancelado'])
+        ->exists();
 
-        $validated['user_id'] = null;
-        $validated['cliente'] = null;
-        $validated['personas'] = null;
-        $validated['pedido_listo'] = false;
+    if ($hasUnpaidOrders) {
+        return redirect()->back()->withErrors([
+            'estado' => 'La mesa solo puede liberarse al registrar el pago con un PIN autorizado.',
+        ]);
     }
+
+    $mesa->pedidos()
+        ->where('estado', 'entregado')
+        ->update(['estado' => 'pagado']);
+
+    $validated['user_id'] = null;
+    $validated['cliente'] = null;
+    $validated['personas'] = null;
+    $validated['pedido_listo'] = false;
+}
 
     $mesa->update($validated);
     broadcast(new MesaActualizada($mesa));

@@ -16,7 +16,7 @@ interface ModalVerTicketsProps {
     tickets: Ticket[];
     onClose: () => void;
     onEntregarTicket: (ticketId: number) => void;
-    onCobrarMesa?: () => void; 
+    onCobrarMesa?: () => void;
 }
 
 export default function ModalVerTickets({
@@ -29,13 +29,12 @@ export default function ModalVerTickets({
 }: ModalVerTicketsProps) {
     if (!isOpen) return null;
 
-    // ✅ AHORA: Mostrar TODOS los tickets (incluyendo entregados)
     const ticketsActivos = tickets; // Todos los tickets
     const ticketsNoEntregados = tickets.filter(t => t.estado !== 'entregado');
     const ticketsListos = tickets.filter(t => t.estado === 'listo');
     const todosEntregados = tickets.every(t => t.estado === 'entregado');
 
-    // ✅ Badge para los estados
+
     const getEstadoBadge = (estado: string) => {
         const estados = {
             pendiente: { label: 'Pendiente', color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -121,11 +120,10 @@ export default function ModalVerTickets({
                                 return (
                                     <div
                                         key={ticket.id}
-                                        className={`bg-white rounded-xl p-4 border transition-all ${
-                                            isEntregado 
-                                                ? 'border-gray-100 opacity-75' 
+                                        className={`bg-white rounded-xl p-4 border transition-all ${isEntregado
+                                                ? 'border-gray-100 opacity-75'
                                                 : 'border-gray-100 hover:border-gray-200 hover:shadow-md'
-                                        }`}
+                                            }`}
                                     >
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-3">
@@ -195,6 +193,17 @@ export default function ModalVerTickets({
                                     </div>
                                 );
                             })}
+
+                            {/* ✅ Mensaje de "Todos entregados" - SOLO como info adicional, no reemplaza los tickets */}
+                            {todosEntregados && (
+                                <div className="flex flex-col items-center justify-center py-4 bg-purple-50 rounded-xl border border-purple-200 mt-4">
+                                    <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+                                        <CheckCircle2 className="w-6 h-6 text-purple-500" />
+                                    </div>
+                                    <p className="text-lg font-bold text-gray-800">🎉 ¡Todos los pedidos entregados!</p>
+                                    <p className="text-sm text-gray-500">La mesa está completa y lista para cobrar</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

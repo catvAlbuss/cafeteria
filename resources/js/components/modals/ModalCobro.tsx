@@ -76,11 +76,21 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
     const cambio = montoRecibidoNum - total;
 
     const handleCobrar = () => {
-    setCargando(true);
+        setCargando(true);
+
+        const pedidosACobrar = pedidosArray.filter(p =>
+            !['pagado', 'cancelado'].includes(p.estado || '')
+        );
+
+        if (pedidosACobrar.length === 0) {
+            alert('No hay pedidos disponibles para cobrar.');
+            setCargando(false);
+            return;
+        }
 
         const ventaData = {
             metodo_pago: metodoPago,
-            pedido_ids: pedidosArray.map(pedidoActivo => pedidoActivo.id),
+            pedido_ids: pedidosACobrar.map(p => p.id),
             authorization_pin: authorizationPin,
         };
 
@@ -90,7 +100,6 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
             onSuccess: () => {
                 console.log('✅ Venta registrada correctamente');
 
-                // ✅ Imprimir ticket
                 if (ticketRef.current) {
                     const printWindow = window.open('', '_blank');
                     if (printWindow) {
