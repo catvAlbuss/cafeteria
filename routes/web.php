@@ -47,7 +47,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/caja/estado', [CajaController::class, 'estado'])->name('caja.estado');
     Route::get('/ventas', [PedidoController::class, 'index'])->middleware('can:ver ventas')->name('ventas');
     Route::patch('/pedidos/{id}/marcar-listo', [PedidoController::class, 'marcarListo'])->middleware('cash.session')->name('pedidos.marcar-listo');
-
+    Route::post('/pedidos/{id}/entregar', [PedidoController::class, 'entregarTicket'])->name('pedidos.entregar');
     //  Solo esta ruta para el contador (con el controlador)
     Route::get('/contador', [ContadorController::class, 'index'])->middleware('can:manage-cash-session')->name('contador.index');
     Route::post('/contador/abrir', [ContadorController::class, 'abrir'])->middleware(['can:manage-cash-session', 'operating.hours'])->name('contador.abrir');

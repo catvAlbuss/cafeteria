@@ -322,44 +322,52 @@ class PedidoController extends Controller
         $estado = $validated['estado'] ?? 'pendiente';
         $userId = $validated['user_id'] ?? auth()->id();
 
-        $productsByArea = $estado === 'pendiente'
-            ? $this->productionAreaClassifier->group($validated['productos'], $validated['area'] ?? 'cocina')
-            : [($validated['area'] ?? 'cocina') => $validated['productos']];
 
-        [$orders, $updatedTable] = DB::transaction(function () use ($validated, $estado, $userId, $productsByArea) {
-            $orders = collect($productsByArea)->map(function (array $products, string $area) use ($validated, $estado, $userId) {
-                return Pedido::create([
-                    'numero' => Pedido::generarNumero(),
-                    'mesa_id' => $validated['mesa_id'] ?? null,
-                    'mesa' => $validated['mesa'] ?? null,
-                    'cliente' => $validated['cliente'] ?? 'Anónimo',
-                    'productos' => $products,
-                    'total' => collect($products)->sum(fn (array $product): float => (float) $product['subtotal']),
-                    'metodo_pago' => $validated['metodo_pago'] ?? null,
-                    'tipo' => $validated['tipo'] ?? 'mesa',
-                    'estado' => $estado,
-                    'area' => $area,
-                    'observaciones' => $validated['observaciones'] ?? null,
-                    'hora_pedido' => now(),
-                    'user_id' => $userId,
-                    'team_id' => auth()->user()->current_team_id,
-                ]);
-            })->values();
-
-            $updatedTable = null;
-            if ($estado === 'pendiente' && ! empty($validated['mesa_id'])) {
-                $mesa = Mesa::query()->find($validated['mesa_id']);
-                if ($mesa && $mesa->estado !== 'ocupada') {
-                    $mesa->estado = 'ocupada';
-                    $mesa->user_id ??= $userId;
-                    $mesa->save();
-                }
-
-                $updatedTable = $mesa;
+[$orders, $updatedTable] = DB::transaction(function () use ($validated, $estado, $userId) {
+    $orders = collect($validated['productos'])->map(function (array $producto) use ($validated, $estado, $userId) {
+      
+        $area = $producto['area'] ?? $validated['area'] ?? 'cocina';
+        
+      
+        if (!empty($producto['categoria'])) {
+            $categoria = strtolower($producto['categoria']);
+            if (in_array($categoria, ['bar', 'cocina', 'horno', 'postres'])) {
+                $area = $categoria;
             }
+        }
 
-            return [$orders, $updatedTable];
-        }, 3);
+        return Pedido::create([
+            'numero' => Pedido::generarNumero(),
+            'mesa_id' => $validated['mesa_id'] ?? null,
+            'mesa' => $validated['mesa'] ?? null,
+            'cliente' => $validated['cliente'] ?? 'Anónimo',
+            'productos' => [$producto],
+            'total' => (float) $producto['subtotal'],
+            'metodo_pago' => $validated['metodo_pago'] ?? null,
+            'tipo' => $validated['tipo'] ?? 'mesa',
+            'estado' => $estado,
+            'area' => $area,
+            'observaciones' => $validated['observaciones'] ?? null,
+            'hora_pedido' => now(),
+            'user_id' => $userId,
+            'team_id' => auth()->user()->current_team_id,
+        ]);
+    })->values();
+
+    // Actualizar estado de la mesa
+    $updatedTable = null;
+    if ($estado === 'pendiente' && ! empty($validated['mesa_id'])) {
+        $mesa = Mesa::query()->find($validated['mesa_id']);
+        if ($mesa && $mesa->estado !== 'ocupada') {
+            $mesa->estado = 'ocupada';
+            $mesa->user_id ??= $userId;
+            $mesa->save();
+        }
+        $updatedTable = $mesa;
+    }
+
+    return [$orders, $updatedTable];
+}, 3);
 
         if ($updatedTable) {
             broadcast(new MesaActualizada($updatedTable));
@@ -417,38 +425,44 @@ class PedidoController extends Controller
             return redirect()->back()->with('success', 'Pedido actualizado correctamente');
         }
 
-        // Si viene de cambio de estado (desde Producción)
-        if ($request->has('estado')) {
-            $validated = $request->validate([
-                'estado' => 'required|in:pendiente,preparando,listo,entregado,pagado,cancelado',
-            ]);
+       
+if ($request->has('estado')) {
+    $validated = $request->validate([
+        'estado' => 'required|in:pendiente,preparando,listo,entregado,pagado,cancelado',
+    ]);
 
-            $pedido->estado = $validated['estado'];
+    $pedido->estado = $validated['estado'];
 
-            if ($validated['estado'] === 'entregado') {
-                $pedido->hora_entrega = now();
+    if ($validated['estado'] === 'entregado') {
+        $pedido->hora_entrega = now();
+    }
+
+    $pedido->save();
+
+    broadcast(new PedidoActualizado($pedido));
+
+    if ($validated['estado'] === 'listo') {
+       
+        $productos = is_array($pedido->productos) ? $pedido->productos : json_decode($pedido->productos, true) ?? [];
+        $itemsNoListos = collect($productos)->filter(fn($item) => ($item['estado'] ?? 'pendiente') !== 'listo');
+        $todosItemsListos = $itemsNoListos->count() === 0;
+        
+        if ($pedido->mesa_id) {
+            $mesa = Mesa::find($pedido->mesa_id);
+
+            if ($mesa) {
+               
+                $mesa->pedido_listo = $todosItemsListos;
+                $mesa->save();
+                broadcast(new MesaActualizada($mesa));
             }
-
-            $pedido->save();
-
-            broadcast(new PedidoActualizado($pedido));
-
-            if ($validated['estado'] === 'listo') {
-                if ($pedido->mesa_id) {
-                    $mesa = Mesa::find($pedido->mesa_id);
-
-                    if ($mesa) {
-                        $mesa->pedido_listo = true;
-                        $mesa->save();
-                        broadcast(new MesaActualizada($mesa));
-                    }
-                }
-
-                broadcast(new PedidoListo($pedido));
-            }
-
-            return redirect()->back()->with('success', 'Estado del pedido actualizado');
         }
+
+        broadcast(new PedidoListo($pedido));
+    }
+
+    return redirect()->back()->with('success', 'Estado del pedido actualizado');
+}
 
         return redirect()->back()->with('error', 'No se realizaron cambios');
     }
@@ -559,4 +573,68 @@ class PedidoController extends Controller
 
         return redirect()->back()->with('success', 'Pedido eliminado correctamente');
     }
+
+        /**
+     * Entregar un ticket específico (pedido individual)
+     */
+public function entregarTicket($id)
+{
+    $pedido = Pedido::findOrFail($id);
+    
+    // ✅ Verificar que todos los productos del ticket están listos
+    // Los productos están en el campo 'productos' como JSON
+    $productos = is_array($pedido->productos) ? $pedido->productos : json_decode($pedido->productos, true) ?? [];
+    
+    $itemsNoListos = collect($productos)->filter(fn($item) => ($item['estado'] ?? 'pendiente') !== 'listo');
+    
+    if ($itemsNoListos->count() > 0) {
+        return redirect()->back()->with('error', 'No se puede entregar. Faltan items por marcar como listos.');
+    }
+    
+    DB::beginTransaction();
+    
+    try {
+        // Marcar pedido como entregado
+        $pedido->estado = 'entregado';
+        $pedido->hora_entrega = now();
+        $pedido->save();
+        
+        // Verificar si la mesa ya no tiene tickets pendientes
+        $ticketsPendientes = Pedido::where('mesa_id', $pedido->mesa_id)
+            ->where('estado', '!=', 'entregado')
+            ->where('estado', '!=', 'pagado')
+            ->where('estado', '!=', 'cancelado')
+            ->count();
+        
+        if ($pedido->mesa_id) {
+            $mesa = Mesa::find($pedido->mesa_id);
+            
+            if ($mesa) {
+                if ($ticketsPendientes === 0) {
+                    // Todos los tickets entregados → cambiar a "Cobrar" automáticamente
+                    $mesa->estado = 'listo_cobrar';
+                    $mesa->pedido_listo = false;
+                    $mesa->save();
+                    broadcast(new MesaActualizada($mesa));
+                } else {
+                    // Aún hay tickets pendientes, actualizar estado de la mesa
+                    $mesa->pedido_listo = false;
+                    $mesa->save();
+                    broadcast(new MesaActualizada($mesa));
+                }
+            }
+        }
+        
+        DB::commit();
+        
+        broadcast(new PedidoActualizado($pedido));
+        
+        return redirect()->back()->with('success', 'Ticket #' . ($pedido->numero ?? $pedido->id) . ' entregado correctamente');
+        
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return redirect()->back()->with('error', 'Error al entregar ticket: ' . $e->getMessage());
+    }
+}
+
 }

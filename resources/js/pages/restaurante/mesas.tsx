@@ -6,6 +6,8 @@ import 'sweetalert2/dist/sweetalert2.min.css';
 import ModalCobro from '@/components/modals/ModalCobro';
 import { useSedeChannel } from '@/hooks/useSedeChannel';
 import { swalError, swalSuccess, errorsToText } from '@/lib/swal';
+import TarjetaTicket from '@/components/tickets/TarjetaTicket';
+import ModalVerTickets from '@/components/tickets/ModalVerTickets';
 
 import {
     DndContext,
@@ -175,128 +177,6 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
 // COMPONENTE TARJETA DE PEDIDO (MODAL FLOTANTE)
 // ============================================================
 
-interface TarjetaPedidoProps {
-    pedido: any;
-    mesaNumero: string;
-    mesero: string;
-    onClose: () => void;
-}
-
-function TarjetaPedido({ pedido, mesaNumero, mesero, onClose }: TarjetaPedidoProps) {
-    const productos = typeof pedido.productos === 'string'
-        ? JSON.parse(pedido.productos)
-        : pedido.productos;
-
-    const total = typeof pedido.total === 'number'
-        ? pedido.total
-        : parseFloat(pedido.total) || 0;
-
-    const fecha = new Date(pedido.created_at).toLocaleString('es-PE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-
-    return (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-[#2D1B1A] to-[#4A2C2A] px-5 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[#C9A96E] rounded-full flex items-center justify-center">
-                            <span className="text-lg">📋</span>
-                        </div>
-                        <div>
-                            <h3 className="text-white font-semibold text-base">Detalle del Pedido</h3>
-                            <p className="text-gray-300 text-xs">Mesa #{mesaNumero} · {fecha}</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition text-white/60 hover:text-white"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-
-                {/* Body */}
-                <div className="p-5 max-h-[60vh] overflow-y-auto">
-                    {/* Mesero */}
-                    <div className="flex items-center gap-2 bg-[#FBF7F0] rounded-lg px-3 py-2 mb-4">
-                        <User className="w-4 h-4 text-[#C9A96E]" />
-                        <span className="text-sm text-[#2D1B1A]">
-                            <span className="font-medium">Mesero:</span> {mesero || 'No asignado'}
-                        </span>
-                    </div>
-
-                    {/* Productos */}
-                    <div className="space-y-2">
-                        <p className="text-xs font-bold uppercase text-[#8D6B53] tracking-wider">Productos</p>
-                        <div className="border-t border-[#8D6B53]/20 pt-2">
-                            {productos && productos.length > 0 ? (
-                                productos.map((item: any, index: number) => (
-                                    <div key={index} className="flex justify-between py-2 border-b border-[#8D6B53]/10 last:border-0">
-                                        <div>
-                                            <p className="text-sm font-medium text-[#2D1B1A]">
-                                                {item.cantidad}x {item.nombre}
-                                            </p>
-                                            <p className="text-xs text-[#8D6B53]">S/ {item.precio.toFixed(2)} c/u</p>
-                                        </div>
-                                        <p className="text-sm font-bold text-[#C9A96E]">S/ {item.subtotal.toFixed(2)}</p>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-sm text-gray-400 text-center py-4">Sin productos en este pedido</p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Total */}
-                    <div className="mt-4 pt-4 border-t-2 border-dashed border-[#C9A96E]/30">
-                        <div className="flex justify-between items-center">
-                            <span className="text-base font-bold text-[#2D1B1A] uppercase">Total</span>
-                            <span className="text-xl font-bold text-[#C9A96E]">S/ {total.toFixed(2)}</span>
-                        </div>
-                    </div>
-
-                    {/* Estado */}
-                    {pedido.estado && (
-                        <div className="mt-3 flex items-center gap-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${pedido.estado === 'entregado' ? 'bg-green-100 text-green-700' :
-                                pedido.estado === 'cocina' ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-gray-100 text-gray-700'
-                                }`}>
-                                {pedido.estado === 'cocina' ? '👨‍🍳 En cocina' :
-                                    pedido.estado === 'entregado' ? '✅ Entregado' :
-                                        pedido.estado || 'Pendiente'}
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="px-5 py-4 border-t border-gray-200 flex gap-2">
-                    <button
-                        onClick={() => {
-                            window.location.href = `/ventas?mesa=${mesaNumero}`;
-                        }}
-                        className="flex-1 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-medium text-sm transition"
-                    >
-                        ✏️ Editar pedido
-                    </button>
-                    <button
-                        onClick={onClose}
-                        className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition"
-                    >
-                        Cerrar
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 interface Mesa {
     id: number;
@@ -404,14 +284,15 @@ function PlanoMesa({ mesa, colorClass, disabled }: { mesa: Mesa; colorClass: str
 }
 
 // -----------------------------------------------------------------------
-// Tarjeta de mesa (también es zona "droppable" para recibir sillas)
+// Tarjeta de mesa
 // -----------------------------------------------------------------------
-function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onVerPedido, pedidos, userRole }: {
+function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onVerPedido, onVerTickets, pedidos, userRole }: {
     mesa: Mesa;
     onCambiarEstado: (id: number, estado: string) => void;
     onTomarPedido: (mesa: Mesa) => void;
     onAbrirModalCobro: (mesa: Mesa) => void;
     onVerPedido?: (mesa: Mesa) => void;
+    onVerTickets?: (mesa: Mesa) => void;
     pedidos: any[];
     userRole?: string;
 }) {
@@ -425,63 +306,57 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
                         'text-green-500';
 
     const dragDisabled = mesa.estado !== 'libre';
-
-    // Verificar si el usuario es Mesero
     const isMesero = userRole === 'Mesero';
 
-    // Roles que tienen acceso completo (Administración, Gerencia, Caja)
     const rolesAccesoCompleto = ['Administración', 'Gerencia', 'Caja', 'Administrador', 'Gerente', 'Cajero'];
     const tieneAccesoCompleto = userRole && rolesAccesoCompleto.includes(userRole);
 
-    // Renderizar los botones principales en una fila
     const renderButtonsRow = () => {
-        // Para meseros: siempre mostrar los 2 botones
         if (isMesero) {
             return (
-                <div className="mt-2 flex gap-2">
-                    {/* Botón Tomar pedido / Ver pedido - más delgado */}
+                <div className="mt-3 flex gap-2">
                     {mesa.estado === 'ocupada' ? (
                         <button
-                            onClick={() => onVerPedido?.(mesa)}
-                            className="flex-1 flex items-center justify-center rounded-md bg-[#C9A96E] py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#B8975D] active:scale-95 whitespace-nowrap"
+                            onClick={() => onVerTickets?.(mesa)}
+                            className="flex-1 py-1.5 px-4 rounded-lg bg-[#C9A96E] hover:bg-[#B8975D] text-white font-semibold text-sm transition active:scale-95"
                         >
-                            Ver pedido
+                            Ver pedidos
                         </button>
                     ) : (
                         <button
                             onClick={() => onTomarPedido(mesa)}
-                            className="flex-1 flex items-center justify-center rounded-md bg-[#C9A96E] py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#B8975D] active:scale-95 whitespace-nowrap"
+                            className="flex-1 py-1.5 px-4 rounded-lg bg-[#C9A96E] hover:bg-[#B8975D] text-white font-semibold text-sm transition active:scale-95"
                         >
                             Tomar pedido
                         </button>
                     )}
 
-                    {/* Botón Cobrar - solo icono */}
                     <button
                         onClick={() => onAbrirModalCobro(mesa)}
-                        className="flex items-center justify-center rounded-lg bg-purple-600 px-3 py-1.5 text-white transition hover:bg-purple-700 active:scale-95"
+                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition active:scale-95"
                         title="Cobrar"
                     >
-                        <Receipt className="w-4 h-4" />
+                        <Receipt className="w-5 h-5" />
                     </button>
                 </div>
             );
         }
 
-        // Para otros roles: mantener el diseño original
+        // Para Administrador y otros roles
         return (
-            <div className="mt-2">
+            <div className="mt-3">
                 {renderPrimaryAction()}
             </div>
         );
     };
-
     const renderPrimaryAction = () => {
+        const baseClass = "mt-2 w-full py-1.5 rounded-lg text-sm font-semibold transition active:scale-95";
+
         if (mesa.estado === 'listo_cobrar') {
             return (
                 <button
                     onClick={() => onAbrirModalCobro(mesa)}
-                    className="mt-2 flex w-full items-center justify-center rounded-lg bg-purple-600 py-1.5 text-[11px] font-semibold text-white transition hover:bg-purple-700"
+                    className={`${baseClass} bg-purple-600 hover:bg-purple-700 text-white`}
                 >
                     Cobrar
                 </button>
@@ -491,10 +366,10 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
         if (mesa.estado === 'ocupada') {
             return (
                 <button
-                    onClick={() => onVerPedido?.(mesa)}
-                    className="mt-2 flex w-full items-center justify-center rounded-lg bg-[#C9A96E] py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#B8975D] active:scale-95"
+                    onClick={() => onVerTickets?.(mesa)}   // ← Cambiado a nuevo modal
+                    className={`${baseClass} bg-[#C9A96E] hover:bg-[#B8975D] text-white`}
                 >
-                    Ver pedido
+                    Ver pedidos
                 </button>
             );
         }
@@ -502,38 +377,70 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
         return (
             <button
                 onClick={() => onTomarPedido(mesa)}
-                className="mt-2 flex w-full items-center justify-center rounded-lg bg-[#C9A96E] py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#B8975D] active:scale-95"
+                className={`${baseClass} bg-[#C9A96E] hover:bg-[#B8975D] text-white`}
             >
                 Tomar pedido
             </button>
         );
     };
 
-    // Botones de cambio de estado - SOLO para roles con acceso completo
     const renderEstadoActions = () => {
         if (!tieneAccesoCompleto) return null;
 
+        // ✅ SOLO AGREGAR ESTA VALIDACIÓN
+        const pedidosPendientes = pedidos.filter(p =>
+            p.mesa_id === mesa.id &&
+            !['pagado', 'cancelado', 'entregado'].includes(p.estado || '')
+        );
+        const tienePedidosPendientes = pedidosPendientes.length > 0;
+
         const estadoActions = [
-            { value: 'libre', label: 'Libre', icon: CircleCheck, activeClass: 'bg-green-500 text-white border-green-500', idleClass: 'bg-white/90 text-green-600 border-green-200 hover:bg-green-50' },
-            { value: 'reserva', label: 'Reserva', icon: Calendar, activeClass: 'bg-blue-500 text-white border-blue-500', idleClass: 'bg-white/90 text-blue-600 border-blue-200 hover:bg-blue-50' },
-            { value: 'listo_cobrar', label: 'Cobrar', icon: Receipt, activeClass: 'bg-purple-500 text-white border-purple-500', idleClass: 'bg-white/90 text-purple-600 border-purple-200 hover:bg-purple-50' },
+            {
+                value: 'libre',
+                label: 'Libre',
+                icon: CircleCheck,
+                activeClass: 'bg-green-500 text-white border-green-500',
+                idleClass: 'bg-white/90 text-green-600 border-green-200 hover:bg-green-50',
+                // ✅ AGREGAR: Deshabilitar si hay pedidos pendientes
+                disabled: tienePedidosPendientes && mesa.estado !== 'libre'
+            },
+            {
+                value: 'reserva',
+                label: 'Reserva',
+                icon: Calendar,
+                activeClass: 'bg-blue-500 text-white border-blue-500',
+                idleClass: 'bg-white/90 text-blue-600 border-blue-200 hover:bg-blue-50',
+                // ✅ AGREGAR: Deshabilitar si hay pedidos pendientes
+                disabled: tienePedidosPendientes && mesa.estado !== 'reserva'
+            },
+            {
+                value: 'listo_cobrar',
+                label: 'Cobrar',
+                icon: Receipt,
+                activeClass: 'bg-purple-500 text-white border-purple-500',
+                idleClass: 'bg-white/90 text-purple-600 border-purple-200 hover:bg-purple-50',
+                // ✅ AGREGAR: Deshabilitar si hay pedidos pendientes
+                disabled: tienePedidosPendientes && mesa.estado !== 'listo_cobrar'
+            },
         ];
 
         return (
             <div className="mt-3 grid grid-cols-3 gap-1">
-                {estadoActions.map(({ value, label, icon: Icon, activeClass, idleClass }) => {
+                {estadoActions.map(({ value, label, icon: Icon, activeClass, idleClass, disabled }) => {
                     const isActive = mesa.estado === value;
+                    const isDisabled = disabled && !isActive;
+
                     return (
                         <button
                             key={value}
-                            type="button"
-                            title={label}
-                            aria-label={`Cambiar mesa ${mesa.numero} a ${label}`}
-                            aria-pressed={isActive}
-                            onClick={() => {
-                                if (!isActive) onCambiarEstado(mesa.id, value);
-                            }}
-                            className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${isActive ? activeClass : idleClass}`}
+                            onClick={() => !isActive && !isDisabled && onCambiarEstado(mesa.id, value)}
+                            disabled={isDisabled}
+                            className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${isActive
+                                ? activeClass
+                                : isDisabled
+                                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50'
+                                    : idleClass
+                                }`}
                         >
                             <Icon className="h-4 w-4" />
                         </button>
@@ -542,17 +449,28 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
             </div>
         );
     };
-
     return (
         <div
             ref={setNodeRef}
             className={`group relative rounded-xl border-2 ${config.border} ${config.bg} p-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${isOver ? 'scale-[1.02] ring-4 ring-[#C9A96E]' : ''}`}
         >
-            {mesa.pedido_listo && (
-                <div className="absolute -right-2 -top-2 z-10 rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-extrabold text-[#2D1B1A] shadow-lg">
-                    Listo
-                </div>
-            )}
+         // Badge de tickets listos - ACTUALIZADO
+            {(() => {
+
+                const ticketsListos = pedidos.filter(p =>
+                    p.mesa_id === mesa.id &&
+                    p.estado === 'listo'
+                ).length;
+
+                if (ticketsListos === 0) return null;
+
+                return (
+                    <div className="absolute -right-2 -top-2 z-10 rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-extrabold text-[#2D1B1A] shadow-lg flex items-center gap-1 animate-pulse">
+                        <span>🟡</span>
+                        {ticketsListos} listo{ticketsListos > 1 ? 's' : ''}
+                    </div>
+                );
+            })()}
 
             <div className="mb-2 flex items-center justify-between gap-2">
                 <span className={`min-w-0 truncate rounded-full border bg-white/90 px-2 py-1 text-[11px] font-extrabold text-gray-800 ${config.border}`}>
@@ -563,7 +481,7 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
 
             <PlanoMesa mesa={mesa} colorClass={colorSilla} disabled={dragDisabled} />
 
-            <div className="mt-2 text-center">
+            <div className="mt-1 text-center">
                 <p className={`text-xs font-extrabold uppercase tracking-wide ${config.text}`}>{config.label}</p>
                 {mesa.estado === 'ocupada' && mesa.mesero && (
                     <p className="mt-0.5 flex items-center justify-center gap-1 truncate text-[11px] font-semibold text-[#5A3D2B]">
@@ -572,31 +490,8 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
                 )}
             </div>
 
-            {/* Botones de cambio de estado (solo para roles con acceso completo) */}
             {renderEstadoActions()}
 
-            {mesa.pedido_listo && (
-                <button
-                    onClick={() => {
-
-                        const pedido = pedidos.find(p => p.mesa_id === mesa.id);
-                        if (!pedido || pedido.estado !== 'listo') {
-                            alert('⚠️ El pedido debe estar en estado "Listo" para entregar.');
-                            return;
-                        }
-
-                        router.post(`/mesas/${mesa.id}/entregar`, {}, {
-                            onSuccess: () => router.reload(),
-                            onError: (errors) => swalError('No se pudo confirmar la entrega', errorsToText(errors)),
-                        });
-                    }}
-                    className="mt-2 flex w-full items-center justify-center rounded-lg bg-orange-400 py-1.5 text-[11px] font-semibold text-white transition hover:bg-orange-500"
-                >
-                    Entregar
-                </button>
-            )}
-
-            {/* Botones principales en fila para meseros, o el botón completo para otros roles */}
             {renderButtonsRow()}
         </div>
     );
@@ -625,13 +520,67 @@ export default function MesasDistribucion() {
     const [modalPinAbierto, setModalPinAbierto] = useState(false);
     const [mesaSeleccionada, setMesaSeleccionada] = useState<Mesa | null>(null);
 
-    const [modalPedidoAbierto, setModalPedidoAbierto] = useState(false);
-    const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any | null>(null);
     const pedidos = toArray<any>(pedidosIniciales);
     const [isClient, setIsClient] = useState(false);
+    // ===== ESTADOS PARA TICKETS =====
+    const [modalTicketsAbierto, setModalTicketsAbierto] = useState(false);
+
+    const [ticketsDeMesa, setTicketsDeMesa] = useState<any[]>([]);
+    const [pedidosLista, setPedidosLista] = useState<any[]>(() => toArray<any>(pedidosIniciales));
 
 
     const cambiarEstado = (id: number, nuevoEstado: string) => {
+        const mesa = mesas.find(m => m.id === id);
+        if (!mesa) return;
+
+      
+        if (nuevoEstado === 'listo_cobrar') {
+            const pedidosPendientes = pedidosLista.filter(p =>
+                p.mesa_id === id &&
+                !['pagado', 'cancelado', 'entregado'].includes(p.estado || '')
+            );
+
+            if (pedidosPendientes.length > 0) {
+                swalError(
+                    'No se puede cambiar a "Cobrar"',
+                    'Primero debes entregar TODOS los pedidos de la mesa.\nEl sistema cambiará automáticamente a "Cobrar" cuando todos los pedidos estén entregados.'
+                );
+                return;
+            }
+        }
+
+ 
+        if (nuevoEstado === 'libre') {
+            const pedidosSinEntregar = pedidos.filter(p =>
+                p.mesa_id === id &&
+                !['pagado', 'cancelado', 'entregado'].includes(p.estado || '')
+            );
+
+            if (pedidosSinEntregar.length > 0) {
+                swalError(
+                    'No se puede liberar la mesa',
+                    'La mesa tiene pedidos pendientes o sin entregar.\nPrimero debes entregar todos los pedidos y cobrar la mesa.'
+                );
+                return;
+            }
+        }
+
+        // ✅ BLOQUEAR: No permitir "reserva" si hay pedidos pendientes
+        if (nuevoEstado === 'reserva') {
+            const pedidosSinEntregar = pedidos.filter(p =>
+                p.mesa_id === id &&
+                !['pagado', 'cancelado', 'entregado'].includes(p.estado || '')
+            );
+
+            if (pedidosSinEntregar.length > 0) {
+                swalError(
+                    'No se puede poner en "Reserva"',
+                    'La mesa tiene pedidos activos. No se puede poner en reserva mientras tenga pedidos pendientes.'
+                );
+                return;
+            }
+        }
+
         const mesasAnteriores = mesas;
 
         setMesas(prev => prev.map(m =>
@@ -642,14 +591,14 @@ export default function MesasDistribucion() {
             preserveScroll: true,
             preserveState: true,
             onError: (errors) => {
-                setMesas(mesasAnteriores); // revertir solo si falla
+                setMesas(mesasAnteriores);
                 swalError('Error al cambiar estado', errorsToText(errors));
             },
         });
     };
 
     const abrirModalCobro = (mesa: Mesa) => {
-        const pedidosDeLaMesa = pedidos.filter(p => p.mesa_id === mesa.id);
+        const pedidosDeLaMesa = pedidosLista.filter(p => p.mesa_id === mesa.id);
         setPedidoCobro(pedidosDeLaMesa);
         setMesaCobro(mesa);
         setModalCobroAbierto(true);
@@ -660,8 +609,11 @@ export default function MesasDistribucion() {
     );
 
     useEffect(() => {
-        setMesas(toArray<Mesa>(mesasIniciales));
-    }, [mesasIniciales]);
+        const mesasArray = toArray<Mesa>(mesasIniciales);
+        setMesas(mesasArray);
+      
+        setPedidosLista(toArray<any>(pedidosIniciales));
+    }, [mesasIniciales, pedidosIniciales]);
     useEffect(() => {
         setIsClient(true);
     }, []);
@@ -697,8 +649,6 @@ export default function MesasDistribucion() {
     }, [flash]);
 
 
-
-
     const tomarPedido = (mesa: Mesa) => {
         setMesaSeleccionada(mesa);
         setModalPinAbierto(true);
@@ -720,25 +670,145 @@ export default function MesasDistribucion() {
         });
     };
 
-    const verPedido = (mesa: Mesa) => {
+    // ===== FUNCIÓN PARA VER TODOS LOS TICKETS DE UNA MESA =====
+    const verTickets = (mesa: Mesa) => {
+      
 
-        // Buscar el pedido activo de esta mesa
-        const pedido = pedidos.find(p => p.mesa_id === mesa.id);
-        if (pedido) {
-            // Crear un objeto con los datos necesarios incluyendo el número de mesa
-            const pedidoConMesa = {
-                ...pedido,
-                mesa_numero: mesa.numero,
-                mesero: mesa.mesero || 'No asignado'
-            };
-            // Guardar el pedido seleccionado y abrir la tarjeta
-            setPedidoSeleccionado(pedidoConMesa);
-            setModalPedidoAbierto(true);
-        } else {
-            swalError('Sin pedido activo', 'No hay pedido para esta mesa.');
+         const tickets = pedidosLista.filter(p =>
+            p.mesa_id === mesa.id &&
+            !['pagado', 'cancelado'].includes(p.estado || '')
+        );
+
+        if (tickets.length === 0) {
+            swalError('Sin pedidos', `La mesa #${mesa.numero} no tiene pedidos.`);
+            return;
         }
+
+        const todosEntregados = tickets.every(t => t.estado === 'entregado');
+     
+        if (todosEntregados && mesa.estado !== 'listo_cobrar') {
+            // Actualizar la mesa localmente
+            setMesas(prev => prev.map(m =>
+                m.id === mesa.id ? { ...m, estado: 'listo_cobrar' } : m
+            ));
+            // También actualizar en el backend
+            router.patch(`/mesas/${mesa.id}`, { estado: 'listo_cobrar' }, {
+                preserveScroll: true,
+                preserveState: true,
+            });
+        }
+
+        const ticketsFormateados = tickets.map(p => {
+            let productos = p.productos;
+            if (typeof productos === 'string') {
+                try {
+                    productos = JSON.parse(productos);
+                } catch (e) {
+                    productos = [];
+                }
+            }
+
+            return {
+                id: p.id,
+                numero: p.numero || `#${p.id}`,
+                estado: p.estado || 'pendiente',
+                total: Number(p.total) || 0,
+                created_at: p.created_at,
+                productos: Array.isArray(productos) ? productos : [],
+            };
+        });
+
+     
+        const ordenEstados: Record<string, number> = {
+            'pendiente': 0,
+            'preparando': 1,
+            'listo': 2,
+            'entregado': 3
+        };
+        ticketsFormateados.sort((a, b) => (ordenEstados[a.estado as string] ?? 9) - (ordenEstados[b.estado as string] ?? 9));
+
+
+        setTicketsDeMesa(ticketsFormateados);
+        setMesaSeleccionada(mesa);
+        setModalTicketsAbierto(true);
     };
 
+    // ===== FUNCIÓN PARA ENTREGAR UN TICKET =====
+    const entregarTicket = (ticketId: number) => {
+        const ticket = ticketsDeMesa.find(t => t.id === ticketId);
+        if (!ticket) {
+            swalError('Error', 'Ticket no encontrado');
+            return;
+        }
+
+        if (ticket.estado !== 'listo') {
+            swalError('Error', 'Este pedido no está listo para entregar');
+            return;
+        }
+
+        Swal.fire({
+            title: '¿Entregar pedido?',
+            text: `¿Confirmas que el pedido #${ticket.numero || ticketId} ha sido entregado a la mesa?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: '✅ Sí, entregar',
+            cancelButtonText: '❌ Cancelar',
+            confirmButtonColor: '#10B981',
+            cancelButtonColor: '#6B7280',
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+
+         
+            const nuevosTickets = ticketsDeMesa.map(t =>
+                t.id === ticketId ? { ...t, estado: 'entregado' } : t
+            );
+            setTicketsDeMesa(nuevosTickets);
+
+            setPedidosLista(prev => prev.map(p =>
+                p.id === ticketId ? { ...p, estado: 'entregado' } : p
+            ));
+
+            const todosEntregados = nuevosTickets.every(t => t.estado === 'entregado');
+
+            router.post(`/pedidos/${ticketId}/entregar`, {}, {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: (page) => {
+                    if (todosEntregados) {
+                        swalSuccess(
+                            '🎉 ¡Todos los pedidos entregados!',
+                            '💰 La mesa está lista para cobrar'
+                        );
+
+                        setModalTicketsAbierto(false);
+
+                        if (mesaSeleccionada) {
+                            setMesas(prev => prev.map(m =>
+                                m.id === mesaSeleccionada.id
+                                    ? { ...m, estado: 'listo_cobrar' }
+                                    : m
+                            ));
+                        }
+
+                        router.reload({ only: ['mesas', 'pedidos'] });
+                    } else {
+                        swalSuccess('¡Pedido entregado!', '✅ El pedido ha sido entregado correctamente');
+                    }
+                },
+                onError: (errors) => {
+                
+                    setTicketsDeMesa(prev => prev.map(t =>
+                        t.id === ticketId ? { ...t, estado: 'listo' } : t
+                    ));
+                    setPedidosLista(prev => prev.map(p =>
+                        p.id === ticketId ? { ...p, estado: 'listo' } : p
+                    ));
+                    
+                    swalError('Error', errorsToText(errors) || 'No se pudo entregar el pedido');
+                }
+            });
+        });
+    };
     const crearMesa = async () => {
         const result = await Swal.fire({
             title: 'Nueva mesa',
@@ -860,7 +930,7 @@ export default function MesasDistribucion() {
                     </div>
                 </div>
 
-                {/* 👇 PLANO DE MESAS - SIN BARRA LATERAL */}
+                {/*  PLANO DE MESAS - SIN BARRA LATERAL */}
                 <div className="w-full">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-sm font-semibold text-[#5A3D2B]">Distribucion de mesas - tiempo real</h2>
@@ -879,8 +949,8 @@ export default function MesasDistribucion() {
                                         onCambiarEstado={cambiarEstado}
                                         onTomarPedido={tomarPedido}
                                         onAbrirModalCobro={abrirModalCobro}
-                                        onVerPedido={verPedido}
-                                        pedidos={pedidos}
+                                        onVerTickets={verTickets}
+                                        pedidos={pedidosLista}  // ✅ DINÁMICO
                                         userRole={userRole}
                                     />
                                 ))}
@@ -888,21 +958,6 @@ export default function MesasDistribucion() {
                         </DndContext>
                     )}
                 </div>
-
-                {/* TARJETA DE PEDIDO */}
-                {modalPedidoAbierto && pedidoSeleccionado && (
-                    <div className="mt-4">
-                        <TarjetaPedido
-                            pedido={pedidoSeleccionado}
-                            mesaNumero={pedidoSeleccionado.mesa_numero}
-                            mesero={pedidoSeleccionado.mesero || 'No asignado'}
-                            onClose={() => {
-                                setModalPedidoAbierto(false);
-                                setPedidoSeleccionado(null);
-                            }}
-                        />
-                    </div>
-                )}
 
                 {/* MODALES */}
                 <ModalPin
@@ -924,6 +979,22 @@ export default function MesasDistribucion() {
                         router.reload({ only: ['mesas', 'pedidos'], preserveUrl: true });
                     }}
                 />
+                {/* ===== MODAL: VER TICKETS ===== */}
+                {
+                    <ModalVerTickets
+                        isOpen={modalTicketsAbierto}
+                        mesa={mesaSeleccionada || { id: 0, numero: '' }}
+                        tickets={ticketsDeMesa}
+                        onClose={() => setModalTicketsAbierto(false)}
+                        onEntregarTicket={entregarTicket}
+                        onCobrarMesa={() => {
+                            if (mesaSeleccionada) {
+                                setModalTicketsAbierto(false);
+                                abrirModalCobro(mesaSeleccionada);
+                            }
+                        }}
+                    />
+                }
             </div>
         </>
     );

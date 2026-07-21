@@ -12,20 +12,18 @@ use Inertia\Inertia;
 class MesaController extends Controller
 {
     //  Listar todas las mesas
-    public function index()
-    {
-        $mesas = Mesa::with('meseroUser')->orderBy('numero')->get()->values();
+public function index()
+{
+    $mesas = Mesa::with('meseroUser')->orderBy('numero')->get()->values();
 
-        //  Antes solo traía 'listo' y 'entregado' — eso dejaba fuera los pedidos
-        //  que todavía están en cocina (pendiente/preparando), y por eso "Ver Pedido"
-        //  y el cobro no los veían. Ahora trae TODO lo que no esté ya cerrado.
-        $pedidos = Pedido::whereNotIn('estado', ['pagado', 'cancelado'])->get()->values();
+   
+    $pedidos = Pedido::whereNotIn('estado', ['pagado', 'cancelado'])->get()->values();
 
-        return Inertia::render('restaurante/mesas', [
-            'mesas' => $mesas->values()->all(),
-            'pedidos' => $pedidos->values()->all(),
-        ]);
-    }
+    return Inertia::render('restaurante/mesas', [
+        'mesas' => $mesas->values()->all(),
+        'pedidos' => $pedidos->values()->all(),
+    ]);
+}
 
     //  Crear una nueva mesa
     public function store(Request $request)
@@ -41,46 +39,71 @@ class MesaController extends Controller
         return redirect()->back()->with('success', 'Mesa creada correctamente');
     }
 
-    public function update(Request $request, Mesa $mesa)
-    {
-        $validated = $request->validate([
-            'estado' => 'required|in:libre,pendiente,ocupada,reserva,listo_cobrar',
-            'cliente' => 'nullable|string',
-            'personas' => 'nullable|integer|min:1',
-            'user_id' => 'nullable|integer|exists:users,id',
-        ]);
+public function update(Request $request, Mesa $mesa)
+{
+    $validated = $request->validate([
+        'estado' => 'required|in:libre,pendiente,ocupada,reserva,listo_cobrar',
+        'cliente' => 'nullable|string',
+        'personas' => 'nullable|integer|min:1',
+        'user_id' => 'nullable|integer|exists:users,id',
+    ]);
 
-        if (! empty($validated['user_id']) && ! auth()->user()->currentTeam->members()->where('users.id', $validated['user_id'])->exists()) {
-            return redirect()->back()->with('error', 'El empleado no pertenece a esta sede.');
-        }
-
-        if ($validated['estado'] === 'ocupada' && empty($validated['user_id']) && ! $mesa->user_id) {
-            $validated['user_id'] = auth()->id();
-        }
-
-        if ($validated['estado'] === 'libre') {
-            $hasUnpaidOrders = $mesa->pedidos()
-                ->withoutGlobalScopes()
-                ->whereNotIn('estado', ['pagado', 'cancelado'])
-                ->exists();
-
-            if ($hasUnpaidOrders) {
-                return redirect()->back()->withErrors([
-                    'estado' => 'La mesa solo puede liberarse al registrar el pago con un PIN autorizado.',
-                ]);
-            }
-
-            $validated['user_id'] = null;
-            $validated['cliente'] = null;
-            $validated['personas'] = null;
-            $validated['pedido_listo'] = false;
-        }
-
-        $mesa->update($validated);
-        broadcast(new MesaActualizada($mesa));
-
-        return redirect()->back()->with('success', 'Estado de mesa actualizado');
+    if (! empty($validated['user_id']) && ! auth()->user()->currentTeam->members()->where('users.id', $validated['user_id'])->exists()) {
+        return redirect()->back()->with('error', 'El empleado no pertenece a esta sede.');
     }
+
+    
+    if ($validated['estado'] === 'listo_cobrar') {
+        $pedidosPendientes = $mesa->pedidos()
+            ->whereNotIn('estado', ['pagado', 'cancelado', 'entregado'])
+            ->count();
+
+        if ($pedidosPendientes > 0) {
+            return redirect()->back()->withErrors([
+                'estado' => 'No se puede cambiar manualmente a "Cobrar". El sistema lo activa automáticamente cuando todos los pedidos están entregados.'
+            ]);
+        }
+    }
+
+  
+    if ($validated['estado'] === 'reserva') {
+        $pedidosPendientes = $mesa->pedidos()
+            ->whereNotIn('estado', ['pagado', 'cancelado', 'entregado'])
+            ->count();
+
+        if ($pedidosPendientes > 0) {
+            return redirect()->back()->withErrors([
+                'estado' => 'No se puede poner en "Reserva". La mesa tiene pedidos activos pendientes.'
+            ]);
+        }
+    }
+
+    if ($validated['estado'] === 'ocupada' && empty($validated['user_id']) && ! $mesa->user_id) {
+        $validated['user_id'] = auth()->id();
+    }
+
+    if ($validated['estado'] === 'libre') {
+        $hasUnpaidOrders = $mesa->pedidos()
+            ->whereNotIn('estado', ['pagado', 'cancelado'])
+            ->exists();
+
+        if ($hasUnpaidOrders) {
+            return redirect()->back()->withErrors([
+                'estado' => 'La mesa solo puede liberarse al registrar el pago con un PIN autorizado.',
+            ]);
+        }
+
+        $validated['user_id'] = null;
+        $validated['cliente'] = null;
+        $validated['personas'] = null;
+        $validated['pedido_listo'] = false;
+    }
+
+    $mesa->update($validated);
+    broadcast(new MesaActualizada($mesa));
+
+    return redirect()->back()->with('success', 'Estado de mesa actualizado');
+}
 
     //  Ver detalle de una mesa
     public function show(Mesa $mesa)
