@@ -345,11 +345,20 @@ export default function ModalCobro({
                             className="rounded-xl border border-gray-200 bg-white p-4"
                             id="ticket-print"
                         >
-                            {/* SHOP NAME */}
+                            {/* SHOP NAME CON LOGO */}
                             <div
                                 className="mb-2 pb-2 text-center"
                                 style={{ borderBottom: '1.5px dashed #ccc' }}
                             >
+                                <img
+                                    src="/img/logoTiket.png"
+                                    alt="DOLCE CAFE"
+                                    style={{
+                                        maxWidth: '90px',
+                                        margin: '0 auto 6px auto',
+                                        display: 'block',
+                                    }}
+                                />
                                 <p
                                     style={{
                                         fontSize: '18px',

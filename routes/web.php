@@ -151,7 +151,7 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/mesas/{mesa}/cobrar', [PedidoController::class, 'cobrarMesa'])->middleware('cash.session')->name('mesas.cobrar');
 
     // PEDIDOS
-
+    Route::post('/pedidos/{pedido}/agregar-productos', [PedidoController::class, 'agregarProductos']);
     Route::get('/pedidos/pendientes', [PedidoController::class, 'pendientes'])->name('pedidos.pendientes');
     Route::get('/pedidos/listos', [PedidoController::class, 'listosParaCobrar'])->name('pedidos.listos');
     Route::patch('/pedidos/{pedido}/cobrar', [PedidoController::class, 'cobrar'])->middleware('cash.session')->name('pedidos.cobrar');

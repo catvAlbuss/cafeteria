@@ -737,7 +737,7 @@ export default function MesasDistribucion() {
         }
 
         if (nuevoEstado === 'libre') {
-            const pedidosSinEntregar = pedidos.filter(
+            const pedidosSinEntregar = pedidosLista.filter(
                 (p) =>
                     p.mesa_id === id &&
                     !['pagado', 'cancelado', 'entregado'].includes(
@@ -757,7 +757,7 @@ export default function MesasDistribucion() {
 
         // ✅ BLOQUEAR: No permitir "reserva" si hay pedidos pendientes
         if (nuevoEstado === 'reserva') {
-            const pedidosSinEntregar = pedidos.filter(
+            const pedidosSinEntregar = pedidosLista.filter(
                 (p) =>
                     p.mesa_id === id &&
                     !['pagado', 'cancelado', 'entregado'].includes(
@@ -791,6 +791,7 @@ export default function MesasDistribucion() {
             {
                 preserveScroll: true,
                 preserveState: true,
+                only: ['mesas', 'pedidos'],
                 onError: (errors) => {
                     setMesas(mesasAnteriores);
                     swalError('Error al cambiar estado', errorsToText(errors));
@@ -1261,6 +1262,7 @@ export default function MesasDistribucion() {
             {},
             {
                 preserveScroll: true,
+                only: ['mesas'],
                 onError: () => {
                     // revertir si falla
                     setMesas((prev) =>

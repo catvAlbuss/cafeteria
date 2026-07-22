@@ -295,13 +295,7 @@ export default function Cardex() {
                             </h2>
                             <p className="text-xs text-[#5A3D2B] mt-1">{movimientosFiltrados.length} registros</p>
                         </div>
-                        <button
-                            onClick={() => window.print()}
-                            className="bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 hover:shadow-md active:scale-95"
-                        >
-                            <Printer className="w-4 h-4" />
-                            Imprimir
-                        </button>
+
                     </div>
 
                     <div className="overflow-x-auto">

@@ -14,9 +14,18 @@ class MesaController extends Controller
     //  Listar todas las mesas
     public function index()
     {
-        $mesas = Mesa::with('meseroUser')->orderBy('numero')->get()->values();
+        $teamId = auth()->user()->current_team_id;
 
-        $pedidos = Pedido::whereNotIn('estado', ['pagado', 'cancelado'])->get()->values();
+        $mesas = Mesa::where('team_id', $teamId)
+            ->with('meseroUser')
+            ->orderBy('numero')
+            ->get()
+            ->values();
+
+        $pedidos = Pedido::where('team_id', $teamId)
+            ->whereNotIn('estado', ['pagado', 'cancelado'])
+            ->get()
+            ->values();
 
         return Inertia::render('restaurante/mesas', [
             'mesas' => $mesas->values()->all(),
