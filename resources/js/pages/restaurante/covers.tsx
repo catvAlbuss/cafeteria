@@ -95,20 +95,44 @@ function CoverFormModal({ isOpen, cover, onClose, onGuardado }: CoverFormModalPr
     const [guardando, setGuardando] = useState(false);
     const [error, setError] = useState('');
 
+    // ✅ Convertir DD/MM/YYYY a YYYY-MM-DD para input type="date"
+    const formatDateToInput = (date: string) => {
+        if (!date) return '';
+        if (date.match(/^\d{4}-\d{2}-\d{2}$/)) return date;
+        if (date.includes('/')) {
+            const parts = date.split('/');
+            if (parts.length === 3) {
+                return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+        }
+        return date;
+    };
+
     useEffect(() => {
         if (isOpen) {
             if (cover) {
+                const fechaInicio = cover.fechaInicio ? formatDateToInput(cover.fechaInicio) : '';
+                const fechaFin = cover.fechaFin ? formatDateToInput(cover.fechaFin) : '';
+
                 setForm({
                     titulo: cover.titulo,
                     descripcion: cover.descripcion || '',
                     tipo: cover.tipo,
-                    fechaInicio: cover.fechaInicio,
-                    fechaFin: cover.fechaFin,
+                    fechaInicio: fechaInicio,
+                    fechaFin: fechaFin,
                     imagen: cover.imagen || '',
                 });
+
                 setPreviewImagen(cover.imagen || '');
             } else {
-                setForm({ titulo: '', descripcion: '', tipo: 'promocion', fechaInicio: '', fechaFin: '', imagen: '' });
+                setForm({
+                    titulo: '',
+                    descripcion: '',
+                    tipo: 'promocion',
+                    fechaInicio: '',
+                    fechaFin: '',
+                    imagen: '',
+                });
                 setPreviewImagen('');
             }
             setError('');
@@ -130,7 +154,13 @@ function CoverFormModal({ isOpen, cover, onClose, onGuardado }: CoverFormModalPr
         if (form.fechaInicio > form.fechaFin) return setError('La fecha de inicio no puede ser mayor a la fecha fin');
         setError('');
 
-        const payload = { ...form, imagen: form.imagen || '/images/default-cover.jpg' };
+        const payload = {
+            ...form,
+            fechaInicio: form.fechaInicio,
+            fechaFin: form.fechaFin,
+            imagen: form.imagen || '/images/default-cover.jpg'
+        };
+
         setGuardando(true);
 
         const opciones = {
@@ -231,7 +261,7 @@ function CoverFormModal({ isOpen, cover, onClose, onGuardado }: CoverFormModalPr
                                     <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Fecha Inicio</label>
                                     <input
                                         type="date"
-                                        style={{ colorScheme: 'light' }} 
+                                        style={{ colorScheme: 'light' }}
                                         className="w-full border-2 border-gray-200 rounded-xl px-3 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
                                         value={form.fechaInicio}
                                         onChange={(e) => setForm({ ...form, fechaInicio: e.target.value })}
@@ -241,7 +271,7 @@ function CoverFormModal({ isOpen, cover, onClose, onGuardado }: CoverFormModalPr
                                     <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Fecha Fin</label>
                                     <input
                                         type="date"
-                                        style={{ colorScheme: 'light' }} 
+                                        style={{ colorScheme: 'light' }}
                                         className="w-full border-2 border-gray-200 rounded-xl px-3 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
                                         value={form.fechaFin}
                                         onChange={(e) => setForm({ ...form, fechaFin: e.target.value })}
@@ -255,9 +285,8 @@ function CoverFormModal({ isOpen, cover, onClose, onGuardado }: CoverFormModalPr
                             <div>
                                 <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Imagen</label>
                                 <div
-                                    className={`w-full border-2 border-dashed rounded-xl p-6 text-center transition cursor-pointer ${
-                                        previewImagen ? 'border-[#C9A96E] bg-[#FBF7F0]' : 'border-gray-300 bg-gray-50 hover:border-[#C9A96E] hover:bg-[#FBF7F0]'
-                                    }`}
+                                    className={`w-full border-2 border-dashed rounded-xl p-6 text-center transition cursor-pointer ${previewImagen ? 'border-[#C9A96E] bg-[#FBF7F0]' : 'border-gray-300 bg-gray-50 hover:border-[#C9A96E] hover:bg-[#FBF7F0]'
+                                        }`}
                                     onPaste={(e) => {
                                         const items = e.clipboardData?.items;
                                         if (!items) return;

@@ -409,7 +409,7 @@ public function cobrarMesa(Request $request, Mesa $mesa)
     public function update(Request $request, Pedido $pedido)
     {
         // Si viene de la edición de productos (desde Ventas)
-        if ($request->has('productos')) {
+     if ($request->has('productos')) {
             $request->validate([
                 'productos' => 'required|array|min:1',
                 'productos.*.id' => 'required|integer',
@@ -420,9 +420,9 @@ public function cobrarMesa(Request $request, Mesa $mesa)
                 'total' => 'required|numeric|min:0',
             ]);
 
-            // Solo bloquear si el pedido ya cerró su ciclo (cobrado o cancelado)
-            if (in_array($pedido->estado, ['pagado', 'cancelado'])) {
-                return redirect()->back()->with('error', 'Este pedido ya no se puede editar');
+            
+            if ($pedido->estado !== 'pendiente') {
+                return redirect()->back()->with('error', 'Este pedido ya está en preparación y no se puede editar');
             }
 
             $estabaListo = in_array($pedido->estado, ['listo', 'entregado']);
@@ -430,7 +430,6 @@ public function cobrarMesa(Request $request, Mesa $mesa)
             $pedido->productos = $request->productos;
             $pedido->total = $request->total;
 
-            // Si ya estaba listo/entregado y se le agrega algo nuevo, vuelve a producción
             if ($estabaListo) {
                 $pedido->estado = 'pendiente';
             }
@@ -440,7 +439,7 @@ public function cobrarMesa(Request $request, Mesa $mesa)
             broadcast(new PedidoActualizado($pedido));
 
             if ($estabaListo) {
-                broadcast(new PedidoCreado($pedido)); // dispara notificación en Producción como pedido nuevo
+                broadcast(new PedidoCreado($pedido)); 
             }
 
             return redirect()->back()->with('success', 'Pedido actualizado correctamente');
@@ -492,17 +491,17 @@ if ($request->has('estado')) {
     }
 
     //  NUEVO: Cancelar un pedido activo (desde el modal de edición en Ventas)
-    public function cancelar(Pedido $pedido)
-    {
-        if (! in_array($pedido->estado, ['pendiente', 'preparando'])) {
-            return redirect()->back()->with('error', 'Este pedido ya no se puede cancelar');
-        }
-
-        $pedido->estado = 'cancelado';
-        $pedido->save();
-
-        return redirect()->back()->with('success', 'Pedido cancelado');
+public function cancelar(Pedido $pedido)
+{
+    if ($pedido->estado !== 'pendiente') {
+        return redirect()->back()->with('error', 'Este pedido ya está en preparación y no se puede cancelar');
     }
+
+    $pedido->estado = 'cancelado';
+    $pedido->save();
+
+    return redirect()->back()->with('success', 'Pedido cancelado');
+}
 
     //  Marcar pedido como listo (para cocina)
     public function marcarListo($id)

@@ -175,8 +175,6 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
 // ============================================================
 // COMPONENTE TARJETA DE PEDIDO (MODAL FLOTANTE)
 // ============================================================
-
-
 interface Mesa {
     id: number;
     numero: string;
@@ -196,7 +194,6 @@ const toArray = <T,>(value: T[] | { data?: T[] } | Record<string, T> | null | un
     return [];
 };
 
-
 interface FlashProps {
     success?: string;
     error?: string;
@@ -206,7 +203,6 @@ interface FlashProps {
         mensaje: string;
     };
 }
-
 
 // -----------------------------------------------------------------------
 // Config visual por estado (colores + etiqueta)
@@ -306,16 +302,14 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
 
     const dragDisabled = mesa.estado !== 'libre';
     const isMesero = userRole === 'Mesero';
-
     const rolesAccesoCompleto = ['Administración', 'Gerencia', 'Caja', 'Administrador', 'Gerente', 'Cajero'];
     const tieneAccesoCompleto = userRole && rolesAccesoCompleto.includes(userRole);
-
     const renderButtonsRow = () => {
         if (isMesero) {
             return (
                 <div className="mt-3 flex gap-2">
                     {mesa.estado === 'listo_cobrar' ? (
-                        // ✅ Si está en Cobrar, SOLO el botón Cobrar (más grande)
+                      
                         <button
                             onClick={() => onAbrirModalCobro(mesa)}
                             className="flex-1 py-1.5 px-4 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm transition active:scale-95 flex items-center justify-center gap-2"
@@ -353,7 +347,6 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
                 </div>
             );
         }
-
         // Para Administrador y otros roles
         return (
             <div className="mt-3">
@@ -374,7 +367,6 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
                 </button>
             );
         }
-
         if (mesa.estado === 'ocupada') {
             return (
                 <button
@@ -400,13 +392,11 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
         if (!tieneAccesoCompleto) return null;
 
         const esCobrar = mesa.estado === 'listo_cobrar';
-
         const pedidosPendientes = pedidos.filter(p =>
             p.mesa_id === mesa.id &&
             !['pagado', 'cancelado', 'entregado'].includes(p.estado || '')
         );
         const tienePedidosPendientes = pedidosPendientes.length > 0;
-
         const estadoActions = [
             {
                 value: 'libre',
@@ -465,7 +455,6 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
             ref={setNodeRef}
             className={`group relative rounded-xl border-2 ${config.border} ${config.bg} p-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${isOver ? 'scale-[1.02] ring-4 ring-[#C9A96E]' : ''}`}
         >
-
             {(() => {
 
                 const ticketsListos = pedidos.filter(p =>
@@ -489,9 +478,7 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
                 </span>
                 <span className={`h-3 w-3 shrink-0 rounded-full ${config.chip}`} />
             </div>
-
             <PlanoMesa mesa={mesa} colorClass={colorSilla} disabled={dragDisabled} />
-
             <div className="mt-1 text-center">
                 <p className={`text-xs font-extrabold uppercase tracking-wide ${config.text}`}>{config.label}</p>
                 {mesa.estado === 'ocupada' && mesa.mesero && (
@@ -502,7 +489,6 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
             </div>
 
             {renderEstadoActions()}
-
             {renderButtonsRow()}
         </div>
     );
@@ -522,29 +508,19 @@ export default function MesasDistribucion() {
     const canManageTables = auth?.permissions?.includes('gestionar mesas') ?? false;
 
     const [mesas, setMesas] = useState<Mesa[]>(() => toArray<Mesa>(mesasIniciales));
-
-
-
     const [modalCobroAbierto, setModalCobroAbierto] = useState(false);
     const [mesaCobro, setMesaCobro] = useState<Mesa | null>(null);
     const [pedidoCobro, setPedidoCobro] = useState<any | null>(null);
     const [modalPinAbierto, setModalPinAbierto] = useState(false);
     const [mesaSeleccionada, setMesaSeleccionada] = useState<Mesa | null>(null);
-
-    const pedidos = toArray<any>(pedidosIniciales);
     const [isClient, setIsClient] = useState(false);
     // ===== ESTADOS PARA TICKETS =====
     const [modalTicketsAbierto, setModalTicketsAbierto] = useState(false);
-
     const [ticketsDeMesa, setTicketsDeMesa] = useState<any[]>([]);
     const [pedidosLista, setPedidosLista] = useState<any[]>(() => toArray<any>(pedidosIniciales));
-
-
     const cambiarEstado = (id: number, nuevoEstado: string) => {
         const mesa = mesas.find(m => m.id === id);
         if (!mesa) return;
-
-
         if (nuevoEstado === 'listo_cobrar') {
             const pedidosPendientes = pedidosLista.filter(p =>
                 p.mesa_id === id &&
@@ -560,13 +536,11 @@ export default function MesasDistribucion() {
             }
         }
 
-
         if (nuevoEstado === 'libre') {
-            const pedidosSinEntregar = pedidos.filter(p =>
+            const pedidosSinEntregar = pedidosLista.filter(p =>
                 p.mesa_id === id &&
                 !['pagado', 'cancelado', 'entregado'].includes(p.estado || '')
             );
-
             if (pedidosSinEntregar.length > 0) {
                 swalError(
                     'No se puede liberar la mesa',
@@ -576,13 +550,11 @@ export default function MesasDistribucion() {
             }
         }
 
-        // ✅ BLOQUEAR: No permitir "reserva" si hay pedidos pendientes
         if (nuevoEstado === 'reserva') {
-            const pedidosSinEntregar = pedidos.filter(p =>
+            const pedidosSinEntregar = pedidosLista.filter(p =>
                 p.mesa_id === id &&
                 !['pagado', 'cancelado', 'entregado'].includes(p.estado || '')
             );
-
             if (pedidosSinEntregar.length > 0) {
                 swalError(
                     'No se puede poner en "Reserva"',
@@ -593,7 +565,6 @@ export default function MesasDistribucion() {
         }
 
         const mesasAnteriores = mesas;
-
         setMesas(prev => prev.map(m =>
             m.id === id ? { ...m, estado: nuevoEstado as Mesa['estado'] } : m
         ));
@@ -601,6 +572,7 @@ export default function MesasDistribucion() {
         router.patch(`/mesas/${id}`, { estado: nuevoEstado }, {
             preserveScroll: true,
             preserveState: true,
+            only: ['mesas', 'pedidos'],
             onError: (errors) => {
                 setMesas(mesasAnteriores);
                 swalError('Error al cambiar estado', errorsToText(errors));
@@ -609,7 +581,6 @@ export default function MesasDistribucion() {
     };
 
     const abrirModalCobro = (mesa: Mesa) => {
-
         const pedidosDeLaMesa = pedidosLista.filter(p =>
             p.mesa_id === mesa.id &&
             !['pagado', 'cancelado'].includes(p.estado || '')
@@ -632,7 +603,6 @@ export default function MesasDistribucion() {
     useEffect(() => {
         const mesasArray = toArray<Mesa>(mesasIniciales);
         setMesas(mesasArray);
-
         setPedidosLista(toArray<any>(pedidosIniciales));
     }, [mesasIniciales, pedidosIniciales]);
     useEffect(() => {
@@ -643,7 +613,6 @@ export default function MesasDistribucion() {
     useSedeChannel('mesas', {
         'mesa.actualizada': (payload: any) => {
             setMesas(prev => prev.map(m => (m.id === payload.id ? { ...m, ...payload } : m)));
-
 
             if (payload.estado === 'libre') {
                 setPedidosLista(prev => prev.filter(p => p.mesa_id !== payload.id));
@@ -768,10 +737,8 @@ export default function MesasDistribucion() {
         setMesaSeleccionada(mesa);
         setModalTicketsAbierto(true);
     };
-
     // ===== FUNCIÓN PARA ENTREGAR UN TICKET =====
     const entregarTicket = (ticketId: number) => {
-        console.log('📤 Entregando ticket:', ticketId);
 
         const ticket = ticketsDeMesa.find(t => t.id === ticketId);
         if (!ticket) {
@@ -796,7 +763,6 @@ export default function MesasDistribucion() {
         }).then((result) => {
             if (!result.isConfirmed) return;
 
-            // ✅ ACTUALIZAR LOCALMENTE (optimista)
             const nuevosTickets = ticketsDeMesa.map(t =>
                 t.id === ticketId ? { ...t, estado: 'entregado' } : t
             );
@@ -805,16 +771,11 @@ export default function MesasDistribucion() {
             setPedidosLista(prev => prev.map(p =>
                 p.id === ticketId ? { ...p, estado: 'entregado' } : p
             ));
-
-            // ✅ ENVIAR AL BACKEND - Inertia maneja la respuesta automáticamente
             router.post(`/pedidos/${ticketId}/entregar`, {}, {
                 preserveScroll: true,
                 preserveState: true,
+                only: ['mesas', 'pedidos'],
                 onSuccess: (page) => {
-                    console.log('✅ Ticket entregado correctamente');
-
-                    // ✅ Verificar mensaje flash de éxito
-                    // page.props.flash puede no estar tipado; castear a any para evitar error TS
                     const flash = page.props.flash as any;
                     if (flash?.success) {
                         swalSuccess('¡Pedido entregado!', String(flash.success));
@@ -825,26 +786,12 @@ export default function MesasDistribucion() {
                     const todosEntregados = nuevosTickets.every(t => t.estado === 'entregado');
 
                     if (todosEntregados) {
-                        swalSuccess(
-                            '🎉 ¡Todos los pedidos entregados!',
-                            '💰 La mesa está lista para cobrar'
-                        );
+                        swalSuccess('🎉 ¡Todos los pedidos entregados!', '💰 La mesa está lista para cobrar');
                         setModalTicketsAbierto(false);
-
-                        if (mesaSeleccionada) {
-                            setMesas(prev => prev.map(m =>
-                                m.id === mesaSeleccionada.id
-                                    ? { ...m, estado: 'listo_cobrar' }
-                                    : m
-                            ));
-                        }
-
-                        router.reload({ only: ['mesas', 'pedidos'] });
                     }
+
                 },
                 onError: (errors) => {
-                    console.error('❌ Error al entregar ticket:', errors);
-                    // ✅ Revertir cambio optimista si falla
                     setTicketsDeMesa(prev => prev.map(t =>
                         t.id === ticketId ? { ...t, estado: 'listo' } : t
                     ));
@@ -886,7 +833,6 @@ export default function MesasDistribucion() {
                     Swal.showValidationMessage('Ingresa el numero de mesa');
                     return false;
                 }
-
                 if (!Number.isInteger(capacidad) || capacidad < 1) {
                     Swal.showValidationMessage('Ingresa una capacidad valida');
                     return false;
@@ -912,11 +858,9 @@ export default function MesasDistribucion() {
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over) return;
-
         const mesaOrigenId = active.data.current?.mesaOrigenId as number | undefined;
         const mesaDestinoId = over.data.current?.mesaId as number | undefined;
         if (!mesaOrigenId || !mesaDestinoId || mesaOrigenId === mesaDestinoId) return;
-
         const origen = mesas.find(m => m.id === mesaOrigenId);
         const destino = mesas.find(m => m.id === mesaDestinoId);
         if (!origen || !destino) return;
@@ -929,7 +873,6 @@ export default function MesasDistribucion() {
             swalError('Movimiento no permitido', 'La mesa debe tener al menos 1 silla.');
             return;
         }
-
         // Actualización optimista para que se sienta instantáneo en tablet
         setMesas(prev => prev.map(m => {
             if (m.id === mesaOrigenId) return { ...m, sillas: m.sillas - 1 };
@@ -939,6 +882,7 @@ export default function MesasDistribucion() {
 
         router.patch(`/mesas/${mesaOrigenId}/transferir-silla/${mesaDestinoId}`, {}, {
             preserveScroll: true,
+            only: ['mesas'],
             onError: () => {
                 // revertir si falla
                 setMesas(prev => prev.map(m => {
@@ -950,7 +894,6 @@ export default function MesasDistribucion() {
             },
         });
     };
-
     return (
         <>
             <Head title="Distribución de Mesas" />
@@ -1046,7 +989,6 @@ export default function MesasDistribucion() {
         </>
     );
 }
-
 MesasDistribucion.layout = {
     breadcrumbs: [
         {

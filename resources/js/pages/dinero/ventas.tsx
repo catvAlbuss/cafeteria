@@ -126,8 +126,8 @@ export default function Ventas() {
     const [pedidosActivos, setPedidosActivos] = useState<any[]>(pedidosActivosProp);
     const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any | null>(null);
     const [modalEdicionAbierto, setModalEdicionAbierto] = useState(false);
-
     const [pedidoEnviado, setPedidoEnviado] = useState(false);
+    const [modalListaAbierto, setModalListaAbierto] = useState(false);
 
 
     useEffect(() => {
@@ -573,42 +573,107 @@ export default function Ventas() {
                     </div>
                 </div>
 
-                {/* ===== PEDIDOS ACTIVOS ===== */}
-                {pedidosActivos.length > 0 && (
-                    <div className="mt-4">
-                        <div className="bg-white rounded-2xl border border-[#F3E1C8] p-4 shadow-sm">
-                            <h3 className="font-bold text-[#2D1B1A] text-sm mb-3 flex items-center gap-2">
-                                <Package className="w-4 h-4" />
-                                Pedidos Activos ({pedidosActivos.length})
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {pedidosActivos.map((pedido, index) => (
-                                    <div
-                                        key={pedido.id ?? index}
-                                        className="flex items-center justify-between p-3 bg-[#FBF7F0] rounded-xl border border-[#F3E1C8] cursor-pointer hover:border-[#C9A96E] transition"
-                                        onClick={() => {
-                                            setPedidoSeleccionado(pedido);
-                                            setModalEdicionAbierto(true);
+                {/* ===== PEDIDOS ACTIVOS: resumen de una sola tarjeta ===== */}
+                {pedidosActivos.length > 0 && (() => {
+                    const totalProductos = pedidosActivos.reduce(
+                        (sum, p) => sum + (p.productos?.length || 0), 0
+                    );
+                    const totalMonto = pedidosActivos.reduce(
+                        (sum, p) => sum + Number(p.total || 0), 0
+                    );
+
+                    return (
+                        <div className="mt-4">
+                            <div
+                                className="bg-white rounded-2xl border border-[#F3E1C8] p-4 shadow-sm flex items-center justify-between cursor-pointer hover:border-[#C9A96E] transition"
+                                onClick={() => setModalListaAbierto(true)}
+                            >
+                                <h3 className="font-bold text-[#2D1B1A] text-sm flex items-center gap-2">
+                                    <Package className="w-4 h-4" />
+                                    Mesa {mesaInfo?.numero || '?'} · {totalProductos} producto{totalProductos !== 1 ? 's' : ''}
+                                </h3>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm font-bold text-[#C9A96E]">
+                                        S/ {totalMonto.toFixed(2)}
+                                    </span>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setModalListaAbierto(true);
                                         }}
+                                        className="px-3 py-1.5 rounded-lg bg-[#C9A96E] hover:bg-[#B8975D] text-white text-xs font-medium transition"
                                     >
-                                        <div>
-                                            <p className="text-sm font-medium text-[#2D1B1A]">{pedido.numero}</p>
-                                            <p className="text-xs text-[#8D6B53]">
-                                                🪑 Mesa {mesaInfo?.numero || '?'} · {mesaInfo?.capacidad || 0} personas · {pedido.productos.length} productos · S/ {Number(pedido.total).toFixed(2)}
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setPedidoSeleccionado(pedido);
-                                                setModalEdicionAbierto(true);
-                                            }}
-                                            className="px-3 py-1.5 rounded-lg bg-[#C9A96E] hover:bg-[#B8975D] text-white text-xs font-medium transition"
+                                        Ver pedidos
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {/* ===== MODAL: LISTA DE TICKETS DE LA MESA ===== */}
+                {modalListaAbierto && (
+                    <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+                            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <h3 className="font-bold text-[#2D1B1A]">
+                                    Mesa {mesaInfo?.numero || '?'} · {pedidosActivos.length} ticket{pedidosActivos.length !== 1 ? 's' : ''}
+                                </h3>
+                                <button
+                                    onClick={() => setModalListaAbierto(false)}
+                                    className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <div className="p-4 overflow-y-auto space-y-2">
+                                {pedidosActivos.map((pedido, index) => {
+                                    const editable = pedido.estado === 'pendiente';
+                                    const badgeColor: Record<string, string> = {
+                                        pendiente: 'bg-amber-100 text-amber-700 border-amber-200',
+                                        preparando: 'bg-blue-100 text-blue-700 border-blue-200',
+                                        listo: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                                        entregado: 'bg-green-100 text-green-700 border-green-200',
+                                    };
+
+                                    return (
+                                        <div
+                                            key={pedido.id ?? index}
+                                            className="flex items-center justify-between gap-3 p-3 bg-[#FBF7F0] rounded-xl border border-[#F3E1C8]"
                                         >
-                                            ✏️ Editar pedido
-                                        </button>
-                                    </div>
-                                ))}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <p className="text-sm font-medium text-[#2D1B1A]">{pedido.numero}</p>
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badgeColor[pedido.estado] || badgeColor.pendiente}`}>
+                                                        {pedido.estado}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-[#8D6B53] truncate">
+                                                    {pedido.productos.map((prod: any) => `${prod.nombre} x${prod.cantidad}`).join(' · ')}
+                                                    {' · '}S/ {Number(pedido.total).toFixed(2)}
+                                                </p>
+                                            </div>
+
+                                            {editable ? (
+                                                <button
+                                                    onClick={() => {
+                                                        setPedidoSeleccionado(pedido);
+                                                        setModalEdicionAbierto(true);
+                                                        setModalListaAbierto(false);
+                                                    }}
+                                                    className="px-3 py-1.5 rounded-lg bg-[#C9A96E] hover:bg-[#B8975D] text-white text-xs font-medium transition flex-shrink-0"
+                                                >
+                                                    ✏️ Editar
+                                                </button>
+                                            ) : (
+                                                <span className="text-[10px] text-[#8D6B53] italic flex-shrink-0">
+                                                    En cocina, no editable
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
@@ -625,14 +690,14 @@ export default function Ventas() {
                         pedido={pedidoSeleccionado}
                         productos={productos}
                         onPedidoActualizado={(pedidoActualizado) => {
-                        console.log('📥 Pedido recibido en Ventas:', pedidoActualizado);
-                           
+                            console.log('📥 Pedido recibido en Ventas:', pedidoActualizado);
+
                             setPedidosActivos(prev =>
                                 prev.map(p =>
                                     p.id === pedidoActualizado.id
                                         ? {
                                             ...pedidoActualizado,
-                                            productos: pedidoActualizado.productos 
+                                            productos: pedidoActualizado.productos
                                         }
                                         : p
                                 )

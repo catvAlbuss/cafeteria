@@ -42,7 +42,6 @@ interface ModalCobroProps {
 // ============================================================
 // COMPONENTE
 // ============================================================
-
 export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }: ModalCobroProps) {
     const [metodoPago, setMetodoPago] = useState<string>('efectivo');
     const [montoRecibido, setMontoRecibido] = useState<string>('');
@@ -74,7 +73,6 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
 
     const montoRecibidoNum = parseFloat(montoRecibido) || 0;
     const cambio = montoRecibidoNum - total;
-
     const handleCobrar = () => {
         setCargando(true);
 
@@ -94,12 +92,9 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
             authorization_pin: authorizationPin,
         };
 
-        console.log('📤 Registrando venta:', ventaData);
-
         router.patch(`/mesas/${mesa.id}/cobrar`, ventaData, {
             onSuccess: () => {
-                console.log('✅ Venta registrada correctamente');
-
+            
                 if (ticketRef.current) {
                     const printWindow = window.open('', '_blank');
                     if (printWindow) {
@@ -249,7 +244,6 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                         }, 500);
                     }
                 }
-
                 setCargando(false);
                 setExito(true);
 
@@ -306,7 +300,6 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                         </button>
                     )}
                 </div>
-
                 {!exito ? (
                     <div className="p-4 space-y-3 overflow-y-auto flex-1">
 
@@ -316,10 +309,19 @@ export default function ModalCobro({ isOpen, mesa, pedido, onClose, onSuccess }:
                             className="bg-white rounded-xl p-4 border border-gray-200"
                             id="ticket-print"
                         >
-                            {/* SHOP NAME */}
+                            {/* SHOP NAME CON LOGO */}
                             <div className="text-center pb-2 mb-2" style={{ borderBottom: '1.5px dashed #ccc' }}>
+                                <img
+                                    src="/img/logoTiket.png"
+                                    alt="DOLCE CAFE"
+                                    style={{
+                                        maxWidth: '90px',
+                                        margin: '0 auto 6px auto',
+                                        display: 'block'
+                                    }}
+                                />
                                 <p style={{ fontSize: '18px', fontWeight: 700, color: '#000000', letterSpacing: '2px' }}>
-                                    DOLCE CAFE
+                                    DOLCE CAFEE
                                 </p>
                                 <p style={{ fontSize: '11px', color: '#333333', marginTop: '2px' }}>
                                     Av. Principal 123, Lima
