@@ -397,6 +397,54 @@ class PedidoController extends Controller
         return redirect()->back()->with('success', 'Pedido creado correctamente');
     }
 
+    public function agregarProductos(Request $request, Pedido $pedido): RedirectResponse
+    {
+        if ($pedido->estado !== 'preparando') {
+            return redirect()->back()->with('error', 'Solo se pueden agregar productos a un pedido en preparación.');
+        }
+
+        $validated = $request->validate([
+            'productos_nuevos' => 'required|array|min:1',
+            'productos_nuevos.*.id' => 'nullable|integer',
+            'productos_nuevos.*.nombre' => 'required|string|max:255',
+            'productos_nuevos.*.cantidad' => 'required|integer|min:1',
+            'productos_nuevos.*.precio' => 'required|numeric|min:0',
+            'productos_nuevos.*.subtotal' => 'required|numeric|min:0',
+            'productos_nuevos.*.categoria' => 'nullable|string|max:100',
+            'productos_nuevos.*.area' => 'nullable|string|in:cocina,bar,horno,postres',
+        ]);
+
+        $orders = DB::transaction(function () use ($pedido, $validated) {
+            return collect($validated['productos_nuevos'])
+                ->map(function (array $producto) use ($pedido): Pedido {
+                    $area = $producto['area']
+                        ?? $this->productionAreaClassifier->detect($producto, 'cocina');
+
+                    return Pedido::create([
+                        'numero' => Pedido::generarNumero(),
+                        'mesa_id' => $pedido->mesa_id,
+                        'mesa' => $pedido->getAttribute('mesa'),
+                        'cliente' => $pedido->cliente,
+                        'productos' => [$producto],
+                        'total' => (float) $producto['subtotal'],
+                        'metodo_pago' => $pedido->metodo_pago,
+                        'tipo' => $pedido->tipo,
+                        'estado' => 'pendiente',
+                        'area' => $area,
+                        'observaciones' => $pedido->observaciones,
+                        'hora_pedido' => now(),
+                        'user_id' => $pedido->user_id,
+                        'team_id' => $pedido->team_id,
+                    ]);
+                })
+                ->values();
+        }, 3);
+
+        $orders->each(fn (Pedido $order) => broadcast(new PedidoCreado($order)));
+
+        return redirect()->back()->with('success', 'Productos agregados y enviados a producción.');
+    }
+
     public function show(Pedido $pedido): RedirectResponse
     {
         $mesaNumero = $pedido->mesa()->value('numero');

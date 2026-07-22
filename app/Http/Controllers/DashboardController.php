@@ -20,7 +20,10 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $email = strtolower($user->email);
-        $periodo = $request->get('periodo', 'hoy');
+        $periodoSolicitado = $request->string('periodo', 'hoy')->toString();
+        $periodo = in_array($periodoSolicitado, ['hoy', 'semana', 'mes', 'año'], true)
+            ? $periodoSolicitado
+            : 'hoy';
 
         // ============================================================
         // INVITACIONES PENDIENTES (ya existente)
@@ -107,7 +110,7 @@ class DashboardController extends Controller
             ->orderBy('fecha')
             ->get()
             ->map(fn ($item) => [
-                'fecha' => Carbon::parse($item->fecha)->format('d/m'),
+                'fecha' => Carbon::parse($item->getAttribute('fecha'))->format('d/m'),
                 'total' => (float) $item->total,
             ]);
 
@@ -115,7 +118,7 @@ class DashboardController extends Controller
         $topProductos = Pedido::where('estado', 'pagado')
             ->whereBetween('created_at', [$fechas['inicio'], $fechas['fin']])
             ->get()
-            ->flatMap(fn ($pedido) => is_array($pedido->productos) ? $pedido->productos : json_decode($pedido->productos, true) ?? [])
+            ->flatMap(fn (Pedido $pedido) => $pedido->productos)
             ->groupBy('nombre')
             ->map(fn ($items) => [
                 'nombre' => $items->first()['nombre'] ?? 'Producto',
@@ -130,7 +133,7 @@ class DashboardController extends Controller
         $distribucionCategorias = Pedido::where('estado', 'pagado')
             ->whereBetween('created_at', [$fechas['inicio'], $fechas['fin']])
             ->get()
-            ->flatMap(fn ($pedido) => is_array($pedido->productos) ? $pedido->productos : json_decode($pedido->productos, true) ?? [])
+            ->flatMap(fn (Pedido $pedido) => $pedido->productos)
             ->groupBy('categoria')
             ->map(fn ($items) => [
                 'name' => $items->first()['categoria'] ?? 'Otros',
@@ -186,6 +189,9 @@ class DashboardController extends Controller
     // FUNCIONES AUXILIARES
     // ============================================================
 
+    /**
+     * @return array{inicio: Carbon, fin: Carbon}
+     */
     private function getFechasPeriodo(string $periodo): array
     {
         $now = Carbon::now();
@@ -204,6 +210,9 @@ class DashboardController extends Controller
         }
     }
 
+    /**
+     * @return array{inicio: Carbon, fin: Carbon}
+     */
     private function getFechasPeriodoAnterior(string $periodo): array
     {
         $now = Carbon::now();

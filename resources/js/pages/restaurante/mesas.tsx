@@ -700,7 +700,6 @@ export default function MesasDistribucion() {
     const [modalPinAbierto, setModalPinAbierto] = useState(false);
     const [mesaSeleccionada, setMesaSeleccionada] = useState<Mesa | null>(null);
 
-    const pedidos = toArray<any>(pedidosIniciales);
     const [isClient, setIsClient] = useState(false);
     // ===== ESTADOS PARA TICKETS =====
     const [modalTicketsAbierto, setModalTicketsAbierto] = useState(false);
