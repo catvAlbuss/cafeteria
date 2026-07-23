@@ -3,6 +3,7 @@
 use App\Http\Controllers\CajaController;
 use App\Http\Controllers\CardexController;
 use App\Http\Controllers\ContadorController;
+use App\Http\Controllers\CoverController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\InsumoController;
@@ -64,25 +65,14 @@ Route::middleware(['auth'])->group(function () {
     //  RESTAURANTE
     // ----------------------------
     Route::get('/mesas/distribucion', fn () => Inertia::render('restaurante/mesas-distribucion'))->middleware('can:ver mesas')->name('mesas.distribucion');
-    Route::get('/covers', fn () => Inertia::render('restaurante/covers', [
-        'covers' => Cover::query()
-            ->orderByDesc('fecha_inicio')
-            ->get()
-            ->map(fn (Cover $cover) => [
-                'id' => $cover->id,
-                'titulo' => $cover->titulo,
-                'descripcion' => $cover->descripcion,
-                'tipo' => $cover->tipo,
-                'estado' => $cover->estado,
-                'imagen' => $cover->imagen,
-                'fechaInicio' => $cover->fecha_inicio?->format('d/m/Y'),
-                'fechaFin' => $cover->fecha_fin?->format('d/m/Y'),
-                'clicks' => $cover->clicks,
-                'categoria' => $cover->categoria,
-            ])
-            ->values()
-            ->all(),
-    ]))->middleware('can:ver covers')->name('covers');
+Route::controller(App\Http\Controllers\CoverController::class)->group(function () {
+    Route::get('/covers', 'index')->middleware('can:ver covers')->name('covers.index');
+    Route::post('/covers', 'store')->middleware('cash.session')->name('covers.store');
+    Route::patch('/covers/{id}', 'update')->middleware('cash.session')->name('covers.update');
+    Route::patch('/covers/{id}/estado', 'cambiarEstado')->middleware('cash.session')->name('covers.estado');
+    Route::delete('/covers/{id}', 'destroy')->middleware('cash.session')->name('covers.destroy');
+});
+
     Route::patch('/platos/{id}/disponibilidad', [PlatoController::class, 'toggleDisponibilidad'])->middleware('cash.session')->name('platos.disponibilidad');
 
     // ----------------------------

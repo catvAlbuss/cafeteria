@@ -147,18 +147,18 @@ function CoverFormModal({ isOpen, cover, onClose, onGuardado }: CoverFormModalPr
         { value: 'festividad', label: '⭐ Festividad' },
         { value: 'temporada', label: '🌿 Temporada' },
     ];
-
     const guardar = () => {
         if (!form.titulo.trim()) return setError('Ingresa el título del cover');
         if (!form.fechaInicio || !form.fechaFin) return setError('Ingresa las fechas de inicio y fin');
         if (form.fechaInicio > form.fechaFin) return setError('La fecha de inicio no puede ser mayor a la fecha fin');
         setError('');
 
+        // ✅ Conserva la imagen existente si estás editando y no subiste una nueva
         const payload = {
             ...form,
             fechaInicio: form.fechaInicio,
             fechaFin: form.fechaFin,
-            imagen: form.imagen || '/images/default-cover.jpg'
+            imagen: form.imagen ? form.imagen : (esEdicion ? cover!.imagen : '/images/default-cover.jpg')
         };
 
         setGuardando(true);
@@ -167,8 +167,15 @@ function CoverFormModal({ isOpen, cover, onClose, onGuardado }: CoverFormModalPr
             preserveScroll: true,
             onSuccess: () => {
                 setGuardando(false);
-                onGuardado();
                 onClose();
+
+                
+                router.reload({ only: ['covers'] });
+
+                swalSuccess(
+                    esEdicion ? '✅ Cover actualizado' : '✅ Cover creado',
+                    'Los cambios se guardaron correctamente.'
+                );
             },
             onError: (errors: Record<string, string>) => {
                 setGuardando(false);
@@ -177,12 +184,14 @@ function CoverFormModal({ isOpen, cover, onClose, onGuardado }: CoverFormModalPr
         };
 
         if (esEdicion) {
-            router.put(`/covers/${cover!.id}`, payload, opciones);
+            router.post(`/covers/${cover!.id}`, {
+                ...payload,
+                _method: 'patch'
+            }, opciones);
         } else {
             router.post('/covers', payload, opciones);
         }
     };
-
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300">
@@ -869,14 +878,11 @@ export default function Covers() {
                 <CoverFormModal
                     isOpen={modalFormAbierto}
                     cover={coverEditando}
-                    onClose={() => { setModalFormAbierto(false); setCoverEditando(null); }}
-                    onGuardado={() => {
-                        swalSuccess(
-                            coverEditando ? '✅ Cover actualizado' : '✅ Cover creado',
-                            'Los cambios se guardaron correctamente.'
-                        );
-                        router.reload({ only: ['covers'] });
+                    onClose={() => {
+                        setModalFormAbierto(false);
+                        setCoverEditando(null);
                     }}
+                    onGuardado={() => { }}  // ✅ VACÍO - EL MODAL YA MANEJA LA RECARGA
                 />
 
             </div>

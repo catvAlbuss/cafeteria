@@ -15,7 +15,7 @@ return new class extends Migration
             $table->text('descripcion');
             $table->enum('tipo', ['promocion', 'evento', 'festividad', 'temporada']);
             $table->enum('estado', ['activo', 'programado', 'finalizado', 'pausado'])->default('programado');
-            $table->text('imagen')->nullable();
+            $table->longText('imagen')->nullable();
             $table->date('fecha_inicio');
             $table->date('fecha_fin');
             $table->unsignedInteger('clicks')->default(0);

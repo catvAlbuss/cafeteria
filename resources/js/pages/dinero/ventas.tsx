@@ -726,3 +726,4 @@ Ventas.layout = {
         },
     ],
 };
+    
