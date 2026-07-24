@@ -56,7 +56,7 @@ Route::get('/contador/export', [ContadorController::class, 'export'])->name('con
 Route::post('/contador/cerrar/{id}', [ContadorController::class, 'cerrar'])->middleware('can:manage-cash-session')->name('contador.cerrar');
 Route::post('/contador/movimientos', [MovimientoCajaController::class, 'store'])->middleware('cash.session')->name('contador.movimientos.store');
 Route::delete('/contador/{id}', [ContadorController::class, 'destroy'])->name('contador.destroy');
-
+Route::post('/pedidos/{pedido}/entregar', [PedidoController::class, 'entregarTicket'])->name('pedidos.entregar');
     // Reportes
 
     Route::get('/reportes', [ReporteController::class, 'index'])->middleware('can:ver reportes')->name('reportes.index');

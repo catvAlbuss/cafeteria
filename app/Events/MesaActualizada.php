@@ -46,3 +46,4 @@ class MesaActualizada implements ShouldBroadcastNow, ShouldRescue
         ];
     }
 }
+    

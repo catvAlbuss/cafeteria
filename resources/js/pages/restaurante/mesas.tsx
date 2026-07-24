@@ -8,7 +8,6 @@ import { useSedeChannel } from '@/hooks/useSedeChannel';
 import { swalError, swalSuccess, errorsToText } from '@/lib/swal';
 import TarjetaTicket from '@/components/tickets/TarjetaTicket';
 import ModalVerTickets from '@/components/tickets/ModalVerTickets';
-
 import {
     DndContext,
     PointerSensor,
@@ -52,7 +51,6 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
     const [pin, setPin] = useState('');
     const [error, setError] = useState('');
     const [verificando, setVerificando] = useState(false);
-
     if (!isOpen || !mesa) return null;
 
     const handleClose = () => {
@@ -68,7 +66,6 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
     };
 
     const borrarDigito = () => setPin(prev => prev.slice(0, -1));
-
     const confirmar = async () => {
         if (pin.length !== 4) {
             setError('Ingresa los 4 dígitos de tu PIN');
@@ -309,7 +306,7 @@ function MesaCard({ mesa, onCambiarEstado, onTomarPedido, onAbrirModalCobro, onV
             return (
                 <div className="mt-3 flex gap-2">
                     {mesa.estado === 'listo_cobrar' ? (
-                      
+
                         <button
                             onClick={() => onAbrirModalCobro(mesa)}
                             className="flex-1 py-1.5 px-4 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm transition active:scale-95 flex items-center justify-center gap-2"
@@ -609,7 +606,6 @@ export default function MesasDistribucion() {
         setIsClient(true);
     }, []);
 
-    // Tiempo real: el mapa de mesas se actualiza sin recargar la página
     useSedeChannel('mesas', {
         'mesa.actualizada': (payload: any) => {
             setMesas(prev => prev.map(m => (m.id === payload.id ? { ...m, ...payload } : m)));
@@ -617,6 +613,19 @@ export default function MesasDistribucion() {
             if (payload.estado === 'libre') {
                 setPedidosLista(prev => prev.filter(p => p.mesa_id !== payload.id));
             }
+        },
+    });
+  
+    useSedeChannel('pedidos', {
+        'pedido.actualizado': (payload: any) => {
+            setPedidosLista(prev =>
+                prev.map(p => (p.id === payload.id ? { ...p, ...payload } : p))
+            );
+        },
+        'pedido.creado': (payload: any) => {
+            setPedidosLista(prev =>
+                prev.some(p => p.id === payload.id) ? prev : [...prev, payload]
+            );
         },
     });
     // Aviso de capacidad excedida (viene del backend vía flash)
