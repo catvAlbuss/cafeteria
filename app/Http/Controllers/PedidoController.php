@@ -69,81 +69,46 @@ class PedidoController extends Controller
         ]);
     }
 
-    public function produccion(Request $request)
-    {
-        $user = $request->user();
-        $teamId = $user->current_team_id;
-        $areasDisponibles = collect([
-            'cocina' => $user->can('ver cocina'),
-            'bar' => $user->can('ver bar'),
-        ])->filter()->keys();
+public function produccion(Request $request)
+{
+    $user = $request->user();
+    $teamId = $user->current_team_id;
+    
+    $areasDisponibles = collect([
+        'cocina' => $user->can('ver cocina'),
+        'bar' => $user->can('ver bar'),
+    ])->filter()->keys();
 
-        abort_if($areasDisponibles->isEmpty(), 403);
+    abort_if($areasDisponibles->isEmpty(), 403);
 
-        $areaSolicitada = $request->string('area')->toString();
-        $areaActiva = $areasDisponibles->contains($areaSolicitada)
-            ? $areaSolicitada
-            : $areasDisponibles->first();
-        $areasDePedidos = $areaActiva === 'bar' ? ['bar'] : ['cocina', 'horno', 'postres'];
+    $areaSolicitada = $request->string('area')->toString();
+    $areaActiva = $areasDisponibles->contains($areaSolicitada)
+        ? $areaSolicitada
+        : $areasDisponibles->first();
+    
+    $areasDePedidos = $areaActiva === 'bar' ? ['bar'] : ['cocina', 'horno', 'postres'];
 
-        $pedidos = Pedido::with('mesa')
-            ->where('team_id', $teamId)
-            ->whereIn('area', $areasDePedidos)
-            ->whereIn('estado', ['pendiente', 'preparando'])
-            ->limit(100)
-            ->get()
-            ->sortBy('created_at')
-            ->values()
-            ->map(function ($pedido) {
-                $pedido->tipo_origen = 'mesa';
+    // ✅ Obtener pedidos (sin filtrar por delivery_id)
+    $pedidos = Pedido::with('mesa')
+        ->where('team_id', $teamId)
+        ->whereIn('area', $areasDePedidos)
+        ->whereIn('estado', ['pendiente', 'preparando'])
+        ->limit(100)
+        ->get()
+        ->sortBy('created_at')
+        ->values()
+        ->map(function ($pedido) {
+            $pedido->tipo_origen = $pedido->tipo === 'delivery' ? 'delivery' : 'mesa';
+            return $pedido;
+        });
 
-                return $pedido;
-            });
+    return Inertia::render('inventario/produccion', [
+        'pedidos' => $pedidos,
+        'areaActiva' => $areaActiva,
+        'areasDisponibles' => $areasDisponibles->values(),
+    ]);
+}
 
-        // Pedidos de delivery
-        $deliveries = Delivery::where('team_id', $teamId)
-            ->whereIn('estado_delivery', ['preparando', 'listo_para_entregar'])
-            ->when($areaActiva === 'bar', fn ($query) => $query->whereRaw('1 = 0'))
-            ->orderBy('created_at', 'asc')
-            ->get()
-            ->map(function ($delivery) {
-                $p = new \stdClass;
-                $p->id = $delivery->id;
-                $p->numero = $delivery->codigo;
-                $p->mesa_id = null;
-                $p->mesa = null;
-                $p->cliente = $delivery->cliente;
-                $p->productos = is_array($delivery->productos)
-                    ? $delivery->productos
-                    : (json_decode($delivery->productos, true) ?? []);
-                $p->total = $delivery->total;
-                $p->estado = $delivery->estado_delivery === 'listo_para_entregar' ? 'listo' : $delivery->estado_delivery;
-                $p->tipo = 'delivery';
-                $p->tipo_origen = 'delivery';
-                $p->created_at = $delivery->created_at;
-                $p->hora_pedido = $delivery->created_at;
-                $p->observaciones = null;
-                $p->hora_entrega = null;
-
-                return $p;
-            });
-
-        // Unir y ordenar
-        $todos = collect($pedidos)->concat($deliveries)
-            ->sortBy('created_at')
-            ->values();
-
-        return Inertia::render('inventario/produccion', [
-            'pedidos' => $todos,
-            'areaActiva' => $areaActiva,
-            'areasDisponibles' => $areasDisponibles->values(),
-        ]);
-    }
-
-    /**
-     * @param  array<int, string>  $areas
-     * @return array<string, mixed>
-     */
     private function resumenProduccion(int $teamId, array $areas): array
     {
         $pedidosTerminadosHoy = Pedido::query()
@@ -548,22 +513,36 @@ class PedidoController extends Controller
     }
 
     //  Marcar pedido como listo (para cocina)
-    public function marcarListo($id)
-    {
-        $pedido = Pedido::findOrFail($id);
-        $pedido->estado = 'listo';
+ public function marcarListo($id)
+{
+    $pedido = Pedido::findOrFail($id);
+    $pedido->estado = 'listo';
 
-        if ($pedido->tipo === 'delivery') {
-            $pedido->estado_delivery = 'listo_para_entregar';
+   
+    if ($pedido->tipo === 'delivery' && $pedido->delivery_id) {
+        $delivery = Delivery::find($pedido->delivery_id);
+        if ($delivery) {
+           
+            $todosLosPedidos = Pedido::where('delivery_id', $delivery->id)
+                ->where('estado', '!=', 'pagado')
+                ->get();
+            
+            $todosListos = $todosLosPedidos->every(fn($p) => $p->estado === 'listo');
+            
+            if ($todosListos) {
+                $delivery->estado_delivery = 'listo_para_entregar';
+                $delivery->save();
+            }
         }
-
-        $pedido->save();
-
-        broadcast(new PedidoActualizado($pedido));
-        broadcast(new PedidoListo($pedido));
-
-        return redirect()->back()->with('success', 'Pedido marcado como listo');
     }
+
+    $pedido->save();
+
+    broadcast(new PedidoActualizado($pedido));
+    broadcast(new PedidoListo($pedido));
+
+    return redirect()->back()->with('success', 'Pedido marcado como listo');
+}
 
     //  Enviar delivery a cocina
     public function enviarACocina($id)

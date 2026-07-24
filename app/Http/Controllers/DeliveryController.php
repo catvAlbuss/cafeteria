@@ -6,9 +6,22 @@ use App\Models\Delivery;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Plato; 
+use App\Models\Pedido; 
+use App\Events\PedidoCreado;
+use App\Events\PedidoActualizado;
+use App\Services\ProductionAreaClassifier;
 
 class DeliveryController extends Controller
 {
+    
+protected $areaClassifier;
+
+  
+    public function __construct(ProductionAreaClassifier $areaClassifier)
+    {
+        $this->areaClassifier = $areaClassifier;
+    }
+
   public function index()
     {
         $pedidos = Delivery::whereDate('created_at', today())
@@ -70,18 +83,24 @@ class DeliveryController extends Controller
         return back();
     }
 
-    public function entregar(Delivery $delivery, Request $request)
-    {
-        $validated = $request->validate(['metodo_pago' => 'required|in:efectivo,tarjeta,yape']);
+public function entregar(Delivery $delivery, Request $request)
+{
+    $validated = $request->validate(['metodo_pago' => 'required|in:efectivo,tarjeta,yape']);
 
-        $delivery->update([
-            'metodo_pago' => $validated['metodo_pago'],
-            'estado' => 'pagado',
-            'estado_delivery' => 'entregado',
-        ]);
+    $delivery->update([
+        'metodo_pago' => $validated['metodo_pago'],
+        'estado' => 'pagado',
+        'estado_delivery' => 'entregado',
+    ]);
 
-        return back()->with('success', 'Delivery entregado y cobrado');
+    $pedidos = \App\Models\Pedido::where('delivery_id', $delivery->id)->get();
+    foreach ($pedidos as $pedido) {
+        $pedido->update(['estado' => 'pagado']);
+        broadcast(new \App\Events\PedidoActualizado($pedido));
     }
+
+    return back()->with('success', 'Delivery entregado y cobrado');
+}
 
     public function cancelar(Delivery $delivery)
     {
@@ -121,25 +140,71 @@ class DeliveryController extends Controller
 public function cocina(Delivery $delivery)
 {
     $delivery->update(['estado_delivery' => 'preparando']);
-    return back()->with('success', 'Pedido enviado a cocina');
+
+    $productos = is_array($delivery->productos)
+        ? $delivery->productos
+        : json_decode($delivery->productos, true) ?? [];
+
+ 
+    foreach ($productos as $producto) {
+        // Detectar el área del producto
+        $area = $this->areaClassifier->detect($producto, 'cocina');
+
+        $pedido = Pedido::create([
+            'numero' => Pedido::generarNumero(),
+            'team_id' => auth()->user()->current_team_id,
+            'user_id' => auth()->id(),
+            'mesa_id' => null,
+            'mesa' => null,
+            'delivery_id' => $delivery->id,
+            'cliente' => $delivery->cliente,
+            'tipo' => 'delivery',
+            'productos' => [$producto], 
+            'total' => (float) $producto['subtotal'],
+            'estado' => 'pendiente',
+            'area' => $area,
+            'observaciones' => 'Delivery ' . $delivery->codigo . ' - ' . $producto['nombre'],
+            'hora_pedido' => now(),
+        ]);
+
+        broadcast(new PedidoCreado($pedido));
+    }
+
+    return back()->with('success', 'Pedido enviado a cocina correctamente');
 }
 
 
 public function listoParaEntregar($id)
 {
     $delivery = Delivery::findOrFail($id);
+    
     $delivery->update([
         'estado_delivery' => 'listo_para_entregar',
     ]);
+
+    $pedidos = \App\Models\Pedido::where('delivery_id', $delivery->id)->get();
+    foreach ($pedidos as $pedido) {
+        $pedido->update(['estado' => 'listo']);
+        broadcast(new \App\Events\PedidoActualizado($pedido));
+    }
+
     return back()->with('success', 'Pedido listo para entregar');
 }
 
 public function enRuta($id)
 {
     $delivery = Delivery::findOrFail($id);
+    
     $delivery->update([
         'estado_delivery' => 'en_ruta',
     ]);
+
+    $pedidos = \App\Models\Pedido::where('delivery_id', $delivery->id)->get();
+    foreach ($pedidos as $pedido) {
+        $pedido->update(['estado' => 'entregado']);
+        broadcast(new \App\Events\PedidoActualizado($pedido));
+    }
+
     return back()->with('success', 'Delivery en camino');
 }
 }

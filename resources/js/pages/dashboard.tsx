@@ -81,7 +81,7 @@ function StatCard({ icon: Icon, label, value, change, color, subtitle }: {
     const isNegative = change !== undefined && change < 0;
 
     return (
-        <div className="group bg-white rounded-xl sm:rounded-2xl p-3 sm:p-5 shadow-sm border border-[#F3E1C8] hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+        <div className="group bg-white rounded-xl sm:rounded-2xl p-2.5 sm:p-4 shadow-sm border border-[#F3E1C8] hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
             <div className="flex items-start justify-between">
                 <div className={`p-2 sm:p-2.5 rounded-xl ${color} bg-opacity-10 group-hover:scale-110 transition-transform duration-300`}>
                     <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${color}`} />
@@ -223,9 +223,7 @@ export default function Dashboard() {
         { icon: Bike, title: 'Deliverys', description: 'Gestiona tus pedidos de delivery.', href: '/delivery', color: 'text-rose-500', bg: 'bg-rose-50' },
     ];
 
-    // Estadísticas para el gráfico de distribución
     const totalCategorias = datos.distribucionCategorias.reduce((sum, item) => sum + item.value, 0);
-
     return (
         <>
             <Head title="Dashboard - Dolce Cafe" />
@@ -236,15 +234,6 @@ export default function Dashboard() {
                 {/* HEADER CON FILTROS */}
                 {/* ============================================================ */}
                 <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 sm:gap-3">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-gradient-to-br from-[#C9A96E] to-[#B8975D] flex items-center justify-center shadow-lg">
-                            <LayoutDashboard className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                        </div>
-                        <div>
-                            <p className="text-xs sm:text-sm text-[#5A3D2B]">Resumen general del negocio</p>
-                        </div>
-                    </div>
-
                     {/* ✅ FILTROS A LA DERECHA */}
                     <div className="flex bg-white rounded-2xl border border-[#F3E1C8] p-1 shadow-sm flex-wrap sm:flex-nowrap ml-auto">
                         {periodos.map(p => (
@@ -268,8 +257,8 @@ export default function Dashboard() {
                 {/* ============================================================ */}
                 {/* ACCESOS RÁPIDOS */}
                 {/* ============================================================ */}
-                <div>
-                    <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+               <div className="-mt-5"> 
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
                         <Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-orange-500 fill-orange-500" />
                         <h2 className="text-sm sm:text-base font-bold text-[#2D1B1A]">Accesos rápidos</h2>
                     </div>
@@ -291,7 +280,6 @@ export default function Dashboard() {
                         ))}
                     </div>
                 </div>
-
                 {/* ============================================================ */}
                 {/* TARJETAS DE ESTADÍSTICAS */}
                 {/* ============================================================ */}

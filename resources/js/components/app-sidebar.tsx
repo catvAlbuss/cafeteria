@@ -31,8 +31,9 @@ import type { NavItem } from '@/types';
 export function AppSidebar() {
     const page = usePage();
     const dashboardUrl = '/dashboard';
-    const permissions = page.props.auth.permissions;
-    const roles = page.props.auth.roles ?? [];
+    const permissions = page.props.auth?.permissions ?? [];
+const roles = page.props.auth?.roles ?? [];
+
     const currentTeam = page.props.currentTeam;
     const canManageTeams = roles.includes('Gerente') || ['owner', 'admin'].includes(currentTeam?.role ?? '');
     const canManageCashSession = roles.includes('Gerente') || roles.includes('Cajero') || ['owner', 'admin'].includes(currentTeam?.role ?? '');

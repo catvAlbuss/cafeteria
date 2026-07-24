@@ -145,65 +145,13 @@ export default function Produccion() {
     const pedidosAgrupados = agruparPedidosPorArea(pedidosFiltrados);
     const estadisticas = getEstadisticasPorArea(pedidosFiltrados);
 
-    // ============================================================
-    // CAMBIAR ESTADO - VERSIÓN ORIGINAL (FUNCIONABA)
+// ============================================================
+    // CAMBIAR ESTADO 
     // ============================================================
     const cambiarEstado = (pedido: any, nuevoEstado: Pedido['estado']) => {
         if (!pedido || !pedido.id) {
             console.error('❌ Pedido sin ID:', pedido);
             alert('Error: Pedido sin identificar');
-            return;
-        }
-
-        const esDelivery = pedido.tipo_origen === 'delivery';
-
-        // Para delivery, si el nuevo estado es 'listo'
-        if (esDelivery && nuevoEstado === 'listo') {
-            router.patch(
-                `/delivery/${pedido.id}/listo`,
-                {},
-                {
-                    onSuccess: () => {
-                        setPedidos((prev) =>
-                            prev.filter((p) => p.id !== pedido.id),
-                        );
-                    },
-                    onError: (errors) => {
-                        console.log('❌ Error:', errors);
-                        alert(
-                            'Error al marcar delivery como listo: ' +
-                                Object.values(errors).join(' '),
-                        );
-                    },
-                },
-            );
-            return;
-        }
-
-        // Para delivery, cambiar a 'preparando'
-        if (esDelivery && nuevoEstado === 'preparando') {
-            router.patch(
-                `/delivery/${pedido.id}/cocina`,
-                {},
-                {
-                    onSuccess: () => {
-                        setPedidos((prev) =>
-                            prev.map((p) =>
-                                p.id === pedido.id
-                                    ? { ...p, estado: nuevoEstado }
-                                    : p,
-                            ),
-                        );
-                    },
-                    onError: (errors) => {
-                        console.log('❌ Error:', errors);
-                        alert(
-                            'Error al enviar delivery a cocina: ' +
-                                Object.values(errors).join(' '),
-                        );
-                    },
-                },
-            );
             return;
         }
 

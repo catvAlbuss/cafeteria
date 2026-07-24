@@ -4,11 +4,27 @@ namespace App\Http\Controllers;
 
 use App\Models\Caja;
 use App\Models\Pedido;
+use App\Models\Plato;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class CajaController extends Controller
 {
+    /**
+     * Mostrar la página de caja
+     */
+    public function index()
+    {
+        // Obtener todos los platos disponibles
+        $platos = Plato::all();
+        
+        
+        return Inertia::render('dinero/caja', [
+            'platos' => $platos,
+        ]);
+    }
+
     /**
      * Registrar un pedido desde el POS (Caja)
      */
@@ -60,6 +76,11 @@ class CajaController extends Controller
                 'total_ventas_caja' => DB::raw('total_ventas_caja + '.$validated['total']),
                 'total_pedidos' => DB::raw('total_pedidos + 1'),
             ]);
+
+            // Actualizar stock de los productos
+            foreach ($validated['productos'] as $producto) {
+                Plato::where('id', $producto['id'])->decrement('stock', $producto['cantidad']);
+            }
 
             DB::commit();
 

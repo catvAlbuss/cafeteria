@@ -853,7 +853,7 @@ export default function Platos() {
                                     <h3 className="text-[#C9A96E] text-2xl font-extrabold mb-4">DOLCE CAFE</h3>
                                     <p className="text-lg font-semibold mb-2">{etiquetaActual.nombre}</p>
                                     <p className="text-green-600 text-3xl font-extrabold mb-4">
-                                        S/ {etiquetaActual.precio.toFixed(2)}
+                                        S/ {typeof etiquetaActual.precio === 'number' ? etiquetaActual.precio.toFixed(2) : parseFloat(etiquetaActual.precio || 0).toFixed(2)}
                                     </p>
                                     <hr className="border-gray-200 mb-3" />
                                     <p className="text-gray-500 text-sm tracking-wide">
