@@ -15,6 +15,7 @@ class Pedido extends Model
         'user_id',
         'numero',
         'mesa_id',
+        'delivery_id',
         'mesa',
         'cliente',
         'tipo',
