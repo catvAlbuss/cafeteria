@@ -122,13 +122,11 @@ export default function Ventas() {
     const [productos, setProductos] = useState<Producto[]>([]);
     const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
     const [busqueda, setBusqueda] = useState('');
-
     const [pedidosActivos, setPedidosActivos] = useState<any[]>(pedidosActivosProp);
     const [pedidoSeleccionado, setPedidoSeleccionado] = useState<any | null>(null);
     const [modalEdicionAbierto, setModalEdicionAbierto] = useState(false);
     const [pedidoEnviado, setPedidoEnviado] = useState(false);
     const [modalListaAbierto, setModalListaAbierto] = useState(false);
-
 
     useEffect(() => {
         if (platos && platos.length > 0) {
@@ -221,7 +219,6 @@ export default function Ventas() {
     // FUNCIONES DE CARRITO
     // ============================================================
     const totalCarrito = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-
     const agregarProducto = (producto: Producto) => {
         if (!producto.disponible) {
             toast.warning('Este producto no está disponible');

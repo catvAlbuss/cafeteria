@@ -1,10 +1,11 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { 
-    Search, 
-    Plus, 
-    Minus, 
-    X, 
+import ModalBoleta from '@/components/modals/ModalBoleta';
+import {
+    Search,
+    Plus,
+    Minus,
+    X,
     ArrowRight,
     ShoppingCart,
     ImageOff,
@@ -50,6 +51,7 @@ const ProductImage = ({
 }) => {
     const [hasError, setHasError] = useState(false);
 
+
     if (!src || hasError) {
         return (
             <div className="w-full h-full bg-[#F5EDE3] flex flex-col items-center justify-center">
@@ -70,18 +72,17 @@ const ProductImage = ({
         />
     );
 };
-
-const CategoriaCard = ({ 
-    categoria, 
-    icon: IconComponent, 
-    count, 
-    isActive, 
+const CategoriaCard = ({
+    categoria,
+    icon: IconComponent,
+    count,
+    isActive,
     onClick,
-    stockStatus 
-}: { 
-    categoria: string; 
-    icon: any; 
-    count: number; 
+    stockStatus
+}: {
+    categoria: string;
+    icon: any;
+    count: number;
     isActive: boolean;
     onClick: () => void;
     stockStatus?: 'bajo' | 'normal';
@@ -89,18 +90,16 @@ const CategoriaCard = ({
     return (
         <div
             onClick={onClick}
-            className={`rounded-xl p-5 cursor-pointer transition-all duration-300 group ${
-                isActive 
-                    ? 'bg-gradient-to-br from-[#C9A96E] to-[#B8975D] text-white shadow-md shadow-[#C9A96E]/25 scale-[1.02]' 
-                    : 'bg-white text-gray-800 shadow-sm border border-black/5 hover:shadow-md hover:border-[#C9A96E]/40 hover:scale-[1.02]'
-            }`}
+            className={`rounded-xl p-5 cursor-pointer transition-all duration-300 group ${isActive
+                ? 'bg-gradient-to-br from-[#C9A96E] to-[#B8975D] text-white shadow-md shadow-[#C9A96E]/25 scale-[1.02]'
+                : 'bg-white text-gray-800 shadow-sm border border-black/5 hover:shadow-md hover:border-[#C9A96E]/40 hover:scale-[1.02]'
+                }`}
         >
             <div className="flex items-start justify-between">
-                <div className={`p-1.5 rounded-lg transition-all duration-300 ${
-                    isActive 
-                        ? 'bg-white/20 text-white' 
-                        : 'bg-[#FBF7F0] text-[#C9A96E] group-hover:bg-[#C9A96E]/10'
-                }`}>
+                <div className={`p-1.5 rounded-lg transition-all duration-300 ${isActive
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[#FBF7F0] text-[#C9A96E] group-hover:bg-[#C9A96E]/10'
+                    }`}>
                     <IconComponent className="w-4 h-4" strokeWidth={2} />
                 </div>
                 {stockStatus === 'bajo' && !isActive && (
@@ -129,11 +128,9 @@ const CategoriaCard = ({
 };
 
 export default function Caja() {
-  
-    const { platos = [] } = usePage().props as any;
-    
-    const [productos, setProductos] = useState<Producto[]>([]);
 
+    const { platos = [] } = usePage().props as any;
+    const [productos, setProductos] = useState<Producto[]>([]);
     // Procesar platos desde la base de datos
     useEffect(() => {
         if (platos && platos.length > 0) {
@@ -150,7 +147,7 @@ export default function Caja() {
         }
     }, [platos]);
 
-    // 🛒 Estado del carrito
+    //  Estado del carrito
     const [carrito, setCarrito] = useState<ItemCarrito[]>(() => {
         const saved = localStorage.getItem('carritoCaja');
         return saved ? JSON.parse(saved) : [];
@@ -160,8 +157,10 @@ export default function Caja() {
     const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string | null>(null);
     const [cliente, setCliente] = useState('');
     const [mesa, setMesa] = useState('');
-    const [tipoPedido, setTipoPedido] = useState('salon');
+    const [tipoPedido, setTipoPedido] = useState('llevar');
     const [metodoPago, setMetodoPago] = useState('efectivo');
+    const [datosBoleta, setDatosBoleta] = useState<any>(null);
+    const [modalBoletaAbierto, setModalBoletaAbierto] = useState(false);
 
     // Guardar carrito en localStorage
     useEffect(() => {
@@ -193,7 +192,7 @@ export default function Caja() {
         if (categoriaSeleccionada && p.categoria !== categoriaSeleccionada) {
             return false;
         }
-        if (busqueda && !p.nombre.toLowerCase().includes(busqueda.toLowerCase()) && 
+        if (busqueda && !p.nombre.toLowerCase().includes(busqueda.toLowerCase()) &&
             !p.categoria.toLowerCase().includes(busqueda.toLowerCase())) {
             return false;
         }
@@ -226,7 +225,6 @@ export default function Caja() {
         }
 
         const existente = carrito.find(item => item.id === producto.id);
-
         if (existente) {
             if (producto.stock !== undefined && existente.cantidad + 1 > producto.stock) {
                 toast.error('No hay suficiente stock');
@@ -240,17 +238,16 @@ export default function Caja() {
                 )
             );
         } else {
-            setCarrito(prev => [...prev, { 
-                id: producto.id, 
-                nombre: producto.nombre, 
-                precio: producto.precio, 
-                cantidad: 1, 
-                imagen: producto.imagen 
+            setCarrito(prev => [...prev, {
+                id: producto.id,
+                nombre: producto.nombre,
+                precio: producto.precio,
+                cantidad: 1,
+                imagen: producto.imagen
             }]);
         }
     };
 
-    // ➖ Quitar producto
     const quitarProducto = (id: number) => {
         setCarrito(prev => {
             const existente = prev.find(item => item.id === id);
@@ -265,7 +262,6 @@ export default function Caja() {
         });
     };
 
-    // Eliminar producto
     const eliminarProducto = (id: number) => {
         setCarrito(prev => prev.filter(item => item.id !== id));
     };
@@ -283,7 +279,7 @@ export default function Caja() {
     };
 
     // ============================================================
-    // REALIZAR PEDIDO
+    // REALIZAR PEDIDO - CON MODAL DE BOLETA
     // ============================================================
     const realizarPedido = () => {
         if (carrito.length === 0) {
@@ -322,21 +318,33 @@ export default function Caja() {
         router.post('/caja/registrar', pedidoData, {
             preserveScroll: true,
             onSuccess: () => {
-                toast.success('✅ Pedido registrado con éxito', {
-                    description: `Total: S/ ${total.toFixed(2)} · ${tipoPedido === 'salon' ? 'Salón' : tipoPedido === 'llevar' ? 'Para llevar' : 'Delivery'}`,
-                    duration: 4000,
-                    style: {
-                        background: '#2D1B1A',
-                        color: '#FBF3E7',
-                        border: '1px solid #C9A96E',
-                    },
+                console.log('✅ Pedido registrado');
+
+                // Guardar datos de la boleta y abrir modal
+                setDatosBoleta({
+                    cliente: cliente || 'Anónimo',
+                    mesa: mesa || null,
+                    tipo: tipoPedido,
+                    metodoPago: metodoPago,
+                    productos: carrito.map(item => ({
+                        id: item.id,
+                        nombre: item.nombre,
+                        cantidad: item.cantidad,
+                        precio: item.precio,
+                        subtotal: item.precio * item.cantidad
+                    })),
+                    subtotal: subtotal,
+                    igv: igv,
+                    total: total,
                 });
+                setModalBoletaAbierto(true);
+
                 limpiarCarrito();
-                router.reload();
             },
             onError: (errors) => {
-                const errorMsg = typeof errors === 'object' 
-                    ? Object.values(errors).flat().join(' ') 
+                console.log('❌ Error:', errors);
+                const errorMsg = typeof errors === 'object'
+                    ? Object.values(errors).flat().join(' ')
                     : errors;
                 toast.error('Error al registrar pedido', {
                     description: errorMsg || 'Intenta nuevamente',
@@ -347,12 +355,11 @@ export default function Caja() {
     };
 
     const categoriasData = categorias();
-
     return (
         <>
             <Head title="Caja" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-3 sm:p-4 bg-[#FBF7F0]">
-                
+
                 <div className="flex items-center justify-end">
                     <div className="flex items-center gap-3 text-sm text-gray-500">
                         <span className="px-3 py-1 bg-white rounded-lg border border-black/5">
@@ -366,12 +373,12 @@ export default function Caja() {
 
                 {/* Layout Principal */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    
+
                     {/* ============================================================ */}
                     {/* COLUMNA IZQUIERDA: Productos (2/3) */}
                     {/* ============================================================ */}
                     <div className="lg:col-span-2">
-                        
+
                         {/* Buscador */}
                         <div className="relative mb-4">
                             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" strokeWidth={2} />
@@ -398,7 +405,7 @@ export default function Caja() {
                         </div>
 
                         {/* Categorías */}
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
                             <CategoriaCard
                                 categoria="Todos"
                                 icon={LayoutGrid}
@@ -429,21 +436,20 @@ export default function Caja() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                             {productosFiltrados.length === 0 ? (
                                 <div className="col-span-full text-center py-8 text-[#8D6B53]">
-                                    {busqueda 
-                                        ? `No se encontraron productos para "${busqueda}"` 
-                                        : categoriaSeleccionada 
-                                            ? `No hay productos en "${categoriaSeleccionada}"` 
+                                    {busqueda
+                                        ? `No se encontraron productos para "${busqueda}"`
+                                        : categoriaSeleccionada
+                                            ? `No hay productos en "${categoriaSeleccionada}"`
                                             : 'No hay productos disponibles'}
                                 </div>
                             ) : (
                                 productosFiltrados.map((producto) => (
                                     <div
                                         key={producto.id}
-                                        className={`relative bg-white rounded-2xl border border-black/5 hover:shadow-md transition overflow-hidden group ${
-                                            producto.disponible && (producto.stock === undefined || producto.stock > 0)
-                                                ? 'cursor-pointer hover:border-[#C9A96E]/50 active:scale-[0.98]'
-                                                : 'cursor-not-allowed opacity-70'
-                                        }`}
+                                        className={`relative bg-white rounded-2xl border border-black/5 hover:shadow-md transition overflow-hidden group ${producto.disponible && (producto.stock === undefined || producto.stock > 0)
+                                            ? 'cursor-pointer hover:border-[#C9A96E]/50 active:scale-[0.98]'
+                                            : 'cursor-not-allowed opacity-70'
+                                            }`}
                                         onClick={() => {
                                             if (producto.disponible && (producto.stock === undefined || producto.stock > 0)) {
                                                 agregarProducto(producto);
@@ -505,14 +511,13 @@ export default function Caja() {
                                                     }
                                                 }}
                                                 disabled={!producto.disponible || (producto.stock !== undefined && producto.stock <= 0)}
-                                                className={`w-full mt-2 py-1.5 rounded-lg text-xs font-semibold transition ${
-                                                    producto.disponible && (producto.stock === undefined || producto.stock > 0)
-                                                        ? 'bg-[#C9A96E] hover:bg-[#B8975D] text-white'
-                                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                                }`}
+                                                className={`w-full mt-2 py-1.5 rounded-lg text-xs font-semibold transition ${producto.disponible && (producto.stock === undefined || producto.stock > 0)
+                                                    ? 'bg-[#C9A96E] hover:bg-[#B8975D] text-white'
+                                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                    }`}
                                             >
-                                                {producto.disponible && (producto.stock === undefined || producto.stock > 0) 
-                                                    ? '+ Agregar' 
+                                                {producto.disponible && (producto.stock === undefined || producto.stock > 0)
+                                                    ? '+ Agregar'
                                                     : 'No disponible'}
                                             </button>
                                         </div>
@@ -527,7 +532,7 @@ export default function Caja() {
                     {/* ============================================================ */}
                     <div className="lg:col-span-1">
                         <div className="bg-white rounded-2xl border border-black/5 p-4 shadow-sm h-fit">
-                            
+
                             {/* Cabecera */}
                             <div className="flex justify-between items-center mb-3">
                                 <h2 className="flex items-center gap-2 font-bold text-[#2D1B1A]">
@@ -542,35 +547,31 @@ export default function Caja() {
                                 </button>
                             </div>
 
-                            {/* Tipo de pedido */}
                             <div className="grid grid-cols-3 gap-1 mb-3">
                                 <button
                                     onClick={() => setTipoPedido('salon')}
-                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${
-                                        tipoPedido === 'salon'
-                                            ? 'bg-[#C9A96E] text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${tipoPedido === 'salon'
+                                        ? 'bg-[#C9A96E] text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
                                 >
                                     🪑 Salón
                                 </button>
                                 <button
                                     onClick={() => setTipoPedido('llevar')}
-                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${
-                                        tipoPedido === 'llevar'
-                                            ? 'bg-[#C9A96E] text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${tipoPedido === 'llevar'
+                                        ? 'bg-[#C9A96E] text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
                                 >
                                     📦 Llevar
                                 </button>
                                 <button
                                     onClick={() => setTipoPedido('delivery')}
-                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${
-                                        tipoPedido === 'delivery'
-                                            ? 'bg-[#C9A96E] text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${tipoPedido === 'delivery'
+                                        ? 'bg-[#C9A96E] text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
                                 >
                                     🚚 Delivery
                                 </button>
@@ -675,31 +676,28 @@ export default function Caja() {
                                     <div className="grid grid-cols-3 gap-1 mt-3">
                                         <button
                                             onClick={() => setMetodoPago('efectivo')}
-                                            className={`py-1.5 rounded-lg text-xs font-medium transition ${
-                                                metodoPago === 'efectivo'
-                                                    ? 'bg-green-500 text-white'
-                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                            }`}
+                                            className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'efectivo'
+                                                ? 'bg-green-500 text-white'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                }`}
                                         >
                                             💵 Efectivo
                                         </button>
                                         <button
                                             onClick={() => setMetodoPago('tarjeta')}
-                                            className={`py-1.5 rounded-lg text-xs font-medium transition ${
-                                                metodoPago === 'tarjeta'
-                                                    ? 'bg-blue-500 text-white'
-                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                            }`}
+                                            className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'tarjeta'
+                                                ? 'bg-blue-500 text-white'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                }`}
                                         >
                                             💳 Tarjeta
                                         </button>
                                         <button
                                             onClick={() => setMetodoPago('yape')}
-                                            className={`py-1.5 rounded-lg text-xs font-medium transition ${
-                                                metodoPago === 'yape'
-                                                    ? 'bg-purple-500 text-white'
-                                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                            }`}
+                                            className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'yape'
+                                                ? 'bg-purple-500 text-white'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                }`}
                                         >
                                             📱 Yape
                                         </button>
@@ -719,10 +717,25 @@ export default function Caja() {
                     </div>
                 </div>
             </div>
+            {/* ===== MODAL BOLETA ===== */}
+            <ModalBoleta
+                isOpen={modalBoletaAbierto}
+                data={datosBoleta}
+                onClose={() => {
+                    setModalBoletaAbierto(false);
+                    setDatosBoleta(null);
+                }}
+                onSuccess={() => {
+                    setModalBoletaAbierto(false);
+                    setDatosBoleta(null);
+
+                    router.reload();
+                }}
+            />
         </>
     );
-}
 
+}
 Caja.layout = {
     breadcrumbs: [
         {

@@ -42,7 +42,6 @@ export default function TarjetaTicket({ ticket, onEntregar, onCerrar }: TarjetaT
     const todosListos = ticket.productos.every(p => p.estado === 'listo');
     const estaEntregado = ticket.estado === 'entregado';
 
-    // Contar productos por área
     const productosPorArea = ticket.productos.reduce((acc, p) => {
         if (!acc[p.area]) acc[p.area] = { total: 0, listos: 0 };
         acc[p.area].total++;
@@ -57,7 +56,6 @@ export default function TarjetaTicket({ ticket, onEntregar, onCerrar }: TarjetaT
     };
 
     const estadoInfo = getEstadoLabel();
-
     return (
         <div className="bg-white rounded-2xl shadow-xl border border-[#F3E1C8] overflow-hidden">
             {/* Header del Ticket */}
@@ -127,7 +125,6 @@ export default function TarjetaTicket({ ticket, onEntregar, onCerrar }: TarjetaT
                     Total: S/ {ticket.total.toFixed(2)}
                 </span>
             </div>
-
             {/* Footer: Botón Entregar (solo si está listo y no entregado) */}
             {todosListos && !estaEntregado && (
                 <div className="px-4 py-3 border-t border-gray-200 bg-[#FBF7F0]">

@@ -28,7 +28,6 @@ export default function OperationalInventory() {
         }
 
         const days = (new Date(`${insumo.fecha_vencimiento}T00:00:00`).getTime() - Date.now()) / 86_400_000;
-
         return days >= 0 && days <= 3;
     }).length;
 
@@ -61,7 +60,6 @@ export default function OperationalInventory() {
                         </div>
                     </div>
                 </section>
-
                 <section className="rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
                     <div className="relative">
                         <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-400" />
@@ -74,7 +72,6 @@ export default function OperationalInventory() {
                         />
                     </div>
                 </section>
-
                 {filteredSupplies.length === 0 ? (
                     <section className="rounded-2xl border border-dashed border-neutral-300 bg-white p-10 text-center">
                         <Package className="mx-auto h-10 w-10 text-neutral-300" />
@@ -119,7 +116,6 @@ export default function OperationalInventory() {
         </>
     );
 }
-
 OperationalInventory.layout = {
     breadcrumbs: [
         {

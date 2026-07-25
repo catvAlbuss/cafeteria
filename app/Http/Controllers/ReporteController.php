@@ -22,7 +22,7 @@ class ReporteController extends Controller
 
             $cacheKey = 'reportes.dashboard.'.auth()->user()->current_team_id.".{$fechaInicio}.{$fechaFin}";
 
-            $data = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($fechaInicio, $fechaFin) {
+            $data = call_user_func(function () use ($fechaInicio, $fechaFin) {
 
                 // ============================================================
                 // 1️⃣ DATOS DE VENTAS (SOLO PAGADOS)
@@ -74,24 +74,33 @@ class ReporteController extends Controller
 
                 // Tickets
                 $ticketsHoy = Pedido::whereDate('created_at', today())
-                    ->where('tipo', 'mesa')
-                    ->where('estado', 'pagado')
-                    ->count();
+                ->where('estado', 'pagado')
+                ->count();
 
-                $ticketsPorMesa = Pedido::whereBetween('created_at', [now()->subDays(7), now()])
-                    ->where('tipo', 'mesa')
-                    ->where('estado', 'pagado')
-                    ->select('mesa_id', DB::raw('COUNT(*) as tickets'))
-                    ->groupBy('mesa_id')
-                    ->with('mesa')
-                    ->get()
-                    ->map(function ($item) {
-                        return [
-                            'mesa' => $item->mesa ? $item->mesa->numero : 'N/A',
-                            'tickets' => $item->tickets,
-                        ];
-                    });
+// ============================================================
+// TICKETS POR ORIGEN (Mesa + Caja)
+// ============================================================
 
+$ticketsPorOrigen = Pedido::whereBetween('created_at', [
+    Carbon::parse($fechaInicio)->startOfDay(),
+    Carbon::parse($fechaFin)->endOfDay(),
+])
+->where('estado', 'pagado')
+->select(
+    DB::raw('CASE 
+        WHEN mesa_id IS NOT NULL THEN CONCAT("Mesa ", mesa_id)
+        ELSE "Caja"
+    END as origen'),
+    DB::raw('COUNT(*) as tickets')
+)
+->groupBy('origen')
+->get()
+->map(function ($item) {
+    return [
+        'origen' => $item->origen,
+        'tickets' => $item->tickets,
+    ];
+});
                 // Total cobrado hoy
                 $totalCobradoHoy = Pedido::whereDate('created_at', today())
                     ->where('estado', 'pagado')
@@ -169,35 +178,96 @@ class ReporteController extends Controller
                     'ticketPromedio' => $totalTickets > 0 ? $totalVentas / $totalTickets : 0,
                     'margenGanancia' => $totalVentas > 0 ? round(($totalVentas * 0.75 / $totalVentas) * 100, 1) : 0,
                 ];
+// ============================================================
+// 6️⃣ VENTAS DEL DÍA - DETALLE (fecha, mesa, producto, total, método de pago)
+// ============================================================
 
-                // ============================================================
-                // 6 VENTAS DEL DÍA - DETALLE (fecha, mesa, producto, total, método de pago)
-                // ============================================================
+$mesasMap = Mesa::pluck('numero', 'id');
 
-                $mesasMap = Mesa::pluck('numero', 'id'); // [id => numero]
+$ventasDelDiaDetalle = Pedido::whereDate('created_at', today())
+    ->where('estado', 'pagado')
+    ->orderByDesc('created_at')
+    ->get()
+    ->groupBy('id')
+    ->map(function ($pedidos) use ($mesasMap) {
+        $pedido = $pedidos->first();
 
-                $ventasDelDiaDetalle = Pedido::whereDate('created_at', today())
-                    ->where('estado', 'pagado')
-                    ->orderByDesc('created_at')
-                    ->get()
-                    ->map(function ($pedido) use ($mesasMap) {
-                        $items = is_string($pedido->productos) ? json_decode($pedido->productos, true) : $pedido->productos;
-                        $productoTexto = collect($items ?? [])
-                            ->map(fn ($p) => ($p['cantidad'] ?? 1).'x '.($p['nombre'] ?? 'Producto'))
-                            ->implode(', ');
+        // Decodificar productos
+        $productosRaw = is_string($pedido->productos) ? json_decode($pedido->productos, true) : $pedido->productos;
 
-                        $numeroMesa = $pedido->mesa_id && isset($mesasMap[$pedido->mesa_id])
-                            ? $mesasMap[$pedido->mesa_id]
-                            : ($pedido->tipo === 'delivery' ? 'Delivery' : 'N/A');
+        // Extraer productos correctamente
+        $items = [];
+        if (is_array($productosRaw)) {
+            foreach ($productosRaw as $item) {
+                if (is_array($item) && isset($item['nombre'])) {
+                    $items[] = $item;
+                } elseif (is_array($item) && isset($item['productos']) && is_array($item['productos'])) {
+                    foreach ($item['productos'] as $subItem) {
+                        if (is_array($subItem) && isset($subItem['nombre'])) {
+                            $items[] = $subItem;
+                        }
+                    }
+                } elseif (is_array($item) && isset($item[0]) && is_array($item[0]) && isset($item[0]['nombre'])) {
+                    foreach ($item as $subItem) {
+                        if (is_array($subItem) && isset($subItem['nombre'])) {
+                            $items[] = $subItem;
+                        }
+                    }
+                }
+            }
+        }
 
-                        return [
-                            'fecha' => $pedido->created_at->format('d/m/Y H:i'),
-                            'mesa' => $numeroMesa,
-                            'producto' => $productoTexto,
-                            'total' => $pedido->total,
-                            'metodo_pago' => $pedido->metodo_pago ? ucfirst($pedido->metodo_pago) : 'N/A',
-                        ];
-                    });
+        if (empty($items)) {
+            $items = is_string($pedido->productos) ? json_decode($pedido->productos, true) : $pedido->productos;
+            if (isset($items[0]) && is_array($items[0]) && isset($items[0]['nombre'])) {
+                $items = $items;
+            } elseif (isset($items[0]) && is_array($items[0])) {
+                $items = collect($items)->flatten(1)->toArray();
+            }
+        }
+
+       
+// ✅ Asegurar que cada producto tenga 'precio' y 'subtotal' SIN ALTERAR
+$itemsConPrecio = collect($items ?? [])
+    ->filter(fn ($p) => is_array($p) && isset($p['nombre']))
+    ->map(function ($p) {
+        $precio = (float) ($p['precio'] ?? 0);
+        $cantidad = (int) ($p['cantidad'] ?? 1);
+        $subtotal = (float) ($p['subtotal'] ?? $precio * $cantidad);
+        
+        return [
+            'nombre' => $p['nombre'] ?? 'Producto',
+            'cantidad' => $cantidad,
+            'precio' => $precio, 
+            'subtotal' => $subtotal, 
+        ];
+    })
+    ->toArray();
+
+        // Construir texto de productos
+        $productoTexto = collect($itemsConPrecio)
+            ->map(fn ($p) => ($p['cantidad'] ?? 1) . 'x ' . ($p['nombre'] ?? 'Producto'))
+            ->implode(', ');
+
+        // Determinar origen
+        if ($pedido->mesa_id && isset($mesasMap[$pedido->mesa_id])) {
+            $numeroMesa = $mesasMap[$pedido->mesa_id];
+        } elseif ($pedido->tipo === 'delivery') {
+            $numeroMesa = 'Delivery';
+        } else {
+            $numeroMesa = 'Caja';
+        }
+
+        return [
+            'fecha' => $pedido->created_at->format('d/m/Y H:i'),
+            'mesa' => $numeroMesa,
+            'producto' => $productoTexto ?: 'Sin productos',
+            'total' => $pedido->total,
+            'metodo_pago' => $pedido->metodo_pago ? ucfirst($pedido->metodo_pago) : 'N/A',
+            'productosDetalle' => $itemsConPrecio, // ✅ Ahora con precio y subtotal
+        ];
+    })
+    ->values();
                 // ============================================================
                 // 7 MÉTODOS DE PAGO
                 // ============================================================
@@ -225,7 +295,6 @@ class ReporteController extends Controller
                 // ============================================================
                 // 8 MÉTODOS DE PAGO CON PORCENTAJES
                 // ============================================================
-
                 $metodosPagoConPorcentaje = $metodosPago->map(function ($item) use ($totalCobradoHoy) {
                     $item['porcentaje'] = $totalCobradoHoy > 0 ? round(($item['total'] / $totalCobradoHoy) * 100) : 0;
 
@@ -244,7 +313,7 @@ class ReporteController extends Controller
                     'metodosPago' => $metodosPagoConPorcentaje,
                     'totales' => $totales,
                     'ventasPorTipo' => $ventasPorTipo,
-                    'ticketsPorMesa' => $ticketsPorMesa,
+                    'ticketsPorOrigen' => $ticketsPorOrigen,
                     'estadoMesas' => [
                         'total' => $totalMesas,
                         'ocupadas' => $mesasOcupadas,
