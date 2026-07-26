@@ -99,4 +99,4 @@ public function registrar(Request $request)
             'caja' => $caja,
         ]);
     }
-}
+}   

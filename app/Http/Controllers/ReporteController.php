@@ -178,8 +178,9 @@ $ticketsPorOrigen = Pedido::whereBetween('created_at', [
                     'ticketPromedio' => $totalTickets > 0 ? $totalVentas / $totalTickets : 0,
                     'margenGanancia' => $totalVentas > 0 ? round(($totalVentas * 0.75 / $totalVentas) * 100, 1) : 0,
                 ];
+
 // ============================================================
-// 6️⃣ VENTAS DEL DÍA - DETALLE (fecha, mesa, producto, total, método de pago)
+// 6️ VENTAS DEL DÍA - DETALLE (agrupado por venta real, no por ticket individual)
 // ============================================================
 
 $mesasMap = Mesa::pluck('numero', 'id');
@@ -188,83 +189,96 @@ $ventasDelDiaDetalle = Pedido::whereDate('created_at', today())
     ->where('estado', 'pagado')
     ->orderByDesc('created_at')
     ->get()
-    ->groupBy('id')
-    ->map(function ($pedidos) use ($mesasMap) {
-        $pedido = $pedidos->first();
+    // Agrupa por venta_grupo (varios pedidos de una misma mesa cobrados juntos).
+    // Si no tiene venta_grupo (venta directa de Caja, delivery, o cobro individual
+    // antiguo), se trata como su propio grupo de 1 solo elemento (comportamiento
+    // igual al de antes para esos casos).
+    ->groupBy(fn ($pedido) => $pedido->venta_grupo ?: 'individual-'.$pedido->id)
+    ->map(function ($pedidosDelGrupo) use ($mesasMap) {
+        $primerPedido = $pedidosDelGrupo->first();
 
-        // Decodificar productos
-        $productosRaw = is_string($pedido->productos) ? json_decode($pedido->productos, true) : $pedido->productos;
-
-        // Extraer productos correctamente
+        // Unir los productos de TODOS los pedidos del grupo (toda la mesa/venta)
         $items = [];
-        if (is_array($productosRaw)) {
-            foreach ($productosRaw as $item) {
-                if (is_array($item) && isset($item['nombre'])) {
-                    $items[] = $item;
-                } elseif (is_array($item) && isset($item['productos']) && is_array($item['productos'])) {
-                    foreach ($item['productos'] as $subItem) {
-                        if (is_array($subItem) && isset($subItem['nombre'])) {
-                            $items[] = $subItem;
+        foreach ($pedidosDelGrupo as $pedidoDelGrupo) {
+            $productosRaw = is_string($pedidoDelGrupo->productos)
+                ? json_decode($pedidoDelGrupo->productos, true)
+                : $pedidoDelGrupo->productos;
+
+            if (is_array($productosRaw)) {
+                foreach ($productosRaw as $item) {
+                    if (is_array($item) && isset($item['nombre'])) {
+                        $items[] = $item;
+                    } elseif (is_array($item) && isset($item['productos']) && is_array($item['productos'])) {
+                        foreach ($item['productos'] as $subItem) {
+                            if (is_array($subItem) && isset($subItem['nombre'])) {
+                                $items[] = $subItem;
+                            }
                         }
-                    }
-                } elseif (is_array($item) && isset($item[0]) && is_array($item[0]) && isset($item[0]['nombre'])) {
-                    foreach ($item as $subItem) {
-                        if (is_array($subItem) && isset($subItem['nombre'])) {
-                            $items[] = $subItem;
+                    } elseif (is_array($item) && isset($item[0]) && is_array($item[0]) && isset($item[0]['nombre'])) {
+                        foreach ($item as $subItem) {
+                            if (is_array($subItem) && isset($subItem['nombre'])) {
+                                $items[] = $subItem;
+                            }
                         }
                     }
                 }
             }
         }
 
-        if (empty($items)) {
-            $items = is_string($pedido->productos) ? json_decode($pedido->productos, true) : $pedido->productos;
-            if (isset($items[0]) && is_array($items[0]) && isset($items[0]['nombre'])) {
-                $items = $items;
-            } elseif (isset($items[0]) && is_array($items[0])) {
-                $items = collect($items)->flatten(1)->toArray();
-            }
-        }
+        // Normalizar cada línea con precio/subtotal
+        $itemsConPrecio = collect($items)
+            ->filter(fn ($p) => is_array($p) && isset($p['nombre']))
+            ->map(function ($p) {
+                $precio = (float) ($p['precio'] ?? 0);
+                $cantidad = (int) ($p['cantidad'] ?? 1);
+                $subtotal = (float) ($p['subtotal'] ?? $precio * $cantidad);
 
-       
-// ✅ Asegurar que cada producto tenga 'precio' y 'subtotal' SIN ALTERAR
-$itemsConPrecio = collect($items ?? [])
-    ->filter(fn ($p) => is_array($p) && isset($p['nombre']))
-    ->map(function ($p) {
-        $precio = (float) ($p['precio'] ?? 0);
-        $cantidad = (int) ($p['cantidad'] ?? 1);
-        $subtotal = (float) ($p['subtotal'] ?? $precio * $cantidad);
-        
-        return [
-            'nombre' => $p['nombre'] ?? 'Producto',
-            'cantidad' => $cantidad,
-            'precio' => $precio, 
-            'subtotal' => $subtotal, 
-        ];
-    })
-    ->toArray();
+                return [
+                    'nombre' => $p['nombre'] ?? 'Producto',
+                    'cantidad' => $cantidad,
+                    'precio' => $precio,
+                    'subtotal' => $subtotal,
+                ];
+            })
+            // Fusiona líneas del mismo producto (ej: 2 tickets con "Capuccino" -> 1 línea "2x Capuccino")
+            ->groupBy('nombre')
+            ->map(function ($grupoProducto) {
+                $primero = $grupoProducto->first();
 
-        // Construir texto de productos
+                return [
+                    'nombre' => $primero['nombre'],
+                    'cantidad' => $grupoProducto->sum('cantidad'),
+                    'precio' => $primero['precio'],
+                    'subtotal' => $grupoProducto->sum('subtotal'),
+                ];
+            })
+            ->values()
+            ->toArray();
+
         $productoTexto = collect($itemsConPrecio)
-            ->map(fn ($p) => ($p['cantidad'] ?? 1) . 'x ' . ($p['nombre'] ?? 'Producto'))
+            ->map(fn ($p) => ($p['cantidad'] ?? 1).'x '.($p['nombre'] ?? 'Producto'))
             ->implode(', ');
 
-        // Determinar origen
-        if ($pedido->mesa_id && isset($mesasMap[$pedido->mesa_id])) {
-            $numeroMesa = $mesasMap[$pedido->mesa_id];
-        } elseif ($pedido->tipo === 'delivery') {
+        // Determinar origen (igual que antes)
+        if ($primerPedido->mesa_id && isset($mesasMap[$primerPedido->mesa_id])) {
+            $numeroMesa = $mesasMap[$primerPedido->mesa_id];
+        } elseif ($primerPedido->tipo === 'delivery') {
             $numeroMesa = 'Delivery';
         } else {
             $numeroMesa = 'Caja';
         }
 
+        $totalGrupo = $pedidosDelGrupo->sum('total');
+        $fechaPago = $pedidosDelGrupo->sortByDesc('updated_at')->first()->updated_at
+            ?? $primerPedido->created_at;
+
         return [
-            'fecha' => $pedido->created_at->format('d/m/Y H:i'),
+            'fecha' => $fechaPago->format('d/m/Y H:i'),
             'mesa' => $numeroMesa,
             'producto' => $productoTexto ?: 'Sin productos',
-            'total' => $pedido->total,
-            'metodo_pago' => $pedido->metodo_pago ? ucfirst($pedido->metodo_pago) : 'N/A',
-            'productosDetalle' => $itemsConPrecio, // ✅ Ahora con precio y subtotal
+            'total' => $totalGrupo,
+            'metodo_pago' => $primerPedido->metodo_pago ? ucfirst($primerPedido->metodo_pago) : 'N/A',
+            'productosDetalle' => $itemsConPrecio,
         ];
     })
     ->values();

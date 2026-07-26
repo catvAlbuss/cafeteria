@@ -26,6 +26,7 @@ class Pedido extends Model
         'hora_pedido',
         'hora_entrega',
         'caja_id',
+        'venta_grupo', 
         'metodo_pago',
 
         'subtotal',

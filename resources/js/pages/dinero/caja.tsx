@@ -318,8 +318,6 @@ export default function Caja() {
         router.post('/caja/registrar', pedidoData, {
             preserveScroll: true,
             onSuccess: () => {
-                console.log('✅ Pedido registrado');
-
                 // Guardar datos de la boleta y abrir modal
                 setDatosBoleta({
                     cliente: cliente || 'Anónimo',
@@ -743,4 +741,4 @@ Caja.layout = {
             href: '/caja',
         },
     ],
-};
+};  

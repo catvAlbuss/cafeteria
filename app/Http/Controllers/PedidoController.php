@@ -218,20 +218,23 @@ public function cobrarMesa(Request $request, Mesa $mesa)
 
         $idsEnviados = collect($validated['pedido_ids']);
         $pedidosACobrar = $pedidosActuales->filter(function ($pedido) use ($idsEnviados) {
-            return $idsEnviados->contains($pedido->id);
+         return $idsEnviados->contains($pedido->id);
         });
 
         if ($pedidosACobrar->isEmpty()) {
-            abort(422, 'No se encontraron pedidos válidos para cobrar.');
-        }
+        abort(422, 'No se encontraron pedidos válidos para cobrar.');
+    }
+
+        $ventaGrupo = (string) \Illuminate\Support\Str::uuid();
 
         foreach ($pedidosACobrar as $pedido) {
-            $pedido->update([
-                'estado' => 'pagado',
-                'metodo_pago' => $validated['metodo_pago'],
-                'caja_id' => $caja->id,
-            ]);
-        }
+        $pedido->update([
+        'estado' => 'pagado',
+        'metodo_pago' => $validated['metodo_pago'],
+        'caja_id' => $caja->id,
+        'venta_grupo' => $ventaGrupo,
+        ]);
+    }
 
         $quedanPedidos = $pedidosActuales->filter(function ($pedido) use ($idsEnviados) {
             return !$idsEnviados->contains($pedido->id);
