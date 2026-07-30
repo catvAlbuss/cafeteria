@@ -8,11 +8,11 @@ use App\Models\Pedido;
 use App\Models\TeamInvitation;
 use App\Services\ProductionSummary;
 use App\Services\WaiterSummary;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -20,7 +20,10 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $email = strtolower($user->email);
-        $periodo = $request->get('periodo', 'hoy');
+        $periodoSolicitado = $request->string('periodo', 'hoy')->toString();
+        $periodo = in_array($periodoSolicitado, ['hoy', 'semana', 'mes', 'año'], true)
+            ? $periodoSolicitado
+            : 'hoy';
 
         // ============================================================
         // INVITACIONES PENDIENTES (ya existente)
@@ -106,8 +109,8 @@ class DashboardController extends Controller
             ->groupBy('fecha')
             ->orderBy('fecha')
             ->get()
-            ->map(fn($item) => [
-                'fecha' => Carbon::parse($item->fecha)->format('d/m'),
+            ->map(fn ($item) => [
+                'fecha' => Carbon::parse($item->getAttribute('fecha'))->format('d/m'),
                 'total' => (float) $item->total,
             ]);
 
@@ -151,8 +154,8 @@ $distribucionCategorias = $productosDelPeriodo
             ->whereBetween('created_at', [$fechasAnterior['inicio'], $fechasAnterior['fin']])
             ->sum('total');
 
-        $variacion = $ventasAnterior > 0 
-            ? (($totalVentas - $ventasAnterior) / $ventasAnterior) * 100 
+        $variacion = $ventasAnterior > 0
+            ? (($totalVentas - $ventasAnterior) / $ventasAnterior) * 100
             : 0;
 
         // ============================================================
@@ -187,6 +190,9 @@ $distribucionCategorias = $productosDelPeriodo
     // FUNCIONES AUXILIARES
     // ============================================================
 
+    /**
+     * @return array{inicio: Carbon, fin: Carbon}
+     */
     private function getFechasPeriodo(string $periodo): array
     {
         $now = Carbon::now();
@@ -205,6 +211,9 @@ $distribucionCategorias = $productosDelPeriodo
         }
     }
 
+    /**
+     * @return array{inicio: Carbon, fin: Carbon}
+     */
     private function getFechasPeriodoAnterior(string $periodo): array
     {
         $now = Carbon::now();

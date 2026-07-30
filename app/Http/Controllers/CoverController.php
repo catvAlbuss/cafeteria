@@ -47,7 +47,7 @@ class CoverController extends Controller
         ]);
 
         // ✅ Procesar Base64 a archivo físico
-        $imagenPath = $this->guardarImagenBase64($validated['imagen'] ?? null) 
+        $imagenPath = $this->guardarImagenBase64($validated['imagen'] ?? null)
                       ?? '/images/default-cover.jpg';
 
         $cover = Cover::create([
@@ -68,7 +68,7 @@ class CoverController extends Controller
     {
         try {
             \Log::info('=== UPDATE COVER ===');
-            \Log::info('ID recibido: ' . $id);
+            \Log::info('ID recibido: '.$id);
 
             $validated = $request->validate([
                 'titulo' => 'required|string|max:255',
@@ -79,15 +79,15 @@ class CoverController extends Controller
                 'imagen' => 'nullable|string',
             ]);
 
-            $cover = Cover::withoutGlobalScopes()->find($id);
-            
-            if (!$cover) {
+            $cover = Cover::query()->find($id);
+
+            if (! $cover) {
                 return redirect()->back()->with('error', 'Cover no encontrado');
             }
 
             // ✅ Si viene una nueva imagen Base64 la procesa, si no, mantiene la anterior
             $imagenGuardar = $cover->imagen;
-            if (!empty($validated['imagen'])) {
+            if (! empty($validated['imagen'])) {
                 if (str_contains($validated['imagen'], ';base64,')) {
                     // Si es Base64, la convierte a archivo físico
                     $imagenGuardar = $this->guardarImagenBase64($validated['imagen']);
@@ -109,15 +109,16 @@ class CoverController extends Controller
             return redirect()->back()->with('success', 'Cover actualizado correctamente');
 
         } catch (\Exception $e) {
-            \Log::error('ERROR EN UPDATE: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Error: ' . $e->getMessage());
+            \Log::error('ERROR EN UPDATE: '.$e->getMessage());
+
+            return redirect()->back()->with('error', 'Error: '.$e->getMessage());
         }
     }
 
     public function destroy($id)
     {
         $cover = Cover::findOrFail($id);
-        
+
         // Opcional: Eliminar archivo del storage si existe en el disco local
         if ($cover->imagen && str_contains($cover->imagen, '/storage/covers/')) {
             $path = str_replace('/storage/', '', $cover->imagen);
@@ -147,29 +148,34 @@ class CoverController extends Controller
      */
     private function guardarImagenBase64(?string $base64): ?string
     {
-        if (!$base64 || !str_contains($base64, ';base64,')) {
+        if (! $base64 || ! str_contains($base64, ';base64,')) {
             return $base64;
         }
 
         try {
             // Extraer formato y datos de la cadena Base64
-            @list($type, $file_data) = explode(';', $base64);
-            @list(, $file_data) = explode(',', $file_data);
+            @[$type, $file_data] = explode(';', $base64);
+            @[, $file_data] = explode(',', $file_data);
 
             $extension = 'jpg';
-            if (str_contains($type, 'png')) $extension = 'png';
-            if (str_contains($type, 'webp')) $extension = 'webp';
+            if (str_contains($type, 'png')) {
+                $extension = 'png';
+            }
+            if (str_contains($type, 'webp')) {
+                $extension = 'webp';
+            }
 
             // Generar nombre único
-            $imageName = 'cover_' . time() . '_' . Str::random(8) . '.' . $extension;
-            
+            $imageName = 'cover_'.time().'_'.Str::random(8).'.'.$extension;
+
             // Guardar en el disco 'public' dentro de la carpeta 'covers'
-            Storage::disk('public')->put('covers/' . $imageName, base64_decode($file_data));
+            Storage::disk('public')->put('covers/'.$imageName, base64_decode($file_data));
 
             // Retorna la URL relativa para guardar en BD
-            return Storage::url('covers/' . $imageName);
+            return Storage::url('covers/'.$imageName);
         } catch (\Exception $e) {
-            \Log::error('Error al guardar imagen Base64: ' . $e->getMessage());
+            \Log::error('Error al guardar imagen Base64: '.$e->getMessage());
+
             return null;
         }
     }

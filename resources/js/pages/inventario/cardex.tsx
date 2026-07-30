@@ -287,7 +287,7 @@ export default function Cardex() {
                             </h2>
                             <p className="text-xs text-[#5A3D2B] mt-1">{movimientosFiltrados.length} registros</p>
                         </div>
-                   
+
                     </div>
 
                     <div className="overflow-x-auto">
