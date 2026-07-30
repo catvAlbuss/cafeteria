@@ -11,98 +11,88 @@ use Inertia\Inertia;
 
 class CajaController extends Controller
 {
-    /**
-     * Mostrar la página de caja
-     */
+    
     public function index()
     {
-        // Obtener todos los platos disponibles
         $platos = Plato::all();
-        
-        
         return Inertia::render('dinero/caja', [
             'platos' => $platos,
         ]);
     }
 
-    /**
-     * Registrar un pedido desde el POS (Caja)
-     */
-    public function registrar(Request $request)
-    {
-        $validated = $request->validate([
-            'cliente' => 'nullable|string|max:100',
-            'mesa' => 'nullable|string|max:50',
-            'tipo' => 'required|in:salon,llevar,delivery',
-            'metodoPago' => 'required|in:efectivo,tarjeta,yape',
-            'productos' => 'required|array|min:1',
-            'productos.*.id' => 'required|integer',
-            'productos.*.nombre' => 'required|string',
-            'productos.*.cantidad' => 'required|integer|min:1',
-            'productos.*.precio' => 'required|numeric|min:0',
-            'productos.*.subtotal' => 'required|numeric|min:0',
-            'subtotal' => 'required|numeric|min:0',
-            'igv' => 'required|numeric|min:0',
-            'total' => 'required|numeric|min:0',
+public function registrar(Request $request)
+{
+    $validated = $request->validate([
+        'cliente' => 'nullable|string|max:100',
+        'mesa' => 'nullable|string|max:50',
+        'tipo' => 'required|in:salon,llevar,delivery',
+        'metodoPago' => 'required|in:efectivo,tarjeta,yape',
+        'productos' => 'required|array|min:1',
+        'productos.*.id' => 'required|integer',
+        'productos.*.nombre' => 'required|string',
+        'productos.*.cantidad' => 'required|integer|min:1',
+        'productos.*.precio' => 'required|numeric|min:0',
+        'productos.*.subtotal' => 'required|numeric|min:0',
+        'subtotal' => 'required|numeric|min:0',
+        'igv' => 'required|numeric|min:0',
+        'total' => 'required|numeric|min:0',
+    ]);
+
+    $caja = Caja::query()->where('estado', 'Abierta')->first();
+
+    if (! $caja) {
+        return redirect()->back()->with('error', 'No hay caja abierta. Debes abrir caja primero.');
+    }
+    DB::beginTransaction();
+    try {
+        // Crear el pedido
+        $pedido = Pedido::create([
+            'numero' => Pedido::generarNumero(),
+            'cliente' => $validated['cliente'],
+            'mesa' => $validated['mesa'],
+            'tipo' => $validated['tipo'],
+            'metodo_pago' => $validated['metodoPago'],
+            'productos' => json_encode($validated['productos']),
+            'subtotal' => $validated['subtotal'],
+            'igv' => $validated['igv'],
+            'total' => $validated['total'],
+            'caja_id' => $caja->id,
+            'user_id' => $request->user()->id,
+            'team_id' => $request->user()->current_team_id,
+            'estado' => 'pagado',
+            'created_at' => now(),
         ]);
 
-        $caja = Caja::query()->where('estado', 'Abierta')->first();
-
-        if (! $caja) {
-            return redirect()->back()->with('error', 'No hay caja abierta. Debes abrir caja primero.');
+        // Actualizar caja
+        $caja->total_ventas_caja = $caja->total_ventas_caja + $validated['total'];
+        $caja->total_pedidos = $caja->total_pedidos + 1;
+        $caja->save();
+        // Actualizar stock
+        foreach ($validated['productos'] as $producto) {
+            Plato::where('id', $producto['id'])->decrement('stock', $producto['cantidad']);
         }
 
-        DB::beginTransaction();
+        DB::commit();
+        return redirect()->back()->with('success', 'Pedido registrado correctamente.');
 
-        try {
-            // Crear el pedido
-            $pedido = Pedido::create([
-                'cliente' => $validated['cliente'],
-                'mesa' => $validated['mesa'],
-                'tipo' => $validated['tipo'],
-                'metodo_pago' => $validated['metodoPago'],
-                'productos' => json_encode($validated['productos']),
-                'subtotal' => $validated['subtotal'],
-                'igv' => $validated['igv'],
-                'total' => $validated['total'],
-                'caja_id' => $caja->id,
-                'user_id' => $request->user()->id,
-                'estado' => 'pagado',
-                'created_at' => now(),
-            ]);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        
+        \Log::error('❌ Error al registrar pedido:', [
+            'mensaje' => $e->getMessage(),
+            'linea' => $e->getLine(),
+            'archivo' => $e->getFile(),
+        ]);
 
-            // Actualizar la caja (sumar al total)
-            $caja->update([
-                'total_ventas_caja' => DB::raw('total_ventas_caja + '.$validated['total']),
-                'total_pedidos' => DB::raw('total_pedidos + 1'),
-            ]);
-
-            // Actualizar stock de los productos
-            foreach ($validated['productos'] as $producto) {
-                Plato::where('id', $producto['id'])->decrement('stock', $producto['cantidad']);
-            }
-
-            DB::commit();
-
-            return redirect()->back()->with('success', 'Pedido registrado correctamente.');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return redirect()->back()->with('error', 'Error al registrar pedido: '.$e->getMessage());
-        }
+        return redirect()->back()->with('error', 'Error al registrar pedido: ' . $e->getMessage());
     }
-
-    /**
-     * Obtener el estado actual de la caja
-     */
+}
     public function estado()
     {
         $caja = Caja::query()->where('estado', 'Abierta')->first();
-
         return response()->json([
             'abierta' => $caja !== null,
             'caja' => $caja,
         ]);
     }
-}
+}   

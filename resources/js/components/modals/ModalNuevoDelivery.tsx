@@ -360,7 +360,6 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                             </div>
                         </div>
                     )}
-
                     {/* PASO 2: Productos */}
                     {step === 3 && (
                         <div className="space-y-4">
@@ -432,7 +431,6 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                             )}
                         </div>
                     )}
-
                     {/* PASO 3: Confirmación */}
                     {step === 4 && (
                         <div className="space-y-4">
@@ -479,7 +477,6 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                                     ))}
                                 </div>
                             </div>
-
                             {/* Totales */}
                             <div className="bg-[#FBF7F0] rounded-xl p-4 border border-[#F3E1C8]">
                                 <div className="space-y-1 text-sm">
@@ -497,7 +494,6 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                                     </div>
                                 </div>
                             </div>
-
                             {/* Observaciones */}
                             <div>
                                 <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
@@ -514,7 +510,6 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                         </div>
                     )}
                 </div>
-
                 {/* ===== FOOTER ===== */}
                 <div className="border-t border-gray-200 px-6 py-4 bg-gray-50/50 flex justify-between items-center">
                     <div>

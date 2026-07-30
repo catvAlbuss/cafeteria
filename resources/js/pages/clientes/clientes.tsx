@@ -283,7 +283,7 @@ export default function Clientes() {
                 {/* ===== TABLA DE CLIENTES ===== */}
                 <div className="bg-white rounded-2xl shadow-sm border border-[#F3E1C8] overflow-hidden">
                     <div className="flex justify-between items-center p-5 border-b border-[#F3E1C8]">
-                        <h2 className="text-xl font-bold text-[#2D1B1A]">📋 Listado de clientes</h2>
+                        <h2 className="text-xl font-bold text-[#2D1B1A]">Listado de clientes</h2>
                         <span className="text-sm text-[#5A3D2B]">{clientesFiltrados.length} clientes</span>
                     </div>
                     <div className="overflow-x-auto">

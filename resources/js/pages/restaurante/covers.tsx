@@ -78,10 +78,9 @@ interface CoverFormModalProps {
     isOpen: boolean;
     cover: Cover | null; // null = creando, con datos = editando
     onClose: () => void;
-    onGuardado: () => void;
 }
 
-function CoverFormModal({ isOpen, cover, onClose, onGuardado }: CoverFormModalProps) {
+function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
     const esEdicion = !!cover;
     const [form, setForm] = useState({
         titulo: '',
@@ -264,7 +263,6 @@ function CoverFormModal({ isOpen, cover, onClose, onGuardado }: CoverFormModalPr
                                     ))}
                                 </select>
                             </div>
-
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Fecha Inicio</label>
@@ -882,7 +880,6 @@ export default function Covers() {
                         setModalFormAbierto(false);
                         setCoverEditando(null);
                     }}
-                    onGuardado={() => { }}  // ✅ VACÍO - EL MODAL YA MANEJA LA RECARGA
                 />
 
             </div>

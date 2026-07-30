@@ -52,10 +52,8 @@ interface Insumo {
 
 export default function Cardex() {
     const { platos, insumos, movimientos } = usePage().props as any;
-
     const [movimientosData, setMovimientosData] = useState<Movimiento[]>(movimientos || []);
     const [modalAbierto, setModalAbierto] = useState(false);
-
     // Estado del formulario
     const [nuevoMovimiento, setNuevoMovimiento] = useState({
         producto_id: '',
@@ -71,15 +69,11 @@ export default function Cardex() {
     const [filtroItemType, setFiltroItemType] = useState('');
     const [fechaInicio, setFechaInicio] = useState('');
     const [fechaFin, setFechaFin] = useState('');
-
     // Estadísticas
     const totalEntradas = (movimientosData || []).filter(m => m.tipo === 'entrada').reduce((sum, m) => sum + m.cantidad, 0);
     const totalSalidas = (movimientosData || []).filter(m => m.tipo === 'salida').reduce((sum, m) => sum + m.cantidad, 0);
-
     const totalProductos = (platos || []).length + (insumos || []).length;
-
     const formatNumber = (num: number): string => num.toLocaleString('es-PE');
-
     const movimientosFiltrados = (movimientosData || []).filter(m => {
         const busquedaOk = !busqueda ||
             (m.item?.nombre || '').toLowerCase().includes(busqueda.toLowerCase());
@@ -113,9 +107,7 @@ export default function Cardex() {
             ? item.stock + nuevoMovimiento.cantidad
             : item.stock - nuevoMovimiento.cantidad;
 
-        // Aquí iría la llamada al backend para registrar el movimiento
         toast.info('Funcionalidad en desarrollo');
-
         // Por ahora, simular el movimiento
         const nuevoMov: Movimiento = {
             id: Date.now(),
@@ -443,7 +435,6 @@ export default function Cardex() {
                                         />
                                     </div>
                                 </div>
-
                                 <div>
                                     <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
                                         <Building2 className="w-4 h-4 inline mr-1.5 text-[#C9A96E]" />
@@ -457,7 +448,6 @@ export default function Cardex() {
                                         onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, proveedor: e.target.value })}
                                     />
                                 </div>
-
                                 <div>
                                     <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
                                         Observaciones
@@ -471,7 +461,6 @@ export default function Cardex() {
                                     />
                                 </div>
                             </div>
-
                             <div className="border-t border-[#F3E1C8] p-6 flex justify-end gap-3">
                                 <button
                                     onClick={() => setModalAbierto(false)}

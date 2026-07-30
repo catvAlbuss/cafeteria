@@ -46,23 +46,12 @@ export default function TarjetaTicket({
     const todosListos = ticket.productos.every((p) => p.estado === 'listo');
     const estaEntregado = ticket.estado === 'entregado';
 
-    // Contar productos por área
-    const productosPorArea = ticket.productos.reduce(
-        (acc, p) => {
-            if (!acc[p.area]) {
-                acc[p.area] = { total: 0, listos: 0 };
-            }
-
-            acc[p.area].total++;
-
-            if (p.estado === 'listo') {
-                acc[p.area].listos++;
-            }
-
-            return acc;
-        },
-        {} as Record<string, { total: number; listos: number }>,
-    );
+    const productosPorArea = ticket.productos.reduce((acc, p) => {
+        if (!acc[p.area]) acc[p.area] = { total: 0, listos: 0 };
+        acc[p.area].total++;
+        if (p.estado === 'listo') acc[p.area].listos++;
+        return acc;
+    }, {} as Record<string, { total: number; listos: number }>);
 
     const getEstadoLabel = () => {
         if (estaEntregado) {
@@ -80,7 +69,6 @@ export default function TarjetaTicket({
     };
 
     const estadoInfo = getEstadoLabel();
-
     return (
         <div className="overflow-hidden rounded-2xl border border-[#F3E1C8] bg-white shadow-xl">
             {/* Header del Ticket */}
@@ -168,7 +156,6 @@ export default function TarjetaTicket({
                     Total: S/ {ticket.total.toFixed(2)}
                 </span>
             </div>
-
             {/* Footer: Botón Entregar (solo si está listo y no entregado) */}
             {todosListos && !estaEntregado && (
                 <div className="border-t border-gray-200 bg-[#FBF7F0] px-4 py-3">

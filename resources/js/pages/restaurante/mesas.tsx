@@ -1,3 +1,13 @@
+import { Head, usePage, router } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
+import ModalCobro from '@/components/modals/ModalCobro';
+import { useSedeChannel } from '@/hooks/useSedeChannel';
+import { swalError, swalSuccess, errorsToText } from '@/lib/swal';
+import TarjetaTicket from '@/components/tickets/TarjetaTicket';
+import ModalVerTickets from '@/components/tickets/ModalVerTickets';
 import {
     DndContext,
     PointerSensor,
@@ -41,10 +51,7 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
     const [pin, setPin] = useState('');
     const [error, setError] = useState('');
     const [verificando, setVerificando] = useState(false);
-
-    if (!isOpen || !mesa) {
-        return null;
-    }
+    if (!isOpen || !mesa) return null;
 
     const handleClose = () => {
         setPin('');
@@ -61,8 +68,7 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
         setPin((prev) => prev + digito);
     };
 
-    const borrarDigito = () => setPin((prev) => prev.slice(0, -1));
-
+    const borrarDigito = () => setPin(prev => prev.slice(0, -1));
     const confirmar = async () => {
         if (pin.length !== 4) {
             setError('Ingresa los 4 dígitos de tu PIN');
@@ -439,7 +445,7 @@ function MesaCard({
             return (
                 <div className="mt-3 flex gap-2">
                     {mesa.estado === 'listo_cobrar' ? (
-                        // ✅ Si está en Cobrar, SOLO el botón Cobrar (más grande)
+
                         <button
                             onClick={() => onAbrirModalCobro(mesa)}
                             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-purple-700 active:scale-95"
@@ -833,7 +839,6 @@ export default function MesasDistribucion() {
         setIsClient(true);
     }, []);
 
-    // Tiempo real: el mapa de mesas se actualiza sin recargar la página
     useSedeChannel('mesas', {
         'mesa.actualizada': (payload: any) => {
             setMesas((prev) =>
@@ -847,6 +852,19 @@ export default function MesasDistribucion() {
                     prev.filter((p) => p.mesa_id !== payload.id),
                 );
             }
+        },
+    });
+  
+    useSedeChannel('pedidos', {
+        'pedido.actualizado': (payload: any) => {
+            setPedidosLista(prev =>
+                prev.map(p => (p.id === payload.id ? { ...p, ...payload } : p))
+            );
+        },
+        'pedido.creado': (payload: any) => {
+            setPedidosLista(prev =>
+                prev.some(p => p.id === payload.id) ? prev : [...prev, payload]
+            );
         },
     });
     // Aviso de capacidad excedida (viene del backend vía flash)

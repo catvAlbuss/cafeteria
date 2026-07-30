@@ -72,12 +72,8 @@ const categoriaColores: Record<string, string> = {
 export default function Insumos() {
     const { insumos, userRole } = usePage().props as any; // 
     const [insumosData, setInsumosData] = useState<Insumo[]>(insumos || []);
-
-
     const CATEGORIAS_COCINA = ['Panadería', 'Frutas', 'Huevos', 'Dulces', 'Especias', 'Frutas Secas'];
     const CATEGORIAS_BAR = ['Cafetería', 'Lácteos', 'Bebidas'];
-
-
     const insumosFiltradosPorRol = useMemo(() => {
         if (userRole === 'Cocinero') {
             return insumosData.filter(i => CATEGORIAS_COCINA.includes(i.categoria));
@@ -109,7 +105,6 @@ export default function Insumos() {
     const [formMerma, setFormMerma] = useState({ cantidad: 0, observaciones: '' });
     const [motivoMerma, setMotivoMerma] = useState('');
     const [cargandoMerma, setCargandoMerma] = useState(false);
-
     const totalInsumos = insumosData.length;
     const totalStock = insumosData.reduce((sum, i) => sum + i.stock, 0);
     const totalValor = insumosData.reduce((sum, i) => sum + (i.stock * i.precio), 0);
@@ -219,7 +214,6 @@ export default function Insumos() {
         }
 
         setCargandoMerma(true);
-
         router.post('/mermas', {
             items: [{
                 id: insumoSeleccionado.id,

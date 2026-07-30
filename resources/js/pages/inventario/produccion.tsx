@@ -430,7 +430,6 @@ function ResumenOperativo({
         </section>
     );
 }
-
 // ============================================================
 // COMPONENTE: Área Card
 // ============================================================
@@ -558,7 +557,6 @@ function AreaCard({
                                         </p>
                                     </div>
                                 </div>
-
                                 <ul className="my-3 space-y-2">
                                     {pedido.productos.map((producto, index) => (
                                         <li

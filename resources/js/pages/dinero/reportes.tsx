@@ -36,6 +36,7 @@ import {
     Cookie,
     Croissant,
     Utensils,
+    Eye,
     Banknote,
     Smartphone,
     Landmark,
@@ -49,12 +50,20 @@ interface VentaDiaria {
     gastos: number;
     ganancia: number;
 }
+interface ProductoDetalle {
+    nombre: string;
+    cantidad: number;
+    subtotal?: number;
+    precio?: number;
+}
+
 interface VentaDetalle {
     fecha: string;
     mesa: string;
     producto: string;
     total: number;
     metodo_pago: string;
+    productosDetalle?: ProductoDetalle[];
 }
 
 interface ProductoVendido {
@@ -107,15 +116,20 @@ export default function Reportes() {
             margenGanancia: 0,
         },
         ventasPorTipo: ventasPorTipoData = [],
-        ticketsPorMesa: ticketsPorMesaData = [],
+        ticketsPorOrigen: ticketsPorOrigenData = [],
         estadoMesas: estadoMesasData = { total: 0, ocupadas: 0, libres: 0 },
         fechas: fechasData = { inicio: '', fin: '' },
         error = null,
     } = props as any;
 
+    const [modalDetalleVentaAbierto, setModalDetalleVentaAbierto] = useState(false);
+    const [ventaSeleccionada, setVentaSeleccionada] = useState<any>(null);
+    const verDetalleVenta = (venta: any) => {
+        setVentaSeleccionada(venta);
+        setModalDetalleVentaAbierto(true);
+    };
     const [fechaInicio, setFechaInicio] = useState(fechasData.inicio || '');
     const [fechaFin, setFechaFin] = useState(fechasData.fin || '');
-
     const resumen = resumenData;
     const ventasDiarias: VentaDiaria[] = ventasDiariasData.length > 0 ? ventasDiariasData : [
         { fecha: 'Sin datos', tickets: 0, ventas: 0, gastos: 0, ganancia: 0 }
@@ -128,8 +142,10 @@ export default function Reportes() {
     ];
     const totales = totalesData;
 
-    const formatCurrency = (amount: number): string => {
-        return `S/ ${amount.toLocaleString('es-PE')}`;
+    const formatCurrency = (amount: number | string): string => {
+        const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+        if (isNaN(num)) return 'S/ 0.00';
+        return `S/ ${num.toFixed(2)}`;
     };
 
     const formatNumber = (num: number): string => {
@@ -153,7 +169,6 @@ export default function Reportes() {
         return colores[metodo.toLowerCase()] || 'bg-gray-100 text-gray-600 border-gray-200';
     };
 
-    // Íconos para métodos de pago (con Lucide)
     const getMetodoIcon = (metodo: string) => {
         const metodoLower = metodo.toLowerCase();
 
@@ -238,7 +253,6 @@ export default function Reportes() {
             return <Martini className="w-5 h-5 text-purple-500" />;
         }
 
-        // Default
         return <Utensils className="w-5 h-5 text-gray-500" />;
     };
 
@@ -281,7 +295,6 @@ export default function Reportes() {
             textColor: 'text-green-600',
         },
     ];
-
     return (
         <>
             <Head title="Reportes - Dolce Cafe" />
@@ -373,7 +386,6 @@ export default function Reportes() {
                         </div>
                     ))}
                 </div>
-
                 {/* ===== RESUMEN DE VENTAS ===== */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8]">
                     <div className="flex flex-wrap justify-between items-center mb-5">
@@ -395,10 +407,11 @@ export default function Reportes() {
                             <thead>
                                 <tr className="border-b-2 border-[#F3E1C8] bg-[#FBF7F0]">
                                     <th className="text-left py-3 px-4 text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Fecha</th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Mesa</th>
+                                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Mesa/Caja</th>
                                     <th className="text-left py-3 px-4 text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Producto</th>
                                     <th className="text-left py-3 px-4 text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Total</th>
                                     <th className="text-left py-3 px-4 text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Método de Pago</th>
+                                    <th className="text-center py-3 px-4 text-xs font-semibold text-[#5A3D2B] uppercase tracking-wider">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -407,8 +420,11 @@ export default function Reportes() {
                                         <tr key={index} className="border-b border-[#FBF3E7] hover:bg-[#FBF7F0] transition group">
                                             <td className="py-3 px-4 text-sm font-medium text-[#2D1B1A]">{venta.fecha}</td>
                                             <td className="py-3 px-4 text-sm text-[#5A3D2B]">
-                                                <span className="inline-flex items-center gap-1.5 bg-[#F3E1C8] px-2.5 py-1 rounded-lg text-xs font-medium">
-                                                    🪑 {venta.mesa}
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${venta.mesa === 'Caja'
+                                                    ? 'bg-amber-100 text-amber-700'
+                                                    : 'bg-[#F3E1C8] text-[#5A3D2B]'
+                                                    }`}>
+                                                    {venta.mesa === 'Caja' ? '📦' : '🪑'} {venta.mesa}
                                                 </span>
                                             </td>
                                             <td className="py-3 px-4 text-sm text-[#5A3D2B]">{venta.producto}</td>
@@ -419,11 +435,24 @@ export default function Reportes() {
                                                     <span className="ml-1">{venta.metodo_pago}</span>
                                                 </span>
                                             </td>
+                                            <td className="py-3 px-4 text-center">
+                                                <button
+                                                    onClick={() => {
+
+                                                        const productosDetalle = venta.productosDetalle || [];
+                                                        verDetalleVenta({ ...venta, productosDetalle });
+                                                    }}
+                                                    className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-800 transition"
+                                                    title="Ver detalles"
+                                                >
+                                                    <Eye className="w-4 h-4" />
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={5} className="text-center py-10 text-gray-400 text-sm">
+                                        <td colSpan={6} className="text-center py-10 text-gray-400 text-sm">
                                             <div className="flex flex-col items-center gap-2">
                                                 <Receipt className="w-10 h-10 text-gray-300" />
                                                 <span>Sin ventas registradas hoy</span>
@@ -435,7 +464,6 @@ export default function Reportes() {
                         </table>
                     </div>
                 </div>
-
                 {/* ===== DOS COLUMNAS ===== */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
@@ -507,12 +535,18 @@ export default function Reportes() {
                         <div className="mt-4 pt-4 border-t-2 border-[#F3E1C8]">
                             <div className="flex justify-between text-sm">
                                 <span className="text-[#5A3D2B] font-medium">Total ingresos</span>
-                                <span className="font-bold text-[#2D1B1A] text-lg">{formatCurrency(metodosPago.reduce((sum: number, m: MetodoPago) => sum + m.total, 0))}</span>
+                                <span className="font-bold text-[#2D1B1A] text-lg">
+                                    {formatCurrency(
+                                        metodosPago.reduce((sum: number, m: MetodoPago) => {
+                                            const total = typeof m.total === 'string' ? parseFloat(m.total) : m.total;
+                                            return sum + (isNaN(total) ? 0 : total);
+                                        }, 0)
+                                    )}
+                                </span>
                             </div>
                         </div>
                     </div>
                 </div>
-
                 {/* ===== RESUMEN RÁPIDO ===== */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="group bg-gradient-to-br from-[#2D1B1A] to-[#4A2C2A] rounded-2xl p-5 text-white hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
@@ -540,18 +574,17 @@ export default function Reportes() {
                         <p className="text-white/40 text-xs mt-1">Margen: {totales.margenGanancia || 0}%</p>
                     </div>
                 </div>
-
-                {/* ===== TICKETS POR MESA ===== */}
-                {ticketsPorMesaData.length > 0 && (
+                {/* ===== TICKETS EMITIDOS ===== */}
+                {ticketsPorOrigenData.length > 0 && (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#F3E1C8]">
                         <h2 className="text-xl font-bold text-[#2D1B1A] mb-5 flex items-center gap-2">
                             <Store className="w-5 h-5 text-orange-500" />
-                            Tickets por Mesa
+                            Tickets emitidos
                         </h2>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                            {ticketsPorMesaData.map((item: TicketMesa, index: number) => (
+                            {ticketsPorOrigenData.map((item: { origen: string; tickets: number }, index: number) => (
                                 <div key={index} className="group bg-[#FBF7F0] rounded-xl p-4 text-center border border-[#F3E1C8] hover:border-[#C9A96E] hover:shadow-md transition-all duration-300 hover:-translate-y-1">
-                                    <p className="text-xs text-[#8D6B53] font-medium">Mesa {item.mesa}</p>
+                                    <p className="text-xs text-[#8D6B53] font-medium">{item.origen}</p>
                                     <p className="text-3xl font-bold text-[#2D1B1A] group-hover:text-[#C9A96E] transition">{item.tickets}</p>
                                     <p className="text-[10px] text-[#8D6B53]">tickets</p>
                                 </div>
@@ -560,6 +593,95 @@ export default function Reportes() {
                     </div>
                 )}
             </div>
+            {/* ===== MODAL DETALLE VENTA ===== */}
+            {modalDetalleVentaAbierto && ventaSeleccionada && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-3xl shadow-xl w-full max-w-xl">
+                        <div className="flex justify-between items-center p-6 border-b border-[#F3E1C8]">
+                            <h2 className="text-2xl font-bold text-[#2D1B1A] flex items-center gap-2">
+                                <Eye className="w-6 h-6 text-blue-500" />
+                                Detalle de Venta
+                            </h2>
+                            <button
+                                onClick={() => setModalDetalleVentaAbierto(false)}
+                                className="text-3xl text-gray-400 hover:text-red-500 transition"
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-xs text-gray-400">Fecha</p>
+                                    <p className="font-semibold text-[#2D1B1A]">{ventaSeleccionada.fecha}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400">Origen</p>
+                                    <p className="font-semibold text-[#2D1B1A]">{ventaSeleccionada.mesa}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400">Método de Pago</p>
+                                    <p className="font-semibold text-[#2D1B1A]">{ventaSeleccionada.metodo_pago}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400">Total</p>
+                                    <p className="font-bold text-[#C9A96E] text-lg">{formatCurrency(ventaSeleccionada.total)}</p>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-[#F3E1C8] pt-4">
+                                <p className="text-xs text-gray-400 mb-2">Productos</p>
+                                <div className="space-y-2">
+                                    {ventaSeleccionada.productosDetalle && ventaSeleccionada.productosDetalle.length > 0 ? (
+                                        ventaSeleccionada.productosDetalle.map((item: any, index: number) => (
+                                            <div key={index} className="flex justify-between items-center bg-[#FBF7F0] rounded-xl px-4 py-2">
+                                                <div>
+                                                    <p className="font-medium text-[#2D1B1A]">{item.nombre}</p>
+                                                    <p className="text-xs text-[#8D6B53]">Cantidad: {item.cantidad}</p>
+                                                </div>
+                                                <p className="font-semibold text-[#2D1B1A]">{formatCurrency(item.subtotal || item.precio * item.cantidad)}</p>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-gray-400 text-sm">No hay productos disponibles</p>
+                                    )}
+                                </div>
+                            </div>
+                            {/* DESGLOSE DE TOTALES CON IGV */}
+                            <div className="border-t border-[#F3E1C8] pt-3 space-y-1">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">Subtotal</span>
+                                    <span className="font-medium text-[#2D1B1A]">
+                                        {formatCurrency(ventaSeleccionada.productosDetalle.reduce((sum: number, item: any) => sum + (item.subtotal || item.precio * item.cantidad), 0))}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500">IGV (18%)</span>
+                                    <span className="font-medium text-[#2D1B1A]">
+                                        {formatCurrency(ventaSeleccionada.productosDetalle.reduce((sum: number, item: any) => sum + (item.subtotal || item.precio * item.cantidad), 0) * 0.18)}
+                                    </span>
+                                </div>
+                                <div className="border-t-2 border-[#C9A96E]/30 pt-2 flex justify-between">
+                                    <span className="font-bold text-[#2D1B1A] text-lg">TOTAL</span>
+                                    <span className="font-bold text-[#C9A96E] text-lg">
+                                        {formatCurrency(
+                                            ventaSeleccionada.productosDetalle.reduce((sum: number, item: any) => sum + (item.subtotal || item.precio * item.cantidad), 0) * 1.18
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="border-t border-[#F3E1C8] p-6 flex justify-end">
+                            <button
+                                onClick={() => setModalDetalleVentaAbierto(false)}
+                                className="bg-gray-100 text-[#2D1B1A] hover:bg-gray-200 px-5 py-2.5 rounded-xl font-semibold transition"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

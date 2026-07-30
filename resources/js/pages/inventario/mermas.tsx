@@ -29,7 +29,7 @@ interface Insumo {
     nombre: string;
     stock: number;
     precio: number;
-    unidad: string; // kg, litros, unidades...
+    unidad: string; 
     categoria: string;
 }
 
@@ -39,8 +39,8 @@ interface Merma {
     item_type: string;
     cantidad: number;
     stock_resultante: number;
-    motivo: string;      // categoría fija: siempre "merma"
-    submotivo: string;   // razón real: caducado, quemado, etc.
+    motivo: string;    
+    submotivo: string;  
     observaciones: string;
     user: { name: string };
     item?: { nombre: string; precio?: number };
@@ -93,19 +93,15 @@ const getMotivoConfig = (submotivo: string) => {
 
 export default function Mermas() {
     const { platos = [], insumos = [], mermas: mermasData = [] } = usePage().props as any;
-
     const [mermas, setMermas] = useState<Merma[]>(mermasData);
     const [formAbierto, setFormAbierto] = useState(false);
     const [cargando, setCargando] = useState(false);
-
     const [tipoMerma, setTipoMerma] = useState<'producto' | 'insumo'>('producto');
     const [items, setItems] = useState<ItemFormulario[]>([]);
     const [busquedaItem, setBusquedaItem] = useState('');
     const [observaciones, setObservaciones] = useState('');
-
     const [busqueda, setBusqueda] = useState('');
     const [filtroMotivo, setFiltroMotivo] = useState('');
-
     const formatCurrency = (amount: any): string => {
         const num = typeof amount === 'number' ? amount : parseFloat(amount);
         if (isNaN(num)) return 'S/ 0.00';
@@ -124,14 +120,12 @@ export default function Mermas() {
     const totalPerdidas = mermas.reduce((sum, m) => sum + (m.cantidad * (m.item?.precio || 0)), 0);
     const totalRegistros = mermas.length;
 
-    // ===== ITEMS DISPONIBLES SEGÚN TIPO SELECCIONADO =====
     const itemsDisponibles: (Plato | Insumo)[] = tipoMerma === 'producto' ? platos : insumos;
     const itemsFiltrados = itemsDisponibles.filter((i) =>
         i.nombre.toLowerCase().includes(busquedaItem.toLowerCase()) && i.stock > 0
     );
 
     const motivosDisponibles = tipoMerma === 'producto' ? MOTIVOS_PRODUCTO : MOTIVOS_INSUMO;
-
     // ===== AGREGAR ITEM AL FORMULARIO =====
     const agregarItem = (item: Plato | Insumo) => {
         const yaExiste = items.find(i => i.id === item.id && i.tipo === tipoMerma);
@@ -195,7 +189,6 @@ export default function Mermas() {
         }
 
         setCargando(true);
-
         router.post('/mermas', {
             items: items.map(i => ({
                 id: i.id,
@@ -307,7 +300,6 @@ export default function Mermas() {
                                 </button>
                             </div>
                         </div>
-
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {/* PASO 2: Buscar y agregar */}
                             <div>
