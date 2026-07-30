@@ -11,9 +11,7 @@ use Inertia\Inertia;
 
 class CajaController extends Controller
 {
-    /**
-     * Mostrar la página de caja
-     */
+    
     public function index()
     {
         $platos = Plato::all();
@@ -69,14 +67,12 @@ public function registrar(Request $request)
         $caja->total_ventas_caja = $caja->total_ventas_caja + $validated['total'];
         $caja->total_pedidos = $caja->total_pedidos + 1;
         $caja->save();
-
         // Actualizar stock
         foreach ($validated['productos'] as $producto) {
             Plato::where('id', $producto['id'])->decrement('stock', $producto['cantidad']);
         }
 
         DB::commit();
-
         return redirect()->back()->with('success', 'Pedido registrado correctamente.');
 
     } catch (\Exception $e) {
