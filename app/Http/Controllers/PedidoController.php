@@ -183,92 +183,81 @@ public function produccion(Request $request)
         ];
     }
 
-    public function cobrarMesa(Request $request, Mesa $mesa)
-    {
-        $validated = $request->validate([
-            'metodo_pago' => 'required|in:efectivo,tarjeta,yape',
-            'pedido_ids' => 'required|array|min:1',
-            'pedido_ids.*' => 'exists:pedidos,id',
-            'authorization_pin' => 'required|string|size:4',
+public function cobrarMesa(Request $request, Mesa $mesa)
+{
+    $validated = $request->validate([
+        'metodo_pago' => 'required|in:efectivo,tarjeta,yape',
+        'pedido_ids' => 'required|array|min:1',
+        'pedido_ids.*' => 'exists:pedidos,id',
+        'authorization_pin' => 'required|string|size:4',
+    ]);
+
+    
+    $authorizer = $request->user()->currentTeam?->members()
+        ->active()
+        ->where('pin', $validated['authorization_pin'])
+        ->first();
+
+    if (! $authorizer instanceof User || ! $authorizer->hasPermissionTo('procesar pagos')) {
+        return redirect()->back()->withErrors([
+            'authorization_pin' => 'PIN inválido. Solo Caja, Administración o Gerencia pueden confirmar el pago.',
         ]);
+    }
 
     $pedidos = DB::transaction(function () use ($mesa, $validated) {
         $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
+        
         $pedidosActuales = Pedido::query()
             ->where('mesa_id', $mesa->id)
             ->whereNotIn('estado', ['pagado', 'cancelado'])
             ->lockForUpdate()
             ->get();
 
-        if (! $authorizer instanceof User || ! $authorizer->hasPermissionTo('procesar pagos')) {
-            return redirect()->back()->withErrors([
-                'authorization_pin' => 'PIN inválido. Solo Caja, Administración o Gerencia pueden confirmar el pago.',
-            ]);
+        if ($pedidosActuales->isEmpty()) {
+            abort(422, 'Esta mesa no tiene pedidos por cobrar.');
         }
 
         $idsEnviados = collect($validated['pedido_ids']);
         $pedidosACobrar = $pedidosActuales->filter(function ($pedido) use ($idsEnviados) {
-         return $idsEnviados->contains($pedido->id);
+            return $idsEnviados->contains($pedido->id);
         });
 
         if ($pedidosACobrar->isEmpty()) {
-        abort(422, 'No se encontraron pedidos válidos para cobrar.');
-    }
-
-        $ventaGrupo = (string) \Illuminate\Support\Str::uuid();
+            abort(422, 'No se encontraron pedidos válidos para cobrar.');
+        }
 
         foreach ($pedidosACobrar as $pedido) {
-        $pedido->update([
-        'estado' => 'pagado',
-        'metodo_pago' => $validated['metodo_pago'],
-        'caja_id' => $caja->id,
-        'venta_grupo' => $ventaGrupo,
-        ]);
-    }
+            $pedido->update([
+                'estado' => 'pagado',
+                'metodo_pago' => $validated['metodo_pago'],
+                'caja_id' => $caja->id,
+            ]);
+        }
 
-            $idsEnviados = collect($validated['pedido_ids']);
-            $pedidosACobrar = $pedidosActuales->filter(function ($pedido) use ($idsEnviados) {
-                return $idsEnviados->contains($pedido->id);
-            });
-
-            if ($pedidosACobrar->isEmpty()) {
-                abort(422, 'No se encontraron pedidos válidos para cobrar.');
-            }
-
-            foreach ($pedidosACobrar as $pedido) {
-                $pedido->update([
-                    'estado' => 'pagado',
-                    'metodo_pago' => $validated['metodo_pago'],
-                    'caja_id' => $caja->id,
-                ]);
-            }
-
-            $quedanPedidos = $pedidosActuales->filter(function ($pedido) use ($idsEnviados) {
-                return ! $idsEnviados->contains($pedido->id);
-            });
-
-            if ($quedanPedidos->isEmpty()) {
-
-                $mesa->estado = 'libre';
-                $mesa->user_id = null;
-                $mesa->cliente = null;
-                $mesa->personas = null;
-                $mesa->pedido_listo = false;
-                $mesa->save();
-            } else {
-
-                $mesa->pedido_listo = false;
-                $mesa->save();
-            }
-
-            return $pedidosACobrar;
+        $quedanPedidos = $pedidosActuales->filter(function ($pedido) use ($idsEnviados) {
+            return !$idsEnviados->contains($pedido->id);
         });
 
-        $pedidos->each(fn (Pedido $pedido) => broadcast(new PedidoActualizado($pedido)));
-        broadcast(new MesaActualizada($mesa->refresh()));
+        if ($quedanPedidos->isEmpty()) {
+            $mesa->estado = 'libre';
+            $mesa->user_id = null;
+            $mesa->cliente = null;
+            $mesa->personas = null;
+            $mesa->pedido_listo = false;
+            $mesa->save();
+        } else {
+            $mesa->pedido_listo = false;
+            $mesa->save();
+        }
 
-        return redirect()->back()->with('success', 'Pedido(s) cobrado(s) correctamente');
-    }
+        return $pedidosACobrar;
+    });
+
+    $pedidos->each(fn (Pedido $pedido) => broadcast(new PedidoActualizado($pedido)));
+    broadcast(new MesaActualizada($mesa->refresh()));
+
+    return redirect()->back()->with('success', 'Pedido(s) cobrado(s) correctamente');
+}
 
     public function caja()
     {
@@ -639,19 +628,18 @@ public function entregarTicket($id)
         
         DB::commit();
         broadcast(new PedidoActualizado($pedido));
-        
         return redirect()->back()->with('success', 'Ticket #' . ($pedido->numero ?? $pedido->id) . ' entregado correctamente');
         
     } catch (\Exception $e) {
         DB::rollBack();
         return redirect()->back()->with('error', 'Error al entregar ticket: ' . $e->getMessage());
     }
-}
+
 
             DB::afterCommit(fn () => broadcast(new PedidoActualizado($pedido)));
 
             return $pedido;
-        });
+        
 
         return redirect()->back()->with('success', 'Ticket #'.($pedido->numero ?? $pedido->id).' entregado correctamente');
     }
