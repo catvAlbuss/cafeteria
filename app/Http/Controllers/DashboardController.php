@@ -94,7 +94,6 @@ class DashboardController extends Controller
         // Ventas del período
         $ventasQuery = Pedido::where('estado', 'pagado')
             ->whereBetween('created_at', [$fechas['inicio'], $fechas['fin']]);
-
         $totalVentas = $ventasQuery->sum('total');
         $totalPedidos = $ventasQuery->count();
         $ticketPromedio = $totalPedidos > 0 ? $totalVentas / $totalPedidos : 0;
@@ -112,35 +111,33 @@ class DashboardController extends Controller
             ]);
 
 // Una sola consulta, reutilizada para ambos cálculos
-$pedidosDelPeriodo = Pedido::where('estado', 'pagado')
-    ->whereBetween('created_at', [$fechas['inicio'], $fechas['fin']])
-    ->get(['productos']);
+    $pedidosDelPeriodo = Pedido::where('estado', 'pagado')
+        ->whereBetween('created_at', [$fechas['inicio'], $fechas['fin']])
+        ->get(['productos']);
 
-$productosDelPeriodo = $pedidosDelPeriodo->flatMap(
-    fn($pedido) => is_array($pedido->productos) ? $pedido->productos : json_decode($pedido->productos, true) ?? []
-);
+    $productosDelPeriodo = $pedidosDelPeriodo->flatMap(
+        fn($pedido) => is_array($pedido->productos) ? $pedido->productos : json_decode($pedido->productos, true) ?? []
+    );
+    $topProductos = $productosDelPeriodo
+        ->groupBy('nombre')
+        ->map(fn($items) => [
+            'nombre' => $items->first()['nombre'] ?? 'Producto',
+            'cantidad' => $items->sum('cantidad'),
+            'total' => $items->sum('subtotal'),
+        ])
+        ->sortByDesc('total')
+        ->take(5)
+        ->values();
 
-$topProductos = $productosDelPeriodo
-    ->groupBy('nombre')
-    ->map(fn($items) => [
-        'nombre' => $items->first()['nombre'] ?? 'Producto',
-        'cantidad' => $items->sum('cantidad'),
-        'total' => $items->sum('subtotal'),
+    $distribucionCategorias = $productosDelPeriodo
+        ->groupBy('categoria')
+        ->map(fn($items) => [
+            'name' => $items->first()['categoria'] ?? 'Otros',
+            'value' => $items->sum('subtotal'),
     ])
-    ->sortByDesc('total')
-    ->take(5)
-    ->values();
-
-$distribucionCategorias = $productosDelPeriodo
-    ->groupBy('categoria')
-    ->map(fn($items) => [
-        'name' => $items->first()['categoria'] ?? 'Otros',
-        'value' => $items->sum('subtotal'),
-    ])
-    ->sortByDesc('value')
-    ->take(4)
-    ->values();
-
+        ->sortByDesc('value')
+        ->take(4)
+        ->values();
         // Estado de mesas
         $mesasOcupadas = Mesa::where('estado', 'ocupada')->count();
         $mesasTotal = Mesa::count();
