@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 import { X, CheckCircle, CreditCard, Banknote, Smartphone, Printer, KeyRound } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react'; 
 // ============================================================
 // INTERFACES
 // ============================================================
@@ -271,7 +272,7 @@ export default function ModalCobro({
                 setCargando(false);
                 alert(
                     'Error al registrar la venta: ' +
-                        Object.values(errors).join(' '),
+                    Object.values(errors).join(' '),
                 );
             },
         });
@@ -428,15 +429,7 @@ export default function ModalCobro({
                                         <span style={{ color: '#333333' }}>Efectivo</span>
                                         <span style={{ fontWeight: 600, color: '#000000' }}>{montoRecibidoNum.toFixed(2)}</span>
                                     </div>
-                                )}
-
-                            {/* MÉTODO DE PAGO */}
-                            <div
-                                className="mb-2 pt-2"
-                                style={{ borderTop: '1.5px dashed #ccc' }}
-                            >
-                                <div
-                                    style={{
+                                    <div style={{
                                         display: 'flex',
                                         justifyContent: 'space-between',
                                         fontSize: '13px',
@@ -479,33 +472,30 @@ export default function ModalCobro({
                         <div className="grid flex-shrink-0 grid-cols-3 gap-2">
                             <button
                                 onClick={() => setMetodoPago('efectivo')}
-                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${
-                                    metodoPago === 'efectivo'
+                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${metodoPago === 'efectivo'
                                         ? 'bg-[#C9A96E] text-white shadow-md'
                                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                                    }`}
                             >
                                 <Banknote className="h-4 w-4" />
                                 <span>Efectivo</span>
                             </button>
                             <button
                                 onClick={() => setMetodoPago('tarjeta')}
-                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${
-                                    metodoPago === 'tarjeta'
+                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${metodoPago === 'tarjeta'
                                         ? 'bg-[#C9A96E] text-white shadow-md'
                                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                                    }`}
                             >
                                 <CreditCard className="h-4 w-4" />
                                 <span>Tarjeta</span>
                             </button>
                             <button
                                 onClick={() => setMetodoPago('yape')}
-                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${
-                                    metodoPago === 'yape'
+                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${metodoPago === 'yape'
                                         ? 'bg-[#C9A96E] text-white shadow-md'
                                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                                    }`}
                             >
                                 <Smartphone className="h-4 w-4" />
                                 <span>Yape/Plin</span>
@@ -588,13 +578,12 @@ export default function ModalCobro({
                                 (metodoPago === 'efectivo' &&
                                     montoRecibidoNum < total)
                             }
-                            className={`flex w-full flex-shrink-0 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
-                                cargando ||
-                                (metodoPago === 'efectivo' &&
-                                    montoRecibidoNum < total)
+                            className={`flex w-full flex-shrink-0 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${cargando ||
+                                    (metodoPago === 'efectivo' &&
+                                        montoRecibidoNum < total)
                                     ? 'cursor-not-allowed bg-gray-300'
                                     : 'bg-[#2D1B1A] text-white hover:bg-[#1A0F0E]'
-                            }`}
+                                }`}
                         >
                             {cargando ? (
                                 <>

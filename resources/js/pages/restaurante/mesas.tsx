@@ -1,5 +1,5 @@
 import { Head, usePage, router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
@@ -18,8 +18,6 @@ import {
     useDroppable,
 } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
-import { Head, usePage, router } from '@inertiajs/react';
-import axios from 'axios';
 import {
     Armchair,
     Plus,
@@ -28,14 +26,15 @@ import {
     Receipt,
     CircleCheck,
     Calendar,
+    Users,
+    Utensils,
+    ChefHat,
+    ClipboardList,
+    ShoppingCart,
+    AlertCircle,
+    Eye,
+    Search,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import Swal from 'sweetalert2';
-import 'sweetalert2/dist/sweetalert2.min.css';
-import ModalCobro from '@/components/modals/ModalCobro';
-import ModalVerTickets from '@/components/tickets/ModalVerTickets';
-import { useSedeChannel } from '@/hooks/useSedeChannel';
-import { swalError, swalSuccess, errorsToText } from '@/lib/swal';
 
 // ============================================================
 // COMPONENTE MODAL DE PIN (identificación rápida del mesero)
