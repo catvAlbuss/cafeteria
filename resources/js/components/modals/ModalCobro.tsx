@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 // ============================================================
 // INTERFACES
 // ============================================================
-
 interface ProductoPedido {
     nombre: string;
     cantidad: number;
@@ -38,7 +37,6 @@ interface ModalCobroProps {
 // ============================================================
 // COMPONENTE
 // ============================================================
-
 export default function ModalCobro({
     isOpen,
     mesa,
@@ -102,8 +100,6 @@ export default function ModalCobro({
             pedido_ids: pedidosACobrar.map((p) => p.id),
             authorization_pin: authorizationPin,
         };
-
-        console.log('📤 Registrando venta:', ventaData);
 
         router.patch(`/mesas/${mesa.id}/cobrar`, ventaData, {
             onSuccess: () => {
