@@ -117,8 +117,9 @@ export default function Mermas() {
     };
 
     // ===== ESTADÍSTICAS =====
-    const totalPerdidas = mermas.reduce((sum, m) => sum + (m.cantidad * (m.item?.precio || 0)), 0);
-    const totalRegistros = mermas.length;
+    const { stats } = usePage().props as any;
+    const totalPerdidas = stats?.total_perdidas ?? 0;
+    const totalRegistros = stats?.total_registros ?? 0;
 
     const itemsDisponibles: (Plato | Insumo)[] = tipoMerma === 'producto' ? platos : insumos;
     const itemsFiltrados = itemsDisponibles.filter((i) =>
