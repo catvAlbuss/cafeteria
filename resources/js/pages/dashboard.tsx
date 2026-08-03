@@ -578,7 +578,7 @@ function WaiterHome({ summary }: { summary: WaiterSummary }) {
     return (
         <>
             <Head title="Inicio del Mozo" />
-            <main className="min-h-full space-y-3 sm:space-y-4 bg-[#FBF7F0] p-3 sm:p-4 md:p-6">
+            <div className="space-y-3 sm:space-y-4 bg-[#FBF7F0] p-3 sm:p-4 md:p-6">
                 <section className="flex flex-col sm:flex-row gap-3 sm:gap-4 rounded-xl sm:rounded-2xl bg-neutral-950 p-4 sm:p-5 text-white sm:items-center sm:justify-between">
                     <div>
                         <p className="text-xs sm:text-sm font-bold text-orange-300">Panel personal del mozo</p>
@@ -632,7 +632,7 @@ function WaiterHome({ summary }: { summary: WaiterSummary }) {
                         )}
                     </div>
                 </section>
-            </main>
+            </div>
         </>
     );
 }
