@@ -671,7 +671,7 @@
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-p0b2doBO.css",
+    "file": "assets/app-Dfzr_yOa.css",
     "name": "app",
     "names": [
       "app.css"
@@ -680,7 +680,7 @@
     "isEntry": true
   },
   "resources/js/app.tsx": {
-    "file": "assets/app-C6H-jyTH.js",
+    "file": "assets/app-DNxroHSY.js",
     "name": "app",
     "src": "resources/js/app.tsx",
     "isEntry": true,
@@ -995,7 +995,7 @@
     ]
   },
   "resources/js/pages/dinero/reportes.tsx": {
-    "file": "assets/reportes-DJdbzLkt.js",
+    "file": "assets/reportes-D_9Z-elv.js",
     "name": "reportes",
     "src": "resources/js/pages/dinero/reportes.tsx",
     "isDynamicEntry": true,

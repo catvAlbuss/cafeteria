@@ -1,5 +1,7 @@
 <?php
+
 namespace Database\Seeders;
+
 use App\Models\Cover;
 use App\Models\Team;
 use Illuminate\Database\Seeder;
@@ -33,11 +35,13 @@ class CoversSeeder extends Seeder
             );
         }
     }
+
     private function demoSvg(string $text, string $background, string $foreground, int $width, int $height): string
     {
         $label = htmlspecialchars($text, ENT_QUOTES);
-        return "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{$width}\" 
-        height=\"{$height}\" viewBox=\"0 0 {$width} {$height}\"><rect width=\"{$width}\" height=\"{$height}\" 
-        rx=\"18\" fill=\"%23{$background}\"/><text x=\"50%25\" y=\"52%25\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%23{$foreground}\" font-family=\"Arial\" font-size=\"28\" font-weight=\"700\">{$label}</text></svg>";
+
+        return "data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{$width}\" "
+            ."height=\"{$height}\" viewBox=\"0 0 {$width} {$height}\"><rect width=\"{$width}\" height=\"{$height}\" "
+            ."rx=\"18\" fill=\"%23{$background}\"/><text x=\"50%25\" y=\"52%25\" dominant-baseline=\"middle\" text-anchor=\"middle\" fill=\"%23{$foreground}\" font-family=\"Arial\" font-size=\"28\" font-weight=\"700\">{$label}</text></svg>";
     }
 }
