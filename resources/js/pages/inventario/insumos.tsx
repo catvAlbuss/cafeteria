@@ -173,7 +173,9 @@ export default function Insumos() {
     };
 
     const eliminarInsumo = (insumo: Insumo) => {
-        if (!confirm(`¿Seguro que deseas eliminar "${insumo.nombre}"?`)) return;
+        if (!confirm(`¿Seguro que deseas eliminar "${insumo.nombre}"?`)) {
+            return;
+        }
 
         const idEliminar = insumo.id;
         setInsumosData(prev => prev.filter(i => i.id !== idEliminar));
@@ -184,7 +186,6 @@ export default function Insumos() {
                 toast.success('✅ Insumo eliminado correctamente');
             },
             onError: (errors) => {
-            
                 setInsumosData(prev => [...prev, insumo]);
 
                 if (errors.insumo?.includes('Cardex')) {
@@ -205,7 +206,7 @@ export default function Insumos() {
         router.put(`/insumos/${insumo.id}`, {
             nombre: insumo.nombre,
             categoria: insumo.categoria,
-            area: (insumo as any).area,       
+            area: insumo.area,
             unidad: insumo.unidad,
             precio: insumo.precio,
             proveedor: insumo.proveedor,
