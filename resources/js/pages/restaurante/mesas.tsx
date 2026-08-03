@@ -130,11 +130,10 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
                         {[0, 1, 2, 3].map((i) => (
                             <span
                                 key={i}
-                                className={`h-4 w-4 rounded-full border-2 ${
-                                    i < pin.length
+                                className={`h-4 w-4 rounded-full border-2 ${i < pin.length
                                         ? 'border-[#C9A96E] bg-[#C9A96E]'
                                         : 'border-gray-300'
-                                }`}
+                                    }`}
                             />
                         ))}
                     </div>
@@ -311,9 +310,9 @@ function SillaDraggable({
 
     const style = transform
         ? {
-              transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-              zIndex: 50,
-          }
+            transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+            zIndex: 50,
+        }
         : undefined;
 
     return (
@@ -418,12 +417,12 @@ function MesaCard({
         mesa.estado === 'ocupada'
             ? 'text-orange-500'
             : mesa.estado === 'pendiente'
-              ? 'text-yellow-500'
-              : mesa.estado === 'reserva'
-                ? 'text-blue-500'
-                : mesa.estado === 'listo_cobrar'
-                  ? 'text-purple-500'
-                  : 'text-green-500';
+                ? 'text-yellow-500'
+                : mesa.estado === 'reserva'
+                    ? 'text-blue-500'
+                    : mesa.estado === 'listo_cobrar'
+                        ? 'text-purple-500'
+                        : 'text-green-500';
 
     const dragDisabled = mesa.estado !== 'libre';
     const isMesero = userRole === 'Mesero';
@@ -594,13 +593,12 @@ function MesaCard({
                                     onCambiarEstado(mesa.id, value)
                                 }
                                 disabled={isDisabled}
-                                className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${
-                                    isActive
+                                className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${isActive
                                         ? activeClass
                                         : isDisabled
-                                          ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 opacity-50'
-                                          : idleClass
-                                }`}
+                                            ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 opacity-50'
+                                            : idleClass
+                                    }`}
                                 title={
                                     isDisabled
                                         ? esCobrar
@@ -853,7 +851,7 @@ export default function MesasDistribucion() {
             }
         },
     });
-  
+
     useSedeChannel('pedidos', {
         'pedido.actualizado': (payload: any) => {
             setPedidosLista(prev =>
@@ -866,6 +864,54 @@ export default function MesasDistribucion() {
             );
         },
     });
+    useEffect(() => {
+        if (!modalTicketsAbierto || !mesaSeleccionada) {
+            return;
+        }
+
+        const tickets = pedidosLista.filter(
+            (p) =>
+                p.mesa_id === mesaSeleccionada.id &&
+                !['pagado', 'cancelado'].includes(p.estado || ''),
+        );
+
+        if (tickets.length === 0) {
+            return;
+        }
+
+        const ticketsFormateados = tickets.map((p) => {
+            let productos = p.productos;
+            if (typeof productos === 'string') {
+                try {
+                    productos = JSON.parse(productos);
+                } catch {
+                    productos = [];
+                }
+            }
+            return {
+                id: p.id,
+                numero: p.numero || `#${p.id}`,
+                estado: p.estado || 'pendiente',
+                total: Number(p.total) || 0,
+                created_at: p.created_at,
+                productos: Array.isArray(productos) ? productos : [],
+            };
+        });
+
+        const ordenEstados: Record<string, number> = {
+            pendiente: 0,
+            preparando: 1,
+            listo: 2,
+            entregado: 3,
+        };
+        ticketsFormateados.sort(
+            (a, b) =>
+                (ordenEstados[a.estado as string] ?? 9) -
+                (ordenEstados[b.estado as string] ?? 9),
+        );
+
+        setTicketsDeMesa(ticketsFormateados);
+    }, [pedidosLista, modalTicketsAbierto, mesaSeleccionada]);
     // Aviso de capacidad excedida (viene del backend vía flash)
     useEffect(() => {
         const aviso = flash?.aviso_capacidad;
@@ -1056,7 +1102,6 @@ export default function MesasDistribucion() {
                 return;
             }
 
-            // ✅ ACTUALIZAR LOCALMENTE (optimista)
             const nuevosTickets = ticketsDeMesa.map((t) =>
                 t.id === ticketId ? { ...t, estado: 'entregado' } : t,
             );
@@ -1067,8 +1112,6 @@ export default function MesasDistribucion() {
                     p.id === ticketId ? { ...p, estado: 'entregado' } : p,
                 ),
             );
-
-            // ✅ ENVIAR AL BACKEND - Inertia maneja la respuesta automáticamente
             router.post(
                 `/pedidos/${ticketId}/entregar`,
                 {},
@@ -1078,8 +1121,6 @@ export default function MesasDistribucion() {
                     onSuccess: (page) => {
                         console.log('✅ Ticket entregado correctamente');
 
-                        // ✅ Verificar mensaje flash de éxito
-                        // page.props.flash puede no estar tipado; castear a any para evitar error TS
                         const flash = page.props.flash as any;
 
                         if (flash?.success) {
@@ -1120,7 +1161,6 @@ export default function MesasDistribucion() {
                     },
                     onError: (errors) => {
                         console.error('❌ Error al entregar ticket:', errors);
-                        // ✅ Revertir cambio optimista si falla
                         setTicketsDeMesa((prev) =>
                             prev.map((t) =>
                                 t.id === ticketId
@@ -1138,7 +1178,7 @@ export default function MesasDistribucion() {
                         swalError(
                             'Error',
                             errorsToText(errors) ||
-                                'No se pudo entregar el pedido',
+                            'No se pudo entregar el pedido',
                         );
                     },
                 },
