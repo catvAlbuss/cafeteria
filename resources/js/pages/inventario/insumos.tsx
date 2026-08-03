@@ -43,6 +43,7 @@ interface Insumo {
     proveedor: string;
     activo: boolean;
     created_at: string;
+    area: 'cocina' | 'bar';
 }
 
 const categoriaIconos: Record<string, any> = {
@@ -172,8 +173,54 @@ export default function Insumos() {
     };
 
     const eliminarInsumo = (insumo: Insumo) => {
-        setInsumosData(prev => prev.filter(i => i.id !== insumo.id));
-        toast.success('Insumo eliminado');
+        if (!confirm(`¿Seguro que deseas eliminar "${insumo.nombre}"?`)) return;
+
+        const idEliminar = insumo.id;
+        setInsumosData(prev => prev.filter(i => i.id !== idEliminar));
+
+        router.delete(`/insumos/${insumo.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('✅ Insumo eliminado correctamente');
+            },
+            onError: (errors) => {
+            
+                setInsumosData(prev => [...prev, insumo]);
+
+                if (errors.insumo?.includes('Cardex')) {
+                    if (confirm(
+                        `${insumo.nombre} ya tiene movimientos registrados (compras/mermas) y no se puede eliminar sin perder ese historial.\n\n¿Deseas DESACTIVARLO en su lugar? Dejará de aparecer en las operaciones diarias, pero conservará su historial.`
+                    )) {
+                        desactivarInsumo(insumo);
+                    }
+                    return;
+                }
+
+                toast.error(errors.insumo || 'No se pudo eliminar el insumo');
+            }
+        });
+    };
+
+    const desactivarInsumo = (insumo: Insumo) => {
+        router.put(`/insumos/${insumo.id}`, {
+            nombre: insumo.nombre,
+            categoria: insumo.categoria,
+            area: (insumo as any).area,       
+            unidad: insumo.unidad,
+            precio: insumo.precio,
+            proveedor: insumo.proveedor,
+            activo: false,
+        }, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                toast.success('✅ Insumo desactivado — se conserva su historial');
+                const nuevosInsumos = page.props.insumos as Insumo[] || [];
+                setInsumosData(nuevosInsumos);
+            },
+            onError: (errors) => {
+                toast.error('Error al desactivar: ' + Object.values(errors).join(' '));
+            }
+        });
     };
     // ============================================================
     // REGISTRAR COMPRA Y MERMA
@@ -190,7 +237,6 @@ export default function Insumos() {
                 setModalCompraAbierto(false);
                 toast.success('✅ Compra registrada');
 
-                // ✅ Actualizar estado local
                 const nuevosInsumos = page.props.insumos as Insumo[] || [];
                 setInsumosData(nuevosInsumos);
             },

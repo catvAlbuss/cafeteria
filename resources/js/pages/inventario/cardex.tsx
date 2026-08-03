@@ -52,7 +52,13 @@ interface Insumo {
 
 export default function Cardex() {
     const { platos, insumos, movimientos } = usePage().props as any;
-    const [movimientosData, setMovimientosData] = useState<Movimiento[]>(movimientos || []);
+    const [movimientosData, setMovimientosData] = useState<Movimiento[]>(() => {
+        return (movimientos || []).map((m: any) => ({
+            ...m,
+            cantidad: typeof m.cantidad === 'number' ? m.cantidad : parseFloat(String(m.cantidad).replace(/[^\d.]/g, '')) || 0,
+            stock_resultante: typeof m.stock_resultante === 'number' ? m.stock_resultante : parseFloat(String(m.stock_resultante).replace(/[^\d.]/g, '')) || 0,
+        }));
+    });
     const [modalAbierto, setModalAbierto] = useState(false);
     // Estado del formulario
     const [nuevoMovimiento, setNuevoMovimiento] = useState({
@@ -70,8 +76,13 @@ export default function Cardex() {
     const [fechaInicio, setFechaInicio] = useState('');
     const [fechaFin, setFechaFin] = useState('');
     // Estadísticas
-    const totalEntradas = (movimientosData || []).filter(m => m.tipo === 'entrada').reduce((sum, m) => sum + m.cantidad, 0);
-    const totalSalidas = (movimientosData || []).filter(m => m.tipo === 'salida').reduce((sum, m) => sum + m.cantidad, 0);
+    const totalEntradas = (movimientosData || [])
+        .filter(m => m.tipo === 'entrada' && typeof m.cantidad === 'number' && !isNaN(m.cantidad))
+        .reduce((sum, m) => sum + m.cantidad, 0);
+
+    const totalSalidas = (movimientosData || [])
+        .filter(m => m.tipo === 'salida' && typeof m.cantidad === 'number' && !isNaN(m.cantidad))
+        .reduce((sum, m) => sum + m.cantidad, 0);
     const totalProductos = (platos || []).length + (insumos || []).length;
     const formatNumber = (num: number): string => num.toLocaleString('es-PE');
     const movimientosFiltrados = (movimientosData || []).filter(m => {
@@ -83,7 +94,8 @@ export default function Cardex() {
     });
 
     const guardarMovimiento = () => {
-        if (!nuevoMovimiento.producto_id || nuevoMovimiento.cantidad <= 0) {
+        const cantidadNumerica = Number(nuevoMovimiento.cantidad);
+        if (!nuevoMovimiento.producto_id || cantidadNumerica <= 0 || isNaN(cantidadNumerica)) {
             toast.warning('Complete todos los campos correctamente');
             return;
         }
@@ -98,14 +110,14 @@ export default function Cardex() {
             return;
         }
 
-        if (nuevoMovimiento.tipo === 'salida' && item.stock < nuevoMovimiento.cantidad) {
+        if (nuevoMovimiento.tipo === 'salida' && item.stock < cantidadNumerica) {
             toast.error(`Stock insuficiente para ${item.nombre}`);
             return;
         }
 
         const nuevoStock = nuevoMovimiento.tipo === 'entrada'
-            ? item.stock + nuevoMovimiento.cantidad
-            : item.stock - nuevoMovimiento.cantidad;
+            ? Number(item.stock) + cantidadNumerica
+            : Number(item.stock) - cantidadNumerica;
 
         toast.info('Funcionalidad en desarrollo');
         // Por ahora, simular el movimiento
@@ -114,8 +126,8 @@ export default function Cardex() {
             item_type: tipo,
             item_id: Number(id),
             tipo: nuevoMovimiento.tipo,
-            cantidad: nuevoMovimiento.cantidad,
-            stock_resultante: nuevoStock,
+            cantidad: Number(nuevoMovimiento.cantidad),
+            stock_resultante: Number(nuevoStock),
             motivo: 'ajuste',
             observaciones: nuevoMovimiento.observaciones || '',
             user: { name: 'Usuario actual' },
@@ -321,22 +333,20 @@ export default function Cardex() {
                                                 {new Date(mov.created_at).toLocaleDateString()}
                                             </td>
                                             <td className="px-4 py-3 text-sm">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                    mov.item_type === 'plato'
-                                                        ? 'bg-blue-100 text-blue-700'
-                                                        : 'bg-purple-100 text-purple-700'
-                                                }`}>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${mov.item_type === 'plato'
+                                                    ? 'bg-blue-100 text-blue-700'
+                                                    : 'bg-purple-100 text-purple-700'
+                                                    }`}>
                                                     {mov.item_type === 'plato' ? '🍽️ Plato' : '📦 Insumo'}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-sm font-medium text-[#2D1B1A]">{mov.item?.nombre || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-[#5A3D2B]">{mov.item?.categoria || '-'}</td>
                                             <td className="px-4 py-3 text-sm">
-                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-                                                    mov.tipo === 'entrada' 
-                                                        ? 'bg-green-100 text-green-700' 
-                                                        : 'bg-red-100 text-red-700'
-                                                }`}>
+                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${mov.tipo === 'entrada'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-red-100 text-red-700'
+                                                    }`}>
                                                     {mov.tipo === 'entrada' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                                                     {mov.tipo === 'entrada' ? 'Entrada' : 'Salida'}
                                                 </span>
@@ -431,7 +441,7 @@ export default function Cardex() {
                                             placeholder="0"
                                             className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
                                             value={nuevoMovimiento.cantidad}
-                                            onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, cantidad: parseInt(e.target.value) || 0 })}
+                                            onChange={(e) => setNuevoMovimiento({ ...nuevoMovimiento, cantidad: Number(e.target.value) || 0 })}
                                         />
                                     </div>
                                 </div>
