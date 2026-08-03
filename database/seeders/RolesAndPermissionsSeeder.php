@@ -173,7 +173,6 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver delivery',
             'ver insumos',
         ]);
-
         $roleGerente = Role::firstOrCreate([
             'name' => 'Gerente',
             'guard_name' => 'web',

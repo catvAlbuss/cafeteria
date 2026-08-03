@@ -46,7 +46,7 @@ class CoverController extends Controller
             'imagen' => 'nullable|string',
         ]);
 
-        // ✅ Procesar Base64 a archivo físico
+    
         $imagenPath = $this->guardarImagenBase64($validated['imagen'] ?? null)
                       ?? '/images/default-cover.jpg';
 
@@ -85,14 +85,13 @@ class CoverController extends Controller
                 return redirect()->back()->with('error', 'Cover no encontrado');
             }
 
-            // ✅ Si viene una nueva imagen Base64 la procesa, si no, mantiene la anterior
             $imagenGuardar = $cover->imagen;
             if (! empty($validated['imagen'])) {
                 if (str_contains($validated['imagen'], ';base64,')) {
                     // Si es Base64, la convierte a archivo físico
                     $imagenGuardar = $this->guardarImagenBase64($validated['imagen']);
                 } else {
-                    // Si ya es una URL existente
+                  
                     $imagenGuardar = $validated['imagen'];
                 }
             }
@@ -139,7 +138,6 @@ class CoverController extends Controller
         $cover = Cover::findOrFail($id);
         $cover->estado = $validated['estado'];
         $cover->save();
-
         return redirect()->back()->with('success', 'Estado actualizado correctamente');
     }
 
@@ -156,7 +154,6 @@ class CoverController extends Controller
             // Extraer formato y datos de la cadena Base64
             @[$type, $file_data] = explode(';', $base64);
             @[, $file_data] = explode(',', $file_data);
-
             $extension = 'jpg';
             if (str_contains($type, 'png')) {
                 $extension = 'png';
@@ -167,7 +164,6 @@ class CoverController extends Controller
 
             // Generar nombre único
             $imageName = 'cover_'.time().'_'.Str::random(8).'.'.$extension;
-
             // Guardar en el disco 'public' dentro de la carpeta 'covers'
             Storage::disk('public')->put('covers/'.$imageName, base64_decode($file_data));
 
@@ -175,7 +171,6 @@ class CoverController extends Controller
             return Storage::url('covers/'.$imageName);
         } catch (\Exception $e) {
             \Log::error('Error al guardar imagen Base64: '.$e->getMessage());
-
             return null;
         }
     }

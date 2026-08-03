@@ -29,7 +29,7 @@ interface Insumo {
     nombre: string;
     stock: number;
     precio: number;
-    unidad: string; 
+    unidad: string;
     categoria: string;
 }
 
@@ -39,8 +39,8 @@ interface Merma {
     item_type: string;
     cantidad: number;
     stock_resultante: number;
-    motivo: string;    
-    submotivo: string;  
+    motivo: string;
+    submotivo: string;
     observaciones: string;
     user: { name: string };
     item?: { nombre: string; precio?: number };
@@ -195,7 +195,7 @@ export default function Mermas() {
                 tipo: i.tipo,
                 nombre: i.nombre,
                 cantidad: i.cantidad,
-                motivo: i.motivo,  
+                motivo: i.motivo,
             })),
             observaciones: observaciones || null,
         }, {
@@ -233,6 +233,19 @@ export default function Mermas() {
         const motivoOk = !filtroMotivo || m.submotivo === filtroMotivo;
         return busquedaOk && motivoOk;
     });
+
+    // ===== CALCULAR COSTO DE MERMA POR UNIDAD (SOLO FRONTEND) =====
+    const calcularCostoMerma = (merma: Merma) => {
+        const precio = merma.item?.precio || 0;
+        const cantidad = merma.cantidad;
+
+        if (merma.item_type === 'insumo') {
+            const PESO_POR_UNIDAD = 0.100; // 100 gramos por unidad
+            return cantidad * precio * PESO_POR_UNIDAD;
+        }
+
+        return cantidad * precio;
+    };
 
     return (
         <>
@@ -566,7 +579,7 @@ export default function Mermas() {
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm font-semibold text-red-600">
-                                                    {formatCurrency(m.cantidad * (m.item?.precio || 0))}
+                                                    {formatCurrency(calcularCostoMerma(m))}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-[#5A3D2B]">{m.user?.name || '-'}</td>
                                                 <td className="px-4 py-3 text-center">

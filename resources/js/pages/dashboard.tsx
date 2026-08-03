@@ -234,7 +234,7 @@ export default function Dashboard() {
                 {/* HEADER CON FILTROS */}
                 {/* ============================================================ */}
                 <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 sm:gap-3">
-                    {/* ✅ FILTROS A LA DERECHA */}
+                    {/*  FILTROS A LA DERECHA */}
                     <div className="flex bg-white rounded-2xl border border-[#F3E1C8] p-1 shadow-sm flex-wrap sm:flex-nowrap ml-auto">
                         {periodos.map(p => (
                             <button

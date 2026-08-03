@@ -186,10 +186,13 @@ export default function Insumos() {
         }
 
         router.post(`/insumos/${insumoSeleccionado.id}/comprar`, formCompra, {
-            onSuccess: () => {
+            onSuccess: (page) => {
                 setModalCompraAbierto(false);
                 toast.success('✅ Compra registrada');
-                router.reload();
+
+                // ✅ Actualizar estado local
+                const nuevosInsumos = page.props.insumos as Insumo[] || [];
+                setInsumosData(nuevosInsumos);
             },
             onError: (errors) => {
                 toast.error('Error: ' + Object.values(errors).join(' '));
@@ -225,13 +228,15 @@ export default function Insumos() {
             observaciones: formMerma.observaciones || null,
         }, {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page) => {
                 setModalMermaAbierto(false);
                 setFormMerma({ cantidad: 0, observaciones: '' });
                 setMotivoMerma('');
                 setCargandoMerma(false);
                 toast.success('✅ Merma registrada correctamente');
-                router.reload();
+
+                const nuevosInsumos = page.props.insumos as Insumo[] || [];
+                setInsumosData(nuevosInsumos);
             },
             onError: (errors) => {
                 setCargandoMerma(false);
@@ -464,10 +469,13 @@ export default function Insumos() {
                     const method = esEdicion ? 'put' : 'post';
 
                     router[method](url, data, {
-                        onSuccess: () => {
+                        onSuccess: (page) => {
                             setModalAbierto(false);
                             toast.success(esEdicion ? '✅ Insumo actualizado' : '✅ Insumo creado');
-                            router.reload();
+
+                            // ✅ Actualizar el estado local con los nuevos datos
+                            const nuevosInsumos = page.props.insumos as Insumo[] || [];
+                            setInsumosData(nuevosInsumos);
                         },
                         onError: (errors) => {
                             toast.error('Error: ' + Object.values(errors).join(' '));
