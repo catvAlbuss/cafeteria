@@ -126,20 +126,21 @@ class InsumoController extends Controller
         return redirect()->back()->with('success', 'Insumo actualizado correctamente');
     }
 
-    public function destroy(Insumo $insumo)
-    {
-        $movimientos = MovimientoInventario::where('item_type', 'insumo')
-            ->where('item_id', $insumo->id)
-            ->count();
+public function destroy(Insumo $insumo)
+{
+    $tieneMovimientos = MovimientoInventario::where('item_type', 'insumo')
+        ->where('item_id', $insumo->id)
+        ->exists();
 
-        if ($movimientos > 0) {
-            return redirect()->back()->with('error', 'No se puede eliminar porque tiene movimientos en Cardex');
-        }
-
-        $insumo->delete();
-
-        return redirect()->back()->with('success', 'Insumo eliminado correctamente');
+    if ($tieneMovimientos) {
+        return redirect()->back()->withErrors([
+            'insumo' => 'No se puede eliminar porque tiene movimientos en Cardex',
+        ]);
     }
+
+    $insumo->delete();
+    return redirect()->back()->with('success', 'Insumo eliminado correctamente');
+}
 
     // Registrar compra (entrada de stock)
     public function comprar(Request $request, Insumo $insumo)
