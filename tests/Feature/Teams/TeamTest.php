@@ -221,7 +221,7 @@ test('deleting non current team leaves current team unchanged', function () {
     expect($user->fresh()->current_team_id)->toEqual($personalTeam->id);
 });
 
-test('members can leave non personal teams', function () {
+test('operational members cannot leave assigned teams', function () {
     $owner = User::factory()->create();
     $member = User::factory()->create();
     $team = Team::factory()->create();
@@ -233,13 +233,12 @@ test('members can leave non personal teams', function () {
         ->actingAs($member)
         ->delete(route('teams.leave', $team));
 
-    $response->assertRedirect(route('teams.index'));
-    $response->assertInertiaFlash('toast', ['type' => 'success', 'message' => "You left the team \"{$team->name}\""]);
+    $response->assertForbidden();
 
-    expect($member->fresh()->belongsToTeam($team))->toBeFalse();
+    expect($member->fresh()->belongsToTeam($team))->toBeTrue();
 });
 
-test('leaving current team switches to alphabetically first remaining team', function () {
+test('operational members cannot leave or change their assigned team', function () {
     $owner = User::factory()->create();
     $member = User::factory()->create(['name' => 'Mike']);
 
@@ -259,10 +258,10 @@ test('leaving current team switches to alphabetically first remaining team', fun
         ->actingAs($member)
         ->delete(route('teams.leave', $zuluTeam));
 
-    $response->assertRedirect(route('teams.index'));
+    $response->assertForbidden();
 
-    expect($member->fresh()->belongsToTeam($zuluTeam))->toBeFalse();
-    expect($member->fresh()->current_team_id)->toEqual($alphaTeam->id);
+    expect($member->fresh()->belongsToTeam($zuluTeam))->toBeTrue();
+    expect($member->fresh()->current_team_id)->toEqual($zuluTeam->id);
 });
 
 test('personal teams cannot be left', function () {
@@ -362,7 +361,7 @@ test('teams cannot be deleted by non owners', function () {
     $response->assertForbidden();
 });
 
-test('users can switch teams', function () {
+test('operational members cannot switch teams themselves', function () {
     $user = User::factory()->create();
     $team = Team::factory()->create();
 
@@ -372,9 +371,9 @@ test('users can switch teams', function () {
         ->actingAs($user)
         ->post(route('teams.switch', $team));
 
-    $response->assertRedirect();
+    $response->assertForbidden();
 
-    expect($user->fresh()->current_team_id)->toEqual($team->id);
+    expect($user->fresh()->current_team_id)->not->toEqual($team->id);
 });
 
 test('users cannot switch to team they dont belong to', function () {

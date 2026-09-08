@@ -24,6 +24,8 @@ class TeamController extends Controller
      */
     public function index(Request $request): Response
     {
+        Gate::authorize('viewAny', Team::class);
+
         $user = $request->user();
 
         return Inertia::render('teams/index', [
@@ -36,6 +38,8 @@ class TeamController extends Controller
      */
     public function store(SaveTeamRequest $request, CreateTeam $createTeam): RedirectResponse
     {
+        Gate::authorize('create', Team::class);
+
         $team = $createTeam->handle($request->user(), $request->validated('name'));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Team created.')]);
@@ -48,6 +52,8 @@ class TeamController extends Controller
      */
     public function edit(Request $request, Team $team): Response
     {
+        Gate::authorize('view', $team);
+
         $user = $request->user();
 
         return Inertia::render('teams/edit', [
@@ -110,7 +116,7 @@ class TeamController extends Controller
      */
     public function switch(Request $request, Team $team): RedirectResponse
     {
-        abort_unless($request->user()->belongsToTeam($team), 403);
+        Gate::authorize('view', $team);
 
         $request->user()->switchTeam($team);
 

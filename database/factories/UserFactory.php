@@ -35,6 +35,23 @@ class UserFactory extends Factory
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
+            'usuario' => fake()->unique()->userName(),
+            'dni' => fake()->unique()->numerify('########'),
+            'telefono' => fake()->numerify('9########'),
+            'direccion' => fake()->address(),
+            'nro_hijos' => fake()->numberBetween(0, 4),
+            'afiliado' => fake()->randomElement(['ONP', 'AFP']),
+            'asegurado' => fake()->randomElement(['ESSALUD', 'SIS']),
+            'modalidad_trabajo' => fake()->randomElement(['part_time', 'full_time', 'online']),
+            'retencion' => fake()->randomFloat(2, 0, 500),
+            'ingreso_panilla' => fake()->numerify('PLL-####'),
+            'fecha_nacimiento' => fake()->date('Y-m-d', '-18 years'),
+            'fecha_ingreso' => fake()->date('Y-m-d'),
+            'fecha_cese' => fake()->date('Y-m-d'),
+            'modalidad_pago' => fake()->randomElement(['semanal', 'quincenal', 'mensual']),
+            'salario' => fake()->randomFloat(2, 1000, 5000),
+            'foto' => 'default.png',
+            'estado' => true,
         ];
     }
 
@@ -44,6 +61,12 @@ class UserFactory extends Factory
     public function configure(): static
     {
         return $this->afterCreating(function ($user) {
+            // If the user was already assigned to a team (e.g. an employee seeded
+            // directly into a sede), skip creating a personal team for them.
+            if ($user->current_team_id) {
+                return;
+            }
+
             $team = Team::factory()->personal()->create([
                 'name' => $user->name."'s Team",
             ]);
