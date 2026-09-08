@@ -1,5 +1,17 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import { 
+    LayoutDashboard, 
+    DollarSign,
+    BarChart3,
+    Coffee,
+    Package,
+    Users,
+    MapPin,
+    Settings,
+    UserCog,
+    HelpCircle,
+    FileText,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,33 +26,113 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
     const page = usePage();
-    const dashboardUrl = page.props.currentTeam
-        ? dashboard(page.props.currentTeam.slug)
-        : '/';
+    const dashboardUrl = '/dashboard';
 
+    //  TODAS LAS PÁGINAS (SIN items)
     const mainNavItems: NavItem[] = [
+        // DASHBOARD
         {
             title: 'Dashboard',
-            href: dashboardUrl,
-            icon: LayoutGrid,
+            href: '/dashboard',
+            icon: LayoutDashboard,
+        },
+        {
+            title: ' Ventas',
+            href: '/ventas',
+            icon: DollarSign,
+        },
+        
+        {
+            title: 'Caja',
+            href: '/caja',
+            icon: DollarSign,
+        },
+        
+        {
+            title: 'Reportes',
+            href: '/reportes',
+            icon: BarChart3,
+        },
+        {
+            title: ' Contador',
+            href: '/contador',
+            icon: DollarSign,
+        },
+        
+        //  RESTAURANTE - TÍTULO SEPARADOR
+        {
+            title: ' Platos',
+            href: '/platos',
+            icon: Coffee,
+        },
+        {
+            title: 'Mesas',
+            href: '/mesas',
+            icon: Coffee,
+        },
+        {
+            title: ' Covers',
+            href: '/covers',
+            icon: Coffee,
+        },
+        
+     
+        {
+            title: 'Producción',
+            href: '/produccion',
+            icon: Package,
+        },
+        {
+            title: 'Cardex',
+            href: '/cardex',
+            icon: Package,
+        },
+        {
+            title: 'Mermas',
+            href: '/mermas',
+            icon: Package,
+        },
+       
+
+        {
+            title: 'Clientes',
+            href: '/clientes',
+            icon: Users,
+        },
+        {
+            title: 'Delivery',
+            href: '/delivery',
+            icon: MapPin,
+        },
+        
+        // ⚙️ CONFIGURACIÓN - TÍTULO SEPARADOR
+      
+        {
+            title: 'Configuración',
+            href: '/configuracion',
+            icon: Settings,
+        },
+        {
+            title: ' Mi Perfil',
+            href: '/perfil',
+            icon: UserCog,
         },
     ];
 
     const footerNavItems: NavItem[] = [
         {
-            title: 'Repository',
-            href: 'https://github.com/laravel/react-starter-kit',
-            icon: FolderGit2,
+            title: 'Documentación',
+            href: 'https://laravel.com/docs/starter-kits#react',
+            icon: FileText,
         },
         {
-            title: 'Documentation',
-            href: 'https://laravel.com/docs/starter-kits#react',
-            icon: BookOpen,
+            title: 'Soporte',
+            href: '/soporte',
+            icon: HelpCircle,
         },
     ];
 
