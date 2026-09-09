@@ -58,9 +58,9 @@ export default function Contador() {
     });
 
     const [formCierre, setFormCierre] = useState({
-        montoFinal: 0,
-        observaciones: '',
-    });
+    montoFinal: '',
+    observaciones: '',
+});
     const [formMovimiento, setFormMovimiento] = useState({ tipo: 'egreso', concepto: '', monto: 0 });
 
     const [filtroEstado, setFiltroEstado] = useState('');
@@ -146,13 +146,12 @@ export default function Contador() {
             return;
         }
         setRegistroSeleccionado(abierta);
-        setFormCierre({ montoFinal: 0, observaciones: '' });
-        setModalCierreAbierto(true);
+setFormCierre({ montoFinal: '', observaciones: '' });        setModalCierreAbierto(true);
     };
 
     const guardarCierre = () => {
         if (!registroSeleccionado) return;
-        if (formCierre.montoFinal < 0) {
+        if (formCierre.montoFinal === '') {
             alert('Complete los campos correctamente.');
             return;
         }
@@ -713,7 +712,7 @@ export default function Contador() {
                                         step="0.01"
                                         className="mt-1 w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50 text-[#2D1B1A] transition"
                                         value={formCierre.montoFinal}
-                                        onChange={(e) => setFormCierre({ ...formCierre, montoFinal: parseFloat(e.target.value) || 0 })}
+                                        onChange={(e) => setFormCierre({ ...formCierre, montoFinal: e.target.value })}
                                         placeholder="0.00"
                                     />
                                 </div>
