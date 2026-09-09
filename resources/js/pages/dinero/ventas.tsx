@@ -268,9 +268,27 @@ export default function Ventas() {
     };
 
     // ============================================================
-    // ENVIAR PEDIDO - VERSIÓN CORREGIDA (SOLO ESTA PARTE)
+    // ENVIAR PEDIDO - CON VALIDACIÓN DE MESA
     // ============================================================
     const enviarPedido = () => {
+        // ⭐ VALIDACIÓN: Verificar que haya una mesa seleccionada
+        if (!mesaInfo || !mesaInfo.id) {
+            toast.warning('⚠️ Selecciona una mesa', {
+                description: 'Para enviar un pedido, primero debes seleccionar una mesa desde el módulo de Mesas.',
+                duration: 5000,
+                style: {
+                    background: '#2D1B1A',
+                    color: '#FBF3E7',
+                    border: '1px solid #C9A96E',
+                },
+                action: {
+                    label: 'Ir a Mesas',
+                    onClick: () => router.visit('/mesas'),
+                },
+            });
+            return;
+        }
+
         if (carrito.length === 0) {
             toast.warning('Agrega productos al pedido');
             return;
@@ -303,7 +321,7 @@ export default function Ventas() {
         const areaDetectada = detectarArea(productosConCategoria);
 
         router.post('/pedidos', {
-            mesa_id: mesaInfo?.id || null,
+            mesa_id: mesaInfo.id, // ✅ Ya no puede ser null gracias a la validación
             cliente: 'Anónimo',
             productos: productosConCategoria,
             total: totalCarrito,
@@ -313,7 +331,7 @@ export default function Ventas() {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Pedido enviado a cocina', {
-                    description: `Mesa: ${mesaInfo?.numero || 'No asignada'} · Mesero: ${mesaInfo?.mesero || 'No asignado'} · Total: S/ ${totalCarrito.toFixed(2)} · Área: ${areaDetectada}`,
+                    description: `Mesa: ${mesaInfo.numero} · Mesero: ${mesaInfo.mesero || 'No asignado'} · Total: S/ ${totalCarrito.toFixed(2)} · Área: ${areaDetectada}`,
                     duration: 5000,
                     style: {
                         background: '#2D1B1A',
@@ -723,4 +741,3 @@ Ventas.layout = {
         },
     ],
 };
-    

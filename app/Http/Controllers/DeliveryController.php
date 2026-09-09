@@ -15,8 +15,6 @@ class DeliveryController extends Controller
 {
     
 protected $areaClassifier;
-
-  
     public function __construct(ProductionAreaClassifier $areaClassifier)
     {
         $this->areaClassifier = $areaClassifier;
@@ -86,7 +84,6 @@ protected $areaClassifier;
 public function entregar(Delivery $delivery, Request $request)
 {
     $validated = $request->validate(['metodo_pago' => 'required|in:efectivo,tarjeta,yape']);
-
     $delivery->update([
         'metodo_pago' => $validated['metodo_pago'],
         'estado' => 'pagado',
@@ -140,7 +137,6 @@ public function entregar(Delivery $delivery, Request $request)
 public function cocina(Delivery $delivery)
 {
     $delivery->update(['estado_delivery' => 'preparando']);
-
     $productos = is_array($delivery->productos)
         ? $delivery->productos
         : json_decode($delivery->productos, true) ?? [];
@@ -177,7 +173,6 @@ public function cocina(Delivery $delivery)
 public function listoParaEntregar($id)
 {
     $delivery = Delivery::findOrFail($id);
-    
     $delivery->update([
         'estado_delivery' => 'listo_para_entregar',
     ]);
@@ -194,7 +189,6 @@ public function listoParaEntregar($id)
 public function enRuta($id)
 {
     $delivery = Delivery::findOrFail($id);
-    
     $delivery->update([
         'estado_delivery' => 'en_ruta',
     ]);

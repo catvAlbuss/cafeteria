@@ -10,7 +10,6 @@ import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import '@/echo';
 import axios from 'axios';
-
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 // Solo ejecutar en el cliente (navegador)

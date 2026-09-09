@@ -637,7 +637,6 @@ public function entregarTicket($id)
 
 
             DB::afterCommit(fn () => broadcast(new PedidoActualizado($pedido)));
-
             return $pedido;
         
 

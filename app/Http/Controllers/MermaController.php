@@ -14,10 +14,8 @@ class MermaController extends Controller
 public function index()
 {
     $teamId = auth()->user()->current_team_id;
-
     $platos = Plato::where('team_id', $teamId)->get();
     $insumos = Insumo::where('team_id', $teamId)->where('activo', true)->get();
-
     $mermas = MovimientoInventario::where('team_id', $teamId)
         ->where('motivo', 'merma')
         ->with(['user', 'item'])
@@ -58,7 +56,6 @@ public function index()
     public function store(Request $request)
     {
         $teamId = auth()->user()->current_team_id;
-
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.id' => 'required|integer',
@@ -113,7 +110,6 @@ public function index()
 
                 $modelo->stock -= $item['cantidad'];
                 $modelo->save();
-
                 $mermasRegistradas[] = $movimiento;
             }
 
@@ -129,7 +125,6 @@ public function index()
     public function show($id)
     {
         $teamId = auth()->user()->current_team_id;
-
         $merma = MovimientoInventario::where('team_id', $teamId)
             ->where('id', $id)
             ->where('motivo', 'merma')
@@ -142,7 +137,6 @@ public function index()
     public function destroy($id)
     {
         $teamId = auth()->user()->current_team_id;
-
         $merma = MovimientoInventario::where('team_id', $teamId)
             ->where('id', $id)
             ->where('motivo', 'merma')
