@@ -54,7 +54,7 @@ class PlatoController extends Controller
             'descripcion' => 'nullable|string',
             'precio' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
-            'imagen' => 'nullable|image|max:2048',
+            'imagen' => 'nullable|image|max:3072',
 
         ]);
 

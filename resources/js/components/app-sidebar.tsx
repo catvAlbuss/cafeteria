@@ -1,16 +1,21 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     LayoutDashboard,
-    DollarSign,
+    Receipt,
+    Banknote,
     BarChart3,
-    Coffee,
-    Package,
+    Coins,
+    CookingPot,
+    Armchair,
+    Ticket,
+    ChefHat,
+    Martini,
+    Boxes,
+    BookOpen,
+    Trash2,
     Users,
-    MapPin,
-    Settings,
-    UserCog,
-    HelpCircle,
-    FileText,
+    Truck,
+    PackageSearch,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -50,13 +55,13 @@ const roles = page.props.auth?.roles ?? [];
         {
             title: ' Ventas',
             href: '/ventas',
-            icon: DollarSign,
+            icon: Receipt,
             permission: 'ver ventas',
         },
         {
             title: 'Caja',
             href: '/caja',
-            icon: DollarSign,
+            icon: Banknote,
             permission: 'ver caja',
         },
         {
@@ -68,7 +73,7 @@ const roles = page.props.auth?.roles ?? [];
         {
             title: 'Turno de caja',
             href: '/contador',
-            icon: DollarSign,
+            icon: Coins,
             permission: 'ver contador',
         },
 
@@ -76,50 +81,50 @@ const roles = page.props.auth?.roles ?? [];
         {
             title: ' Platos',
             href: '/platos',
-            icon: Coffee,
+            icon: CookingPot,
             permission: 'ver platos',
         },
         {
             title: 'Mesas',
             href: '/mesas',
-            icon: Coffee,
+            icon: Armchair,
             permission: 'ver mesas',
         },
         {
             title: ' Covers',
             href: '/covers',
-            icon: Coffee,
+            icon: Ticket,
             permission: 'ver covers',
         },
 
         {
             title: 'Cocina',
             href: '/produccion?area=cocina',
-            icon: Package,
+            icon: ChefHat,
             permission: 'ver cocina',
         },
         {
             title: 'Bar',
             href: '/produccion?area=bar',
-            icon: Coffee,
+            icon: Martini,
             permission: 'ver bar',
         },
         {
             title: 'Insumos',
             href: '/insumos',
-            icon: Package,
+            icon: Boxes,
             permission: 'ver insumos',
         },
         {
             title: 'Cardex',
             href: '/cardex',
-            icon: Package,
+            icon: BookOpen,
             permission: 'ver cardex',
         },
         {
             title: 'Mermas',
             href: '/mermas',
-            icon: Package,
+            icon: Trash2,
             permission: 'ver mermas',
         },
 
@@ -132,7 +137,7 @@ const roles = page.props.auth?.roles ?? [];
         {
             title: 'Delivery',
             href: '/delivery',
-            icon: MapPin,
+            icon: Truck,
             permission: 'ver delivery',
         },
     ];
@@ -145,7 +150,7 @@ const roles = page.props.auth?.roles ?? [];
         mainNavItems.push({
             title: 'Mi inventario',
             href: '/mi-inventario',
-            icon: Package,
+            icon: PackageSearch,
         });
     }
 
