@@ -37,8 +37,9 @@ import {
 } from 'lucide-react';
 
 // ============================================================
-// COMPONENTE MODAL DE PIN (identificación rápida del mesero)
+// COMPONENTE MODAL DE PIN
 // ============================================================
+
 interface ModalPinProps {
     isOpen: boolean;
     mesa: Mesa | null;
@@ -46,10 +47,16 @@ interface ModalPinProps {
     onConfirm: (userId: number) => void;
 }
 
-function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
+function ModalPin({
+    isOpen,
+    mesa,
+    onClose,
+    onConfirm,
+}: ModalPinProps) {
     const [pin, setPin] = useState('');
     const [error, setError] = useState('');
     const [verificando, setVerificando] = useState(false);
+
     if (!isOpen || !mesa) return null;
 
     const handleClose = () => {
@@ -68,10 +75,10 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
     };
 
     const borrarDigito = () => setPin(prev => prev.slice(0, -1));
+
     const confirmar = async () => {
         if (pin.length !== 4) {
             setError('Ingresa los 4 dígitos de tu PIN');
-
             return;
         }
 
@@ -80,15 +87,19 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
 
         try {
             const { data } = await axios.post('/pin/verificar', { pin });
+
             setPin('');
             onClose();
+
             await swalSuccess(
                 `¡Hola, ${data.user.name}!`,
                 'PIN verificado correctamente',
             );
+
             onConfirm(data.user.id);
         } catch {
             setPin('');
+
             swalError(
                 'PIN incorrecto',
                 'Verifica los 4 dígitos e intenta nuevamente',
@@ -107,15 +118,18 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
                             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#C9A96E]">
                                 <User className="h-4 w-4 text-white" />
                             </div>
+
                             <div>
                                 <h3 className="text-sm font-semibold text-white">
                                     Tomar Pedido
                                 </h3>
+
                                 <p className="text-[10px] text-gray-300">
                                     Mesa #{mesa.numero} · Ingresa tu PIN
                                 </p>
                             </div>
                         </div>
+
                         <button
                             onClick={handleClose}
                             className="flex h-7 w-7 items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white"
@@ -130,10 +144,11 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
                         {[0, 1, 2, 3].map((i) => (
                             <span
                                 key={i}
-                                className={`h-4 w-4 rounded-full border-2 ${i < pin.length
+                                className={`h-4 w-4 rounded-full border-2 ${
+                                    i < pin.length
                                         ? 'border-[#C9A96E] bg-[#C9A96E]'
                                         : 'border-gray-300'
-                                    }`}
+                                }`}
                             />
                         ))}
                     </div>
@@ -145,18 +160,27 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
                     )}
 
                     <div className="grid grid-cols-3 gap-2">
-                        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(
-                            (n) => (
-                                <button
-                                    key={n}
-                                    type="button"
-                                    onClick={() => agregarDigito(n)}
-                                    className="rounded-xl border border-gray-200 bg-gray-50 py-3 text-lg font-semibold text-[#2D1B1A] transition hover:bg-[#C9A96E]/10 active:scale-95"
-                                >
-                                    {n}
-                                </button>
-                            ),
-                        )}
+                        {[
+                            '1',
+                            '2',
+                            '3',
+                            '4',
+                            '5',
+                            '6',
+                            '7',
+                            '8',
+                            '9',
+                        ].map((n) => (
+                            <button
+                                key={n}
+                                type="button"
+                                onClick={() => agregarDigito(n)}
+                                className="rounded-xl border border-gray-200 bg-gray-50 py-3 text-lg font-semibold text-[#2D1B1A] transition hover:bg-[#C9A96E]/10 active:scale-95"
+                            >
+                                {n}
+                            </button>
+                        ))}
+
                         <button
                             type="button"
                             onClick={borrarDigito}
@@ -164,6 +188,7 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
                         >
                             Borrar
                         </button>
+
                         <button
                             type="button"
                             onClick={() => agregarDigito('0')}
@@ -171,6 +196,7 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
                         >
                             0
                         </button>
+
                         <button
                             type="button"
                             onClick={confirmar}
@@ -187,7 +213,7 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
 }
 
 // ============================================================
-// COMPONENTE TARJETA DE PEDIDO (MODAL FLOTANTE)
+// COMPONENTE TARJETA DE PEDIDO
 // ============================================================
 
 interface Mesa {
@@ -195,7 +221,12 @@ interface Mesa {
     numero: string;
     capacidad: number;
     sillas: number;
-    estado: 'libre' | 'pendiente' | 'ocupada' | 'reserva' | 'listo_cobrar';
+    estado:
+        | 'libre'
+        | 'pendiente'
+        | 'ocupada'
+        | 'reserva'
+        | 'listo_cobrar';
     cliente?: string | null;
     personas?: number | null;
     mesero?: string | null;
@@ -203,13 +234,21 @@ interface Mesa {
 }
 
 const toArray = <T,>(
-    value: T[] | { data?: T[] } | Record<string, T> | null | undefined,
+    value:
+        | T[]
+        | { data?: T[] }
+        | Record<string, T>
+        | null
+        | undefined,
 ): T[] => {
     if (Array.isArray(value)) {
         return value;
     }
 
-    if (value && Array.isArray((value as { data?: T[] }).data)) {
+    if (
+        value &&
+        Array.isArray((value as { data?: T[] }).data)
+    ) {
         return (value as { data: T[] }).data;
     }
 
@@ -230,9 +269,10 @@ interface FlashProps {
     };
 }
 
-// -----------------------------------------------------------------------
-// Config visual por estado (colores + etiqueta)
-// -----------------------------------------------------------------------
+// ============================================================
+// CONFIG VISUAL
+// ============================================================
+
 const getEstadoConfig = (estado: string) => {
     switch (estado) {
         case 'libre':
@@ -243,6 +283,7 @@ const getEstadoConfig = (estado: string) => {
                 chip: 'bg-green-400',
                 label: 'Libre',
             };
+
         case 'pendiente':
             return {
                 bg: 'bg-yellow-50',
@@ -251,6 +292,7 @@ const getEstadoConfig = (estado: string) => {
                 chip: 'bg-yellow-400',
                 label: 'Pendiente',
             };
+
         case 'ocupada':
             return {
                 bg: 'bg-orange-50',
@@ -259,6 +301,7 @@ const getEstadoConfig = (estado: string) => {
                 chip: 'bg-orange-400',
                 label: 'Ocupada',
             };
+
         case 'reserva':
             return {
                 bg: 'bg-blue-50',
@@ -267,6 +310,7 @@ const getEstadoConfig = (estado: string) => {
                 chip: 'bg-blue-400',
                 label: 'Reserva',
             };
+
         case 'listo_cobrar':
             return {
                 bg: 'bg-purple-50',
@@ -275,6 +319,7 @@ const getEstadoConfig = (estado: string) => {
                 chip: 'bg-purple-400',
                 label: 'Cobrar',
             };
+
         default:
             return {
                 bg: 'bg-gray-50',
@@ -286,9 +331,10 @@ const getEstadoConfig = (estado: string) => {
     }
 };
 
-// -----------------------------------------------------------------------
-// Silla arrastrable. id único: chair-{mesaId}-{index}
-// -----------------------------------------------------------------------
+// ============================================================
+// SILLA ARRASTRABLE
+// ============================================================
+
 function SillaDraggable({
     mesaId,
     index,
@@ -301,18 +347,24 @@ function SillaDraggable({
     disabled: boolean;
 }) {
     const id = `chair-${mesaId}-${index}`;
-    const { attributes, listeners, setNodeRef, transform, isDragging } =
-        useDraggable({
-            id,
-            data: { mesaOrigenId: mesaId },
-            disabled,
-        });
+
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        isDragging,
+    } = useDraggable({
+        id,
+        data: { mesaOrigenId: mesaId },
+        disabled,
+    });
 
     const style = transform
         ? {
-            transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-            zIndex: 50,
-        }
+              transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+              zIndex: 50,
+          }
         : undefined;
 
     return (
@@ -327,16 +379,27 @@ function SillaDraggable({
                     ? 'Solo se pueden mover sillas entre mesas libres'
                     : 'Arrastra para mover esta silla a otra mesa'
             }
-            className={`touch-none rounded-md p-1 transition ${isDragging ? 'scale-110 opacity-40' : 'opacity-100'} ${disabled ? 'cursor-not-allowed' : 'cursor-grab hover:scale-110 active:cursor-grabbing'} `}
+            className={`touch-none rounded-md p-1 transition ${
+                isDragging
+                    ? 'scale-110 opacity-40'
+                    : 'opacity-100'
+            } ${
+                disabled
+                    ? 'cursor-not-allowed'
+                    : 'cursor-grab hover:scale-110 active:cursor-grabbing'
+            }`}
         >
-            <Armchair className={`h-5 w-5 sm:h-4 sm:w-4 ${colorClass}`} />
+            <Armchair
+                className={`h-5 w-5 sm:h-4 sm:w-4 ${colorClass}`}
+            />
         </button>
     );
 }
 
-// -----------------------------------------------------------------------
-// Layout de sillas alrededor de la mesa (plano tipo "vista de arriba")
-// -----------------------------------------------------------------------
+// ============================================================
+// PLANO DE MESA
+// ============================================================
+
 function PlanoMesa({
     mesa,
     colorClass,
@@ -346,7 +409,7 @@ function PlanoMesa({
     colorClass: string;
     disabled: boolean;
 }) {
-    const total = Math.min(mesa.sillas, 8); // tope visual razonable
+    const total = Math.min(mesa.sillas, 8);
     const arriba = Math.ceil(total / 2);
     const abajo = total - arriba;
 
@@ -363,15 +426,23 @@ function PlanoMesa({
                     />
                 ))}
             </div>
+
             <div
-                className={`flex h-12 w-16 items-center justify-center rounded-xl border-2 ${getEstadoConfig(mesa.estado).border} ${getEstadoConfig(mesa.estado).bg} shadow-inner`}
+                className={`flex h-12 w-16 items-center justify-center rounded-xl border-2 ${
+                    getEstadoConfig(mesa.estado).border
+                } ${
+                    getEstadoConfig(mesa.estado).bg
+                } shadow-inner`}
             >
                 <span
-                    className={`text-lg font-extrabold ${getEstadoConfig(mesa.estado).text}`}
+                    className={`text-lg font-extrabold ${
+                        getEstadoConfig(mesa.estado).text
+                    }`}
                 >
                     {mesa.capacidad}
                 </span>
             </div>
+
             <div className="flex flex-wrap justify-center gap-1">
                 {Array.from({ length: abajo }).map((_, i) => (
                     <SillaDraggable
@@ -387,9 +458,10 @@ function PlanoMesa({
     );
 }
 
-// -----------------------------------------------------------------------
-// Tarjeta de mesa
-// -----------------------------------------------------------------------
+// ============================================================
+// TARJETA DE MESA
+// ============================================================
+
 function MesaCard({
     mesa,
     onCambiarEstado,
@@ -409,23 +481,27 @@ function MesaCard({
     userRole?: string;
 }) {
     const config = getEstadoConfig(mesa.estado);
+
     const { setNodeRef, isOver } = useDroppable({
         id: `mesa-${mesa.id}`,
         data: { mesaId: mesa.id },
     });
+
     const colorSilla =
         mesa.estado === 'ocupada'
             ? 'text-orange-500'
             : mesa.estado === 'pendiente'
-                ? 'text-yellow-500'
-                : mesa.estado === 'reserva'
-                    ? 'text-blue-500'
-                    : mesa.estado === 'listo_cobrar'
-                        ? 'text-purple-500'
-                        : 'text-green-500';
+              ? 'text-yellow-500'
+              : mesa.estado === 'reserva'
+                ? 'text-blue-500'
+                : mesa.estado === 'listo_cobrar'
+                  ? 'text-purple-500'
+                  : 'text-green-500';
 
     const dragDisabled = mesa.estado !== 'libre';
+
     const isMesero = userRole === 'Mesero';
+
     const rolesAccesoCompleto = [
         'Administración',
         'Gerencia',
@@ -434,17 +510,20 @@ function MesaCard({
         'Gerente',
         'Cajero',
     ];
+
     const tieneAccesoCompleto =
-        userRole && rolesAccesoCompleto.includes(userRole);
+        userRole &&
+        rolesAccesoCompleto.includes(userRole);
 
     const renderButtonsRow = () => {
         if (isMesero) {
             return (
                 <div className="mt-3 flex gap-2">
                     {mesa.estado === 'listo_cobrar' ? (
-
                         <button
-                            onClick={() => onAbrirModalCobro(mesa)}
+                            onClick={() =>
+                                onAbrirModalCobro(mesa)
+                            }
                             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-purple-700 active:scale-95"
                         >
                             <Receipt className="h-4 w-4" />
@@ -454,14 +533,18 @@ function MesaCard({
                         <>
                             {mesa.estado === 'ocupada' ? (
                                 <button
-                                    onClick={() => onVerTickets?.(mesa)}
+                                    onClick={() =>
+                                        onVerTickets?.(mesa)
+                                    }
                                     className="flex-1 rounded-lg bg-[#C9A96E] px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-[#B8975D] active:scale-95"
                                 >
                                     Ver pedidos
                                 </button>
                             ) : (
                                 <button
-                                    onClick={() => onTomarPedido(mesa)}
+                                    onClick={() =>
+                                        onTomarPedido(mesa)
+                                    }
                                     className="flex-1 rounded-lg bg-[#C9A96E] px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-[#B8975D] active:scale-95"
                                 >
                                     Tomar pedido
@@ -469,7 +552,9 @@ function MesaCard({
                             )}
 
                             <button
-                                onClick={() => onAbrirModalCobro(mesa)}
+                                onClick={() =>
+                                    onAbrirModalCobro(mesa)
+                                }
                                 className="rounded-lg bg-purple-600 px-3 py-1.5 text-white transition hover:bg-purple-700 active:scale-95"
                                 title="Cobrar"
                             >
@@ -481,9 +566,13 @@ function MesaCard({
             );
         }
 
-        // Para Administrador y otros roles
-        return <div className="mt-3">{renderPrimaryAction()}</div>;
+        return (
+            <div className="mt-3">
+                {renderPrimaryAction()}
+            </div>
+        );
     };
+
     const renderPrimaryAction = () => {
         const baseClass =
             'mt-2 w-full py-1.5 rounded-lg text-sm font-semibold transition active:scale-95';
@@ -491,7 +580,9 @@ function MesaCard({
         if (mesa.estado === 'listo_cobrar') {
             return (
                 <button
-                    onClick={() => onAbrirModalCobro(mesa)}
+                    onClick={() =>
+                        onAbrirModalCobro(mesa)
+                    }
                     className={`${baseClass} bg-purple-600 text-white hover:bg-purple-700`}
                 >
                     Cobrar
@@ -502,7 +593,9 @@ function MesaCard({
         if (mesa.estado === 'ocupada') {
             return (
                 <button
-                    onClick={() => onVerTickets?.(mesa)} // ← Cambiado a nuevo modal
+                    onClick={() =>
+                        onVerTickets?.(mesa)
+                    }
                     className={`${baseClass} bg-[#C9A96E] text-white hover:bg-[#B8975D]`}
                 >
                     Ver pedidos
@@ -525,45 +618,65 @@ function MesaCard({
             return null;
         }
 
-        const esCobrar = mesa.estado === 'listo_cobrar';
+        const esCobrar =
+            mesa.estado === 'listo_cobrar';
+
         const pedidosPendientes = pedidos.filter(
             (p) =>
                 p.mesa_id === mesa.id &&
-                !['pagado', 'cancelado', 'entregado'].includes(p.estado || ''),
+                ![
+                    'pagado',
+                    'cancelado',
+                    'entregado',
+                ].includes(p.estado || ''),
         );
-        const tienePedidosPendientes = pedidosPendientes.length > 0;
+
+        const tienePedidosPendientes =
+            pedidosPendientes.length > 0;
+
         const estadoActions = [
             {
                 value: 'libre',
                 label: 'Libre',
                 icon: CircleCheck,
-                activeClass: 'bg-green-500 text-white border-green-500',
+                activeClass:
+                    'bg-green-500 text-white border-green-500',
                 idleClass:
                     'bg-white/90 text-green-600 border-green-200 hover:bg-green-50',
                 disabled:
                     esCobrar ||
-                    (tienePedidosPendientes && mesa.estado !== 'libre'),
+                    (tienePedidosPendientes &&
+                        mesa.estado !== 'libre'),
             },
             {
                 value: 'reserva',
                 label: 'Reserva',
                 icon: Calendar,
-                activeClass: 'bg-blue-500 text-white border-blue-500',
+                activeClass:
+                    'bg-blue-500 text-white border-blue-500',
                 idleClass:
                     'bg-white/90 text-blue-600 border-blue-200 hover:bg-blue-50',
                 disabled:
                     esCobrar ||
-                    (tienePedidosPendientes && mesa.estado !== 'reserva'),
+                    (tienePedidosPendientes &&
+                        mesa.estado !== 'reserva'),
             },
             {
                 value: 'listo_cobrar',
                 label: 'Cobrar',
                 icon: Receipt,
-                activeClass: 'bg-purple-500 text-white border-purple-500',
+                activeClass:
+                    'bg-purple-500 text-white border-purple-500',
                 idleClass:
                     'bg-white/90 text-purple-600 border-purple-200 hover:bg-purple-50',
+
+                // ====================================================
+                // ÚNICA MODIFICACIÓN:
+                // COBRAR SOLO SE HABILITA CUANDO LA MESA YA ESTÁ
+                // EN ESTADO "listo_cobrar"
+                // ====================================================
                 disabled:
-                    tienePedidosPendientes && mesa.estado !== 'listo_cobrar',
+                    mesa.estado !== 'listo_cobrar',
             },
         ];
 
@@ -578,8 +691,11 @@ function MesaCard({
                         idleClass,
                         disabled,
                     }) => {
-                        const isActive = mesa.estado === value;
-                        const isDisabled = disabled && !isActive;
+                        const isActive =
+                            mesa.estado === value;
+
+                        const isDisabled =
+                            disabled && !isActive;
 
                         return (
                             <button
@@ -587,20 +703,27 @@ function MesaCard({
                                 onClick={() =>
                                     !isActive &&
                                     !isDisabled &&
-                                    onCambiarEstado(mesa.id, value)
+                                    onCambiarEstado(
+                                        mesa.id,
+                                        value,
+                                    )
                                 }
                                 disabled={isDisabled}
-                                className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${isActive
+                                className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${
+                                    isActive
                                         ? activeClass
                                         : isDisabled
-                                            ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 opacity-50'
-                                            : idleClass
-                                    }`}
+                                          ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 opacity-50'
+                                          : idleClass
+                                }`}
                                 title={
                                     isDisabled
                                         ? esCobrar
                                             ? 'La mesa está en Cobrar. Solo puedes proceder con el cobro.'
-                                            : 'Debes entregar todos los pedidos primero'
+                                            : value ===
+                                                'listo_cobrar'
+                                              ? 'Primero debes realizar un pedido y entregar todos los pedidos de la mesa.'
+                                              : 'Debes entregar todos los pedidos primero'
                                         : `Cambiar a ${label}`
                                 }
                             >
@@ -616,11 +739,17 @@ function MesaCard({
     return (
         <div
             ref={setNodeRef}
-            className={`group relative rounded-xl border-2 ${config.border} ${config.bg} p-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${isOver ? 'scale-[1.02] ring-4 ring-[#C9A96E]' : ''}`}
+            className={`group relative rounded-xl border-2 ${config.border} ${config.bg} p-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+                isOver
+                    ? 'scale-[1.02] ring-4 ring-[#C9A96E]'
+                    : ''
+            }`}
         >
             {(() => {
                 const ticketsListos = pedidos.filter(
-                    (p) => p.mesa_id === mesa.id && p.estado === 'listo',
+                    (p) =>
+                        p.mesa_id === mesa.id &&
+                        p.estado === 'listo',
                 ).length;
 
                 if (ticketsListos === 0) {
@@ -630,7 +759,8 @@ function MesaCard({
                 return (
                     <div className="absolute -top-2 -right-2 z-10 flex animate-pulse items-center gap-1 rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-extrabold text-[#2D1B1A] shadow-lg">
                         <span>🟡</span>
-                        {ticketsListos} listo{ticketsListos > 1 ? 's' : ''}
+                        {ticketsListos} listo
+                        {ticketsListos > 1 ? 's' : ''}
                     </div>
                 );
             })()}
@@ -641,6 +771,7 @@ function MesaCard({
                 >
                     Mesa #{mesa.numero}
                 </span>
+
                 <span
                     className={`h-3 w-3 shrink-0 rounded-full ${config.chip}`}
                 />
@@ -658,11 +789,14 @@ function MesaCard({
                 >
                     {config.label}
                 </p>
-                {mesa.estado === 'ocupada' && mesa.mesero && (
-                    <p className="mt-0.5 flex items-center justify-center gap-1 truncate text-[11px] font-semibold text-[#5A3D2B]">
-                        <User className="h-3 w-3" /> {mesa.mesero}
-                    </p>
-                )}
+
+                {mesa.estado === 'ocupada' &&
+                    mesa.mesero && (
+                        <p className="mt-0.5 flex items-center justify-center gap-1 truncate text-[11px] font-semibold text-[#5A3D2B]">
+                            <User className="h-3 w-3" />
+                            {mesa.mesero}
+                        </p>
+                    )}
             </div>
 
             {renderEstadoActions()}
@@ -670,9 +804,11 @@ function MesaCard({
         </div>
     );
 }
-// -----------------------------------------------------------------------
-// Componente principal
-// -----------------------------------------------------------------------
+
+// ============================================================
+// COMPONENTE PRINCIPAL
+// ============================================================
+
 export default function MesasDistribucion() {
     const {
         mesas: mesasIniciales,
@@ -680,33 +816,62 @@ export default function MesasDistribucion() {
         flash,
         auth,
     } = usePage<{
-        mesas?: Mesa[] | { data?: Mesa[] } | Record<string, Mesa>;
-        pedidos?: any[] | { data?: any[] } | Record<string, any>;
+        mesas?:
+            | Mesa[]
+            | { data?: Mesa[] }
+            | Record<string, Mesa>;
+        pedidos?:
+            | any[]
+            | { data?: any[] }
+            | Record<string, any>;
         flash?: FlashProps;
-        auth?: { roles?: string[]; permissions?: string[] };
+        auth?: {
+            roles?: string[];
+            permissions?: string[];
+        };
     }>().props;
+
     const userRole = auth?.roles?.[0];
+
     const canManageTables =
-        auth?.permissions?.includes('gestionar mesas') ?? false;
+        auth?.permissions?.includes('gestionar mesas') ??
+        false;
 
     const [mesas, setMesas] = useState<Mesa[]>(() =>
         toArray<Mesa>(mesasIniciales),
     );
 
-    const [modalCobroAbierto, setModalCobroAbierto] = useState(false);
-    const [mesaCobro, setMesaCobro] = useState<Mesa | null>(null);
-    const [pedidoCobro, setPedidoCobro] = useState<any | null>(null);
-    const [modalPinAbierto, setModalPinAbierto] = useState(false);
-    const [mesaSeleccionada, setMesaSeleccionada] = useState<Mesa | null>(null);
+    const [modalCobroAbierto, setModalCobroAbierto] =
+        useState(false);
+
+    const [mesaCobro, setMesaCobro] =
+        useState<Mesa | null>(null);
+
+    const [pedidoCobro, setPedidoCobro] =
+        useState<any | null>(null);
+
+    const [modalPinAbierto, setModalPinAbierto] =
+        useState(false);
+
+    const [mesaSeleccionada, setMesaSeleccionada] =
+        useState<Mesa | null>(null);
+
     const [isClient, setIsClient] = useState(false);
-    // ===== ESTADOS PARA TICKETS =====
-    const [modalTicketsAbierto, setModalTicketsAbierto] = useState(false);
-    const [ticketsDeMesa, setTicketsDeMesa] = useState<any[]>([]);
-    const [pedidosLista, setPedidosLista] = useState<any[]>(() =>
-        toArray<any>(pedidosIniciales),
+
+    const [modalTicketsAbierto, setModalTicketsAbierto] =
+        useState(false);
+
+    const [ticketsDeMesa, setTicketsDeMesa] =
+        useState<any[]>([]);
+
+    const [pedidosLista, setPedidosLista] = useState<any[]>(
+        () => toArray<any>(pedidosIniciales),
     );
 
-    const cambiarEstado = (id: number, nuevoEstado: string) => {
+    const cambiarEstado = (
+        id: number,
+        nuevoEstado: string,
+    ) => {
         const mesa = mesas.find((m) => m.id === id);
 
         if (!mesa) {
@@ -717,9 +882,11 @@ export default function MesasDistribucion() {
             const pedidosPendientes = pedidosLista.filter(
                 (p) =>
                     p.mesa_id === id &&
-                    !['pagado', 'cancelado', 'entregado'].includes(
-                        p.estado || '',
-                    ),
+                    ![
+                        'pagado',
+                        'cancelado',
+                        'entregado',
+                    ].includes(p.estado || ''),
             );
 
             if (pedidosPendientes.length > 0) {
@@ -733,13 +900,16 @@ export default function MesasDistribucion() {
         }
 
         if (nuevoEstado === 'libre') {
-            const pedidosSinEntregar = pedidosLista.filter(
-                (p) =>
-                    p.mesa_id === id &&
-                    !['pagado', 'cancelado', 'entregado'].includes(
-                        p.estado || '',
-                    ),
-            );
+            const pedidosSinEntregar =
+                pedidosLista.filter(
+                    (p) =>
+                        p.mesa_id === id &&
+                        ![
+                            'pagado',
+                            'cancelado',
+                            'entregado',
+                        ].includes(p.estado || ''),
+                );
 
             if (pedidosSinEntregar.length > 0) {
                 swalError(
@@ -751,15 +921,17 @@ export default function MesasDistribucion() {
             }
         }
 
-        // ✅ BLOQUEAR: No permitir "reserva" si hay pedidos pendientes
         if (nuevoEstado === 'reserva') {
-            const pedidosSinEntregar = pedidosLista.filter(
-                (p) =>
-                    p.mesa_id === id &&
-                    !['pagado', 'cancelado', 'entregado'].includes(
-                        p.estado || '',
-                    ),
-            );
+            const pedidosSinEntregar =
+                pedidosLista.filter(
+                    (p) =>
+                        p.mesa_id === id &&
+                        ![
+                            'pagado',
+                            'cancelado',
+                            'entregado',
+                        ].includes(p.estado || ''),
+                );
 
             if (pedidosSinEntregar.length > 0) {
                 swalError(
@@ -772,10 +944,15 @@ export default function MesasDistribucion() {
         }
 
         const mesasAnteriores = mesas;
+
         setMesas((prev) =>
             prev.map((m) =>
                 m.id === id
-                    ? { ...m, estado: nuevoEstado as Mesa['estado'] }
+                    ? {
+                          ...m,
+                          estado:
+                              nuevoEstado as Mesa['estado'],
+                      }
                     : m,
             ),
         );
@@ -787,9 +964,14 @@ export default function MesasDistribucion() {
                 preserveScroll: true,
                 preserveState: true,
                 only: ['mesas', 'pedidos'],
+
                 onError: (errors) => {
                     setMesas(mesasAnteriores);
-                    swalError('Error al cambiar estado', errorsToText(errors));
+
+                    swalError(
+                        'Error al cambiar estado',
+                        errorsToText(errors),
+                    );
                 },
             },
         );
@@ -799,11 +981,16 @@ export default function MesasDistribucion() {
         const pedidosDeLaMesa = pedidosLista.filter(
             (p) =>
                 p.mesa_id === mesa.id &&
-                !['pagado', 'cancelado'].includes(p.estado || ''),
+                !['pagado', 'cancelado'].includes(
+                    p.estado || '',
+                ),
         );
 
         if (pedidosDeLaMesa.length === 0) {
-            swalError('Error', 'Esta mesa no tiene pedidos para cobrar');
+            swalError(
+                'Error',
+                'Esta mesa no tiene pedidos para cobrar',
+            );
 
             return;
         }
@@ -812,19 +999,30 @@ export default function MesasDistribucion() {
         setMesaCobro(mesa);
         setModalCobroAbierto(true);
     };
+
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+        useSensor(PointerSensor, {
+            activationConstraint: { distance: 6 },
+        }),
         useSensor(TouchSensor, {
-            activationConstraint: { delay: 150, tolerance: 6 },
+            activationConstraint: {
+                delay: 150,
+                tolerance: 6,
+            },
         }),
     );
 
     useEffect(() => {
-        const mesasArray = toArray<Mesa>(mesasIniciales);
+        const mesasArray =
+            toArray<Mesa>(mesasIniciales);
+
         setMesas(mesasArray);
 
-        setPedidosLista(toArray<any>(pedidosIniciales));
+        setPedidosLista(
+            toArray<any>(pedidosIniciales),
+        );
     }, [mesasIniciales, pedidosIniciales]);
+
     useEffect(() => {
         setIsClient(true);
     }, []);
@@ -833,13 +1031,17 @@ export default function MesasDistribucion() {
         'mesa.actualizada': (payload: any) => {
             setMesas((prev) =>
                 prev.map((m) =>
-                    m.id === payload.id ? { ...m, ...payload } : m,
+                    m.id === payload.id
+                        ? { ...m, ...payload }
+                        : m,
                 ),
             );
 
             if (payload.estado === 'libre') {
                 setPedidosLista((prev) =>
-                    prev.filter((p) => p.mesa_id !== payload.id),
+                    prev.filter(
+                        (p) => p.mesa_id !== payload.id,
+                    ),
                 );
             }
         },
@@ -847,25 +1049,40 @@ export default function MesasDistribucion() {
 
     useSedeChannel('pedidos', {
         'pedido.actualizado': (payload: any) => {
-            setPedidosLista(prev =>
-                prev.map(p => (p.id === payload.id ? { ...p, ...payload } : p))
+            setPedidosLista((prev) =>
+                prev.map((p) =>
+                    p.id === payload.id
+                        ? { ...p, ...payload }
+                        : p,
+                ),
             );
         },
+
         'pedido.creado': (payload: any) => {
-            setPedidosLista(prev =>
-                prev.some(p => p.id === payload.id) ? prev : [...prev, payload]
+            setPedidosLista((prev) =>
+                prev.some(
+                    (p) => p.id === payload.id,
+                )
+                    ? prev
+                    : [...prev, payload],
             );
         },
     });
+
     useEffect(() => {
-        if (!modalTicketsAbierto || !mesaSeleccionada) {
+        if (
+            !modalTicketsAbierto ||
+            !mesaSeleccionada
+        ) {
             return;
         }
 
         const tickets = pedidosLista.filter(
             (p) =>
                 p.mesa_id === mesaSeleccionada.id &&
-                !['pagado', 'cancelado'].includes(p.estado || ''),
+                !['pagado', 'cancelado'].includes(
+                    p.estado || '',
+                ),
         );
 
         if (tickets.length === 0) {
@@ -874,6 +1091,7 @@ export default function MesasDistribucion() {
 
         const ticketsFormateados = tickets.map((p) => {
             let productos = p.productos;
+
             if (typeof productos === 'string') {
                 try {
                     productos = JSON.parse(productos);
@@ -881,22 +1099,29 @@ export default function MesasDistribucion() {
                     productos = [];
                 }
             }
+
             return {
                 id: p.id,
                 numero: p.numero || `#${p.id}`,
                 estado: p.estado || 'pendiente',
                 total: Number(p.total) || 0,
                 created_at: p.created_at,
-                productos: Array.isArray(productos) ? productos : [],
+                productos: Array.isArray(productos)
+                    ? productos
+                    : [],
             };
         });
 
-        const ordenEstados: Record<string, number> = {
+        const ordenEstados: Record<
+            string,
+            number
+        > = {
             pendiente: 0,
             preparando: 1,
             listo: 2,
             entregado: 3,
         };
+
         ticketsFormateados.sort(
             (a, b) =>
                 (ordenEstados[a.estado as string] ?? 9) -
@@ -904,8 +1129,12 @@ export default function MesasDistribucion() {
         );
 
         setTicketsDeMesa(ticketsFormateados);
-    }, [pedidosLista, modalTicketsAbierto, mesaSeleccionada]);
-    // Aviso de capacidad excedida (viene del backend vía flash)
+    }, [
+        pedidosLista,
+        modalTicketsAbierto,
+        mesaSeleccionada,
+    ]);
+
     useEffect(() => {
         const aviso = flash?.aviso_capacidad;
 
@@ -932,7 +1161,10 @@ export default function MesasDistribucion() {
                 { forzar: true },
                 {
                     preserveScroll: true,
-                    onSuccess: () => router.reload({ only: ['mesas'] }),
+                    onSuccess: () =>
+                        router.reload({
+                            only: ['mesas'],
+                        }),
                 },
             );
         });
@@ -952,29 +1184,45 @@ export default function MesasDistribucion() {
 
         router.patch(
             `/mesas/${mesa.id}`,
-            { estado: 'ocupada', user_id: userId },
+            {
+                estado: 'ocupada',
+                user_id: userId,
+            },
             {
                 preserveScroll: true,
+
                 onSuccess: () => {
                     setMesas((prev) =>
                         prev.map((m) =>
-                            m.id === mesa.id ? { ...m, estado: 'ocupada' } : m,
+                            m.id === mesa.id
+                                ? {
+                                      ...m,
+                                      estado: 'ocupada',
+                                  }
+                                : m,
                         ),
                     );
-                    window.location.href = `/ventas?mesa=${mesa.numero}`;
+
+                    window.location.href =
+                        `/ventas?mesa=${mesa.numero}`;
                 },
+
                 onError: (errors) =>
-                    swalError('Error al tomar pedido', errorsToText(errors)),
+                    swalError(
+                        'Error al tomar pedido',
+                        errorsToText(errors),
+                    ),
             },
         );
     };
 
-    // ===== FUNCIÓN PARA VER TODOS LOS TICKETS DE UNA MESA =====
     const verTickets = (mesa: Mesa) => {
         const tickets = pedidosLista.filter(
             (p) =>
                 p.mesa_id === mesa.id &&
-                !['pagado', 'cancelado'].includes(p.estado || ''),
+                !['pagado', 'cancelado'].includes(
+                    p.estado || '',
+                ),
         );
 
         if (tickets.length === 0) {
@@ -983,16 +1231,19 @@ export default function MesasDistribucion() {
                     '💰 Mesa lista para cobrar',
                     'Todos los pedidos han sido entregados. Procede con el cobro.',
                 );
+
                 setTicketsDeMesa([
                     {
                         id: 0,
                         numero: 'Cobrar',
                         estado: 'cobrar',
                         total: 0,
-                        created_at: new Date().toISOString(),
+                        created_at:
+                            new Date().toISOString(),
                         productos: [],
                     },
                 ]);
+
                 setMesaSeleccionada(mesa);
                 setModalTicketsAbierto(true);
 
@@ -1007,14 +1258,25 @@ export default function MesasDistribucion() {
             return;
         }
 
-        const todosEntregados = tickets.every((t) => t.estado === 'entregado');
+        const todosEntregados = tickets.every(
+            (t) => t.estado === 'entregado',
+        );
 
-        if (todosEntregados && mesa.estado !== 'listo_cobrar') {
+        if (
+            todosEntregados &&
+            mesa.estado !== 'listo_cobrar'
+        ) {
             setMesas((prev) =>
                 prev.map((m) =>
-                    m.id === mesa.id ? { ...m, estado: 'listo_cobrar' } : m,
+                    m.id === mesa.id
+                        ? {
+                              ...m,
+                              estado: 'listo_cobrar',
+                          }
+                        : m,
                 ),
             );
+
             router.patch(
                 `/mesas/${mesa.id}`,
                 { estado: 'listo_cobrar' },
@@ -1042,16 +1304,22 @@ export default function MesasDistribucion() {
                 estado: p.estado || 'pendiente',
                 total: Number(p.total) || 0,
                 created_at: p.created_at,
-                productos: Array.isArray(productos) ? productos : [],
+                productos: Array.isArray(productos)
+                    ? productos
+                    : [],
             };
         });
 
-        const ordenEstados: Record<string, number> = {
+        const ordenEstados: Record<
+            string,
+            number
+        > = {
             pendiente: 0,
             preparando: 1,
             listo: 2,
             entregado: 3,
         };
+
         ticketsFormateados.sort(
             (a, b) =>
                 (ordenEstados[a.estado as string] ?? 9) -
@@ -1063,27 +1331,39 @@ export default function MesasDistribucion() {
         setModalTicketsAbierto(true);
     };
 
-    // ===== FUNCIÓN PARA ENTREGAR UN TICKET =====
     const entregarTicket = (ticketId: number) => {
-        console.log('📤 Entregando ticket:', ticketId);
+        console.log(
+            '📤 Entregando ticket:',
+            ticketId,
+        );
 
-        const ticket = ticketsDeMesa.find((t) => t.id === ticketId);
+        const ticket = ticketsDeMesa.find(
+            (t) => t.id === ticketId,
+        );
 
         if (!ticket) {
-            swalError('Error', 'Ticket no encontrado');
+            swalError(
+                'Error',
+                'Ticket no encontrado',
+            );
 
             return;
         }
 
         if (ticket.estado !== 'listo') {
-            swalError('Error', 'Este pedido no está listo para entregar');
+            swalError(
+                'Error',
+                'Este pedido no está listo para entregar',
+            );
 
             return;
         }
 
         Swal.fire({
             title: '¿Entregar pedido?',
-            text: `¿Confirmas que el pedido #${ticket.numero || ticketId} ha sido entregado a la mesa?`,
+            text: `¿Confirmas que el pedido #${
+                ticket.numero || ticketId
+            } ha sido entregado a la mesa?`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: '✅ Sí, entregar',
@@ -1095,26 +1375,43 @@ export default function MesasDistribucion() {
                 return;
             }
 
-            const nuevosTickets = ticketsDeMesa.map((t) =>
-                t.id === ticketId ? { ...t, estado: 'entregado' } : t,
-            );
+            const nuevosTickets =
+                ticketsDeMesa.map((t) =>
+                    t.id === ticketId
+                        ? {
+                              ...t,
+                              estado: 'entregado',
+                          }
+                        : t,
+                );
+
             setTicketsDeMesa(nuevosTickets);
 
             setPedidosLista((prev) =>
                 prev.map((p) =>
-                    p.id === ticketId ? { ...p, estado: 'entregado' } : p,
+                    p.id === ticketId
+                        ? {
+                              ...p,
+                              estado: 'entregado',
+                          }
+                        : p,
                 ),
             );
+
             router.post(
                 `/pedidos/${ticketId}/entregar`,
                 {},
                 {
                     preserveScroll: true,
                     preserveState: true,
-                    onSuccess: (page) => {
-                        console.log('✅ Ticket entregado correctamente');
 
-                        const flash = page.props.flash as any;
+                    onSuccess: (page) => {
+                        console.log(
+                            '✅ Ticket entregado correctamente',
+                        );
+
+                        const flash =
+                            page.props.flash as any;
 
                         if (flash?.success) {
                             swalSuccess(
@@ -1128,103 +1425,161 @@ export default function MesasDistribucion() {
                             );
                         }
 
-                        const todosEntregados = nuevosTickets.every(
-                            (t) => t.estado === 'entregado',
-                        );
+                        const todosEntregados =
+                            nuevosTickets.every(
+                                (t) =>
+                                    t.estado ===
+                                    'entregado',
+                            );
 
                         if (todosEntregados) {
                             swalSuccess(
                                 '🎉 ¡Todos los pedidos entregados!',
                                 '💰 La mesa está lista para cobrar',
                             );
-                            setModalTicketsAbierto(false);
+
+                            setModalTicketsAbierto(
+                                false,
+                            );
 
                             if (mesaSeleccionada) {
                                 setMesas((prev) =>
                                     prev.map((m) =>
-                                        m.id === mesaSeleccionada.id
-                                            ? { ...m, estado: 'listo_cobrar' }
+                                        m.id ===
+                                        mesaSeleccionada.id
+                                            ? {
+                                                  ...m,
+                                                  estado: 'listo_cobrar',
+                                              }
                                             : m,
                                     ),
                                 );
                             }
 
-                            router.reload({ only: ['mesas', 'pedidos'] });
+                            router.reload({
+                                only: [
+                                    'mesas',
+                                    'pedidos',
+                                ],
+                            });
                         }
                     },
+
                     onError: (errors) => {
-                        console.error('❌ Error al entregar ticket:', errors);
+                        console.error(
+                            '❌ Error al entregar ticket:',
+                            errors,
+                        );
+
                         setTicketsDeMesa((prev) =>
                             prev.map((t) =>
                                 t.id === ticketId
-                                    ? { ...t, estado: 'listo' }
+                                    ? {
+                                          ...t,
+                                          estado: 'listo',
+                                      }
                                     : t,
                             ),
                         );
+
                         setPedidosLista((prev) =>
                             prev.map((p) =>
                                 p.id === ticketId
-                                    ? { ...p, estado: 'listo' }
+                                    ? {
+                                          ...p,
+                                          estado: 'listo',
+                                      }
                                     : p,
                             ),
                         );
+
                         swalError(
                             'Error',
                             errorsToText(errors) ||
-                            'No se pudo entregar el pedido',
+                                'No se pudo entregar el pedido',
                         );
                     },
                 },
             );
         });
     };
+
     const crearMesa = async () => {
         const result = await Swal.fire({
             title: 'Nueva mesa',
+
             html: `
                 <div class="text-left space-y-3">
                     <label class="block text-sm font-semibold text-gray-700">
                         Numero de mesa
-                        <input id="swal-mesa-numero" class="swal2-input !mx-0 !mt-1 !w-full" placeholder="Ej: 12" />
+                        <input
+                            id="swal-mesa-numero"
+                            class="swal2-input !mx-0 !mt-1 !w-full"
+                            placeholder="Ej: 12"
+                        />
                     </label>
+
                     <label class="block text-sm font-semibold text-gray-700">
                         Capacidad
-                        <input id="swal-mesa-capacidad" type="number" min="1" class="swal2-input !mx-0 !mt-1 !w-full" placeholder="Personas" />
+                        <input
+                            id="swal-mesa-capacidad"
+                            type="number"
+                            min="1"
+                            class="swal2-input !mx-0 !mt-1 !w-full"
+                            placeholder="Personas"
+                        />
                     </label>
                 </div>
             `,
+
             focusConfirm: false,
             showCancelButton: true,
             confirmButtonText: 'Crear mesa',
             cancelButtonText: 'Cancelar',
             confirmButtonColor: '#C9A96E',
             cancelButtonColor: '#6B7280',
+
             preConfirm: () => {
                 const numero = (
                     document.getElementById(
                         'swal-mesa-numero',
                     ) as HTMLInputElement | null
                 )?.value.trim();
+
                 const capacidadValue = (
                     document.getElementById(
                         'swal-mesa-capacidad',
                     ) as HTMLInputElement | null
                 )?.value;
-                const capacidad = Number.parseInt(capacidadValue || '', 10);
+
+                const capacidad = Number.parseInt(
+                    capacidadValue || '',
+                    10,
+                );
 
                 if (!numero) {
-                    Swal.showValidationMessage('Ingresa el numero de mesa');
+                    Swal.showValidationMessage(
+                        'Ingresa el numero de mesa',
+                    );
 
                     return false;
                 }
 
-                if (!Number.isInteger(capacidad) || capacidad < 1) {
-                    Swal.showValidationMessage('Ingresa una capacidad valida');
+                if (
+                    !Number.isInteger(capacidad) ||
+                    capacidad < 1
+                ) {
+                    Swal.showValidationMessage(
+                        'Ingresa una capacidad valida',
+                    );
 
                     return false;
                 }
 
-                return { numero, capacidad };
+                return {
+                    numero,
+                    capacidad,
+                };
             },
         });
 
@@ -1232,48 +1587,80 @@ export default function MesasDistribucion() {
             return;
         }
 
-        const { numero, capacidad } = result.value;
+        const { numero, capacidad } =
+            result.value;
 
         router.post(
             '/mesas',
-            { numero, capacidad, sillas: capacidad },
+            {
+                numero,
+                capacidad,
+                sillas: capacidad,
+            },
             {
                 onSuccess: () => {
                     swalSuccess(
                         'Mesa creada',
                         `Mesa #${numero} registrada correctamente.`,
                     );
-                    router.reload({ only: ['mesas'] });
+
+                    router.reload({
+                        only: ['mesas'],
+                    });
                 },
+
                 onError: (errors) =>
-                    swalError('Error al crear mesa', errorsToText(errors)),
+                    swalError(
+                        'Error al crear mesa',
+                        errorsToText(errors),
+                    ),
             },
         );
     };
 
-    const handleDragEnd = (event: DragEndEvent) => {
+    const handleDragEnd = (
+        event: DragEndEvent,
+    ) => {
         const { active, over } = event;
 
         if (!over) {
             return;
         }
 
-        const mesaOrigenId = active.data.current?.mesaOrigenId as
-            number | undefined;
-        const mesaDestinoId = over.data.current?.mesaId as number | undefined;
+        const mesaOrigenId =
+            active.data.current?.mesaOrigenId as
+                | number
+                | undefined;
 
-        if (!mesaOrigenId || !mesaDestinoId || mesaOrigenId === mesaDestinoId) {
+        const mesaDestinoId =
+            over.data.current?.mesaId as
+                | number
+                | undefined;
+
+        if (
+            !mesaOrigenId ||
+            !mesaDestinoId ||
+            mesaOrigenId === mesaDestinoId
+        ) {
             return;
         }
 
-        const origen = mesas.find((m) => m.id === mesaOrigenId);
-        const destino = mesas.find((m) => m.id === mesaDestinoId);
+        const origen = mesas.find(
+            (m) => m.id === mesaOrigenId,
+        );
+
+        const destino = mesas.find(
+            (m) => m.id === mesaDestinoId,
+        );
 
         if (!origen || !destino) {
             return;
         }
 
-        if (origen.estado !== 'libre' || destino.estado !== 'libre') {
+        if (
+            origen.estado !== 'libre' ||
+            destino.estado !== 'libre'
+        ) {
             swalError(
                 'Movimiento no permitido',
                 'Solo puedes mover sillas entre mesas libres.',
@@ -1291,15 +1678,20 @@ export default function MesasDistribucion() {
             return;
         }
 
-        // Actualización optimista para que se sienta instantáneo en tablet
         setMesas((prev) =>
             prev.map((m) => {
                 if (m.id === mesaOrigenId) {
-                    return { ...m, sillas: m.sillas - 1 };
+                    return {
+                        ...m,
+                        sillas: m.sillas - 1,
+                    };
                 }
 
                 if (m.id === mesaDestinoId) {
-                    return { ...m, sillas: m.sillas + 1 };
+                    return {
+                        ...m,
+                        sillas: m.sillas + 1,
+                    };
                 }
 
                 return m;
@@ -1312,22 +1704,39 @@ export default function MesasDistribucion() {
             {
                 preserveScroll: true,
                 only: ['mesas'],
+
                 onError: () => {
-                    // revertir si falla
                     setMesas((prev) =>
                         prev.map((m) => {
-                            if (m.id === mesaOrigenId) {
-                                return { ...m, sillas: m.sillas + 1 };
+                            if (
+                                m.id ===
+                                mesaOrigenId
+                            ) {
+                                return {
+                                    ...m,
+                                    sillas:
+                                        m.sillas + 1,
+                                };
                             }
 
-                            if (m.id === mesaDestinoId) {
-                                return { ...m, sillas: m.sillas - 1 };
+                            if (
+                                m.id ===
+                                mesaDestinoId
+                            ) {
+                                return {
+                                    ...m,
+                                    sillas:
+                                        m.sillas - 1,
+                                };
                             }
 
                             return m;
                         }),
                     );
-                    swalError('No se pudo mover la silla');
+
+                    swalError(
+                        'No se pudo mover la silla',
+                    );
                 },
             },
         );
@@ -1336,6 +1745,7 @@ export default function MesasDistribucion() {
     return (
         <>
             <Head title="Distribución de Mesas" />
+
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl bg-[#FBF7F0] p-3 sm:p-4">
                 <div className="flex justify-end gap-3">
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4">
@@ -1348,56 +1758,86 @@ export default function MesasDistribucion() {
                                 Nueva Mesa
                             </button>
                         )}
+
                         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#8D6B53]/20 bg-white/80 p-2 text-xs sm:gap-3">
                             <span className="flex items-center gap-1 text-gray-700">
-                                <span className="h-3 w-3 rounded-full bg-green-400" />{' '}
+                                <span className="h-3 w-3 rounded-full bg-green-400" />
                                 Libre
                             </span>
+
                             <span className="flex items-center gap-1 text-gray-700">
-                                <span className="h-3 w-3 rounded-full bg-yellow-400" />{' '}
+                                <span className="h-3 w-3 rounded-full bg-yellow-400" />
                                 Pendiente
                             </span>
+
                             <span className="flex items-center gap-1 text-gray-700">
-                                <span className="h-3 w-3 rounded-full bg-orange-400" />{' '}
+                                <span className="h-3 w-3 rounded-full bg-orange-400" />
                                 Ocupada
                             </span>
+
                             <span className="flex items-center gap-1 text-gray-700">
-                                <span className="h-3 w-3 rounded-full bg-blue-400" />{' '}
+                                <span className="h-3 w-3 rounded-full bg-blue-400" />
                                 Reserva
                             </span>
+
                             <span className="flex items-center gap-1 text-gray-700">
-                                <span className="h-3 w-3 rounded-full bg-purple-400" />{' '}
+                                <span className="h-3 w-3 rounded-full bg-purple-400" />
                                 Cobrar
                             </span>
                         </div>
                     </div>
                 </div>
 
-                {/*  PLANO DE MESAS - SIN BARRA LATERAL */}
                 <div className="w-full">
                     <div className="mb-3 flex items-center justify-between">
                         <h2 className="text-sm font-semibold text-[#5A3D2B]">
-                            Distribucion de mesas - tiempo real
+                            Distribucion de mesas -
+                            tiempo real
                         </h2>
+
                         <span className="text-xs text-[#8D6B53]">
-                            {mesas.filter((m) => m.estado === 'ocupada').length}{' '}
-                            ocupadas / {mesas.length} total
+                            {
+                                mesas.filter(
+                                    (m) =>
+                                        m.estado ===
+                                        'ocupada',
+                                ).length
+                            }{' '}
+                            ocupadas / {mesas.length}{' '}
+                            total
                         </span>
                     </div>
 
                     {isClient && (
-                        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+                        <DndContext
+                            sensors={sensors}
+                            onDragEnd={
+                                handleDragEnd
+                            }
+                        >
                             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
                                 {mesas.map((mesa) => (
                                     <MesaCard
                                         key={mesa.id}
                                         mesa={mesa}
-                                        onCambiarEstado={cambiarEstado}
-                                        onTomarPedido={tomarPedido}
-                                        onAbrirModalCobro={abrirModalCobro}
-                                        onVerTickets={verTickets}
-                                        pedidos={pedidosLista}
-                                        userRole={userRole}
+                                        onCambiarEstado={
+                                            cambiarEstado
+                                        }
+                                        onTomarPedido={
+                                            tomarPedido
+                                        }
+                                        onAbrirModalCobro={
+                                            abrirModalCobro
+                                        }
+                                        onVerTickets={
+                                            verTickets
+                                        }
+                                        pedidos={
+                                            pedidosLista
+                                        }
+                                        userRole={
+                                            userRole
+                                        }
                                     />
                                 ))}
                             </div>
@@ -1405,7 +1845,6 @@ export default function MesasDistribucion() {
                     )}
                 </div>
 
-                {/* MODALES */}
                 <ModalPin
                     isOpen={modalPinAbierto}
                     mesa={mesaSeleccionada}
@@ -1415,35 +1854,54 @@ export default function MesasDistribucion() {
                     }}
                     onConfirm={confirmarPin}
                 />
+
                 <ModalCobro
                     isOpen={modalCobroAbierto}
                     mesa={mesaCobro}
                     pedido={pedidoCobro}
-                    onClose={() => setModalCobroAbierto(false)}
+                    onClose={() =>
+                        setModalCobroAbierto(false)
+                    }
                     onSuccess={() => {
                         setModalCobroAbierto(false);
+
                         router.reload({
-                            only: ['mesas', 'pedidos'],
+                            only: [
+                                'mesas',
+                                'pedidos',
+                            ],
                             preserveUrl: true,
                         });
                     }}
                 />
-                {/* ===== MODAL: VER TICKETS ===== */}
-                {
-                    <ModalVerTickets
-                        isOpen={modalTicketsAbierto}
-                        mesa={mesaSeleccionada || { id: 0, numero: '' }}
-                        tickets={ticketsDeMesa}
-                        onClose={() => setModalTicketsAbierto(false)}
-                        onEntregarTicket={entregarTicket}
-                        onCobrarMesa={() => {
-                            if (mesaSeleccionada) {
-                                setModalTicketsAbierto(false);
-                                abrirModalCobro(mesaSeleccionada);
-                            }
-                        }}
-                    />
-                }
+
+                <ModalVerTickets
+                    isOpen={modalTicketsAbierto}
+                    mesa={
+                        mesaSeleccionada || {
+                            id: 0,
+                            numero: '',
+                        }
+                    }
+                    tickets={ticketsDeMesa}
+                    onClose={() =>
+                        setModalTicketsAbierto(false)
+                    }
+                    onEntregarTicket={
+                        entregarTicket
+                    }
+                    onCobrarMesa={() => {
+                        if (mesaSeleccionada) {
+                            setModalTicketsAbierto(
+                                false,
+                            );
+
+                            abrirModalCobro(
+                                mesaSeleccionada,
+                            );
+                        }
+                    }}
+                />
             </div>
         </>
     );
