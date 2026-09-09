@@ -219,6 +219,8 @@ export default function Ventas() {
     // FUNCIONES DE CARRITO
     // ============================================================
     const totalCarrito = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+    const igvCarrito = totalCarrito * 0.18;
+    const totalConIgv = totalCarrito + igvCarrito;
     const agregarProducto = (producto: Producto) => {
         if (!producto.disponible) {
             toast.warning('Este producto no está disponible');
@@ -324,14 +326,20 @@ export default function Ventas() {
             mesa_id: mesaInfo.id, // ✅ Ya no puede ser null gracias a la validación
             cliente: 'Anónimo',
             productos: productosConCategoria,
-            total: totalCarrito,
+            subtotal: totalCarrito,
+            igv: igvCarrito,
+            total: totalConIgv,
             area: areaDetectada,
             observaciones: '',
         }, {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Pedido enviado a cocina', {
+
                     description: `Mesa: ${mesaInfo.numero} · Mesero: ${mesaInfo.mesero || 'No asignado'} · Total: S/ ${totalCarrito.toFixed(2)} · Área: ${areaDetectada}`,
+
+                    description: `Mesa: ${mesaInfo?.numero || 'No asignada'} · Mesero: ${mesaInfo?.mesero || 'No asignado'} · Total: S/ ${totalConIgv.toFixed(2)} · Área: ${areaDetectada}`,
+
                     duration: 5000,
                     style: {
                         background: '#2D1B1A',
@@ -570,10 +578,18 @@ export default function Ventas() {
                         )}
 
                         {carrito.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-black/5">
+                            <div className="mt-4 pt-4 border-t border-black/5 space-y-1">
+                                <div className="flex justify-between text-sm text-gray-500">
+                                    <span>Subtotal</span>
+                                    <span>S/ {totalCarrito.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-sm text-gray-500">
+                                    <span>IGV (18%)</span>
+                                    <span>S/ {igvCarrito.toFixed(2)}</span>
+                                </div>
                                 <div className="flex justify-between items-baseline font-bold text-[#2D1B1A]">
                                     <span className="text-sm">Total</span>
-                                    <span className="text-[#C9A96E] text-lg">S/ {totalCarrito.toFixed(2)}</span>
+                                    <span className="text-[#C9A96E] text-lg">S/ {totalConIgv.toFixed(2)}</span>
                                 </div>
 
                                 <button

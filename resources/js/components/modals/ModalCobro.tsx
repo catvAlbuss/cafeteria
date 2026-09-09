@@ -22,6 +22,8 @@ interface Pedido {
     mesa_id: number;
     cliente: string;
     productos: ProductoPedido[] | string;
+    subtotal?: number | string | null;
+    igv?: number | string | null;
     total: number | string;
     hora_pedido: string;
     estado: string;
@@ -66,14 +68,15 @@ export default function ModalCobro({
     }
 
     const pedidosArray = pedido || [];
-    const total = pedidosArray.reduce((sum, p) => {
-        const t =
-            typeof p.total === 'number'
-                ? p.total
-                : parseFloat(p.total as string) || 0;
-
-        return sum + t;
-    }, 0);
+    const toNum = (v: number | string | null | undefined) =>
+        typeof v === 'number' ? v : parseFloat(v as string) || 0;
+    const total = pedidosArray.reduce((sum, p) => sum + toNum(p.total), 0);
+    const subtotal = pedidosArray.reduce((sum, p) => sum + toNum(p.subtotal), 0);
+    const igv = pedidosArray.reduce((sum, p) => sum + toNum(p.igv), 0);
+    const igvCalculado = total > 0 && subtotal === 0 && igv === 0
+        ? total - total / 1.18
+        : igv;
+    const subtotalMostrado = subtotal > 0 ? subtotal : total - igvCalculado;
     const productos = pedidosArray.flatMap((p) =>
         typeof p.productos === 'string' ? JSON.parse(p.productos) : p.productos,
     );
@@ -399,6 +402,26 @@ export default function ModalCobro({
                             </div>
                             {/* TOTAL */}
                             <div className="pt-1 mb-1" style={{ borderTop: '2px dashed #ccc' }}>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '13px',
+                                    padding: '1px 0',
+                                    color: '#000000'
+                                }}>
+                                    <span style={{ color: '#333333' }}>Subtotal</span>
+                                    <span style={{ fontWeight: 600, color: '#000000' }}>{subtotalMostrado.toFixed(2)}</span>
+                                </div>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    fontSize: '13px',
+                                    padding: '1px 0',
+                                    color: '#000000'
+                                }}>
+                                    <span style={{ color: '#333333' }}>IGV (18%)</span>
+                                    <span style={{ fontWeight: 600, color: '#000000' }}>{igvCalculado.toFixed(2)}</span>
+                                </div>
                                 <div style={{
                                     display: 'flex',
                                     justifyContent: 'space-between',
