@@ -5,6 +5,7 @@
 *.html diff=html
 *.md diff=markdown
 *.php diff=php
+public/build/** -diff -whitespace
 
 CHANGELOG.md export-ignore
 README.md export-ignore

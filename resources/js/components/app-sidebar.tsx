@@ -1,5 +1,17 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import {
+    LayoutDashboard,
+    DollarSign,
+    BarChart3,
+    Coffee,
+    Package,
+    Users,
+    MapPin,
+    Settings,
+    UserCog,
+    HelpCircle,
+    FileText,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,35 +26,128 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
     const page = usePage();
-    const dashboardUrl = page.props.currentTeam
-        ? dashboard(page.props.currentTeam.slug)
-        : '/';
+    const dashboardUrl = '/dashboard';
+    const permissions = page.props.auth?.permissions ?? [];
+const roles = page.props.auth?.roles ?? [];
 
-    const mainNavItems: NavItem[] = [
+    const currentTeam = page.props.currentTeam;
+    const canManageTeams = roles.includes('Gerente') || ['owner', 'admin'].includes(currentTeam?.role ?? '');
+    const canManageCashSession = roles.includes('Gerente') || roles.includes('Cajero') || ['owner', 'admin'].includes(currentTeam?.role ?? '');
+    const isProductionOperator = roles.includes('Cocinero') || roles.includes('Bar');
+
+    //  TODAS LAS PÁGINAS (se filtran según el permiso de "ver" de cada rol)
+    const allNavItems: NavItem[] = [
+        // DASHBOARD - siempre visible, sin permiso asociado
         {
-            title: 'Dashboard',
-            href: dashboardUrl,
-            icon: LayoutGrid,
+            title: 'Inicio',
+            href: '/dashboard',
+            icon: LayoutDashboard,
+        },
+        {
+            title: ' Ventas',
+            href: '/ventas',
+            icon: DollarSign,
+            permission: 'ver ventas',
+        },
+        {
+            title: 'Caja',
+            href: '/caja',
+            icon: DollarSign,
+            permission: 'ver caja',
+        },
+        {
+            title: 'Reportes',
+            href: '/reportes',
+            icon: BarChart3,
+            permission: 'ver reportes',
+        },
+        {
+            title: 'Turno de caja',
+            href: '/contador',
+            icon: DollarSign,
+            permission: 'ver contador',
+        },
+
+        //  RESTAURANTE - TÍTULO SEPARADOR
+        {
+            title: ' Platos',
+            href: '/platos',
+            icon: Coffee,
+            permission: 'ver platos',
+        },
+        {
+            title: 'Mesas',
+            href: '/mesas',
+            icon: Coffee,
+            permission: 'ver mesas',
+        },
+        {
+            title: ' Covers',
+            href: '/covers',
+            icon: Coffee,
+            permission: 'ver covers',
+        },
+
+        {
+            title: 'Cocina',
+            href: '/produccion?area=cocina',
+            icon: Package,
+            permission: 'ver cocina',
+        },
+        {
+            title: 'Bar',
+            href: '/produccion?area=bar',
+            icon: Coffee,
+            permission: 'ver bar',
+        },
+        {
+            title: 'Insumos',
+            href: '/insumos',
+            icon: Package,
+            permission: 'ver insumos',
+        },
+        {
+            title: 'Cardex',
+            href: '/cardex',
+            icon: Package,
+            permission: 'ver cardex',
+        },
+        {
+            title: 'Mermas',
+            href: '/mermas',
+            icon: Package,
+            permission: 'ver mermas',
+        },
+
+        {
+            title: 'Clientes',
+            href: '/clientes',
+            icon: Users,
+            permission: 'ver clientes',
+        },
+        {
+            title: 'Delivery',
+            href: '/delivery',
+            icon: MapPin,
+            permission: 'ver delivery',
         },
     ];
 
-    const footerNavItems: NavItem[] = [
-        {
-            title: 'Repository',
-            href: 'https://github.com/laravel/react-starter-kit',
-            icon: FolderGit2,
-        },
-        {
-            title: 'Documentation',
-            href: 'https://laravel.com/docs/starter-kits#react',
-            icon: BookOpen,
-        },
-    ];
+    const mainNavItems: NavItem[] = allNavItems.filter((item) => item.href === '/contador'
+        ? canManageCashSession
+        : !item.permission || permissions.includes(item.permission));
+
+    if (isProductionOperator) {
+        mainNavItems.push({
+            title: 'Mi inventario',
+            href: '/mi-inventario',
+            icon: Package,
+        });
+    }
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -50,17 +155,19 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboardUrl} prefetch>
+                            <Link href={dashboardUrl}>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <TeamSwitcher />
-                    </SidebarMenuItem>
-                </SidebarMenu>
+                {canManageTeams && (
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <TeamSwitcher />
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                )}
             </SidebarHeader>
 
             <SidebarContent>
@@ -68,7 +175,6 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
