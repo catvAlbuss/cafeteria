@@ -231,7 +231,34 @@ export default function Platos() {
     useEffect(() => {
         setPlatos(toArray<Plato>(platosIniciales));
     }, [platosIniciales]);
+useEffect(() => {
+    if (!modalAbierto) return;
 
+    const manejarPegado = (e: ClipboardEvent) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+
+                if (file) {
+                    setImagenFile(file);
+                    setPreviewImagen(URL.createObjectURL(file));
+                }
+
+                e.preventDefault();
+                break;
+            }
+        }
+    };
+
+    window.addEventListener('paste', manejarPegado);
+
+    return () => {
+        window.removeEventListener('paste', manejarPegado);
+    };
+}, [modalAbierto]);
     return (
         <>
             <Head title="Platos - Dolce Cafe" />
