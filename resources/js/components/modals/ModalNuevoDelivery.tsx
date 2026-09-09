@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
+import { toast } from 'sonner';
 import { X, User, MapPin, Phone, Truck, Package, DollarSign, Clock, Calendar, Check, AlertCircle } from 'lucide-react';
 
 interface ModalDeliveryProps {
@@ -40,12 +41,14 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
     const handleClose = () => {
         setCliente({ nombre: '', telefono: '', direccion: '', referencia: '' });
         setProductos([]);
+        setErrores({});
         setStep(1);
         onClose();
     };
 
     const [busquedaProducto, setBusquedaProducto] = useState('');
     const [repartidorSeleccionado, setRepartidorSeleccionado] = useState('');
+    const [errores, setErrores] = useState<Record<string, string>>({});
 
     const repartidores = [
         { id: 1, nombre: 'Carlos Pérez' },
@@ -89,6 +92,7 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                 subtotal: producto.precio
             }]);
         }
+        setErrores(prev => ({ ...prev, productos: '' }));
     };
 
     // Quitar producto
@@ -108,6 +112,43 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
     // Eliminar producto
     const eliminarProducto = (id: number) => {
         setProductos(productos.filter(p => p.id !== id));
+    };
+
+    // Validar paso actual y avanzar si es válido
+    const validarYAvanzar = () => {
+        const nuevosErrores: Record<string, string> = {};
+
+        if (step === 1) {
+            if (!repartidorSeleccionado) {
+                nuevosErrores['repartidor'] = 'Selecciona un repartidor';
+            }
+        } else if (step === 2) {
+            if (!cliente.nombre.trim()) {
+                nuevosErrores['nombre'] = 'El nombre es obligatorio';
+            }
+            if (!cliente.telefono.trim()) {
+                nuevosErrores['telefono'] = 'El teléfono es obligatorio';
+            }
+            if (!cliente.direccion.trim()) {
+                nuevosErrores['direccion'] = 'La dirección es obligatoria';
+            }
+        } else if (step === 3) {
+            if (productos.length === 0) {
+                nuevosErrores['productos'] = 'Agrega al menos un producto';
+            }
+        }
+
+        setErrores(nuevosErrores);
+
+        if (Object.keys(nuevosErrores).length > 0) {
+            toast.warning('Completa los campos obligatorios antes de continuar', {
+                description: Object.values(nuevosErrores).join('. '),
+                duration: 3000,
+            });
+            return;
+        }
+
+        setStep(step + 1);
     };
 
     // Enviar pedido
@@ -220,11 +261,21 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                                 <p className="text-sm text-gray-500">Elige quién realizará la entrega</p>
                             </div>
 
+                            {errores['repartidor'] && (
+                                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-red-700 text-sm">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    {errores['repartidor']}
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {repartidores.map((r) => (
                                     <button
                                         key={r.id}
-                                        onClick={() => setRepartidorSeleccionado(r.nombre)}
+                                        onClick={() => {
+                                            setRepartidorSeleccionado(r.nombre);
+                                            setErrores(prev => ({ ...prev, repartidor: '' }));
+                                        }}
                                         className={`p-4 rounded-xl border-2 text-left transition ${repartidorSeleccionado === r.nombre
                                             ? 'border-[#C9A96E] bg-[#FBF7F0] ring-2 ring-[#C9A96E]/30'
                                             : 'border-gray-200 hover:border-[#C9A96E]/50 hover:bg-gray-50'
@@ -253,61 +304,82 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                     {/* PASO 1: Datos del Cliente */}
                     {step === 2 && (
                         <div className="space-y-4">
+                            {Object.values(errores).some(e => e) && (
+                                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-red-700 text-sm">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    Completa todos los campos obligatorios marcados
+                                </div>
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
                                         <User className="w-4 h-4 inline mr-1.5 text-[#C9A96E]" />
-                                        Nombre completo
+                                        Nombre completo *
                                     </label>
                                     <input
                                         type="text"
-                                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                        className={`w-full border-2 rounded-xl px-4 py-2.5 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white ${errores['nombre'] ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}
                                         value={cliente.nombre}
                                         onChange={(e) => {
-                                            // Solo letras y espacios
                                             const value = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
                                             setCliente({ ...cliente, nombre: value });
+                                            if (value.trim()) setErrores(prev => ({ ...prev, nombre: '' }));
                                         }}
                                         placeholder="Ej: Juan Pérez"
                                     />
+                                    {errores['nombre'] && (
+                                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                            <AlertCircle className="w-3 h-3" /> {errores['nombre']}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
                                         <Phone className="w-4 h-4 inline mr-1.5 text-[#C9A96E]" />
-                                        Teléfono
+                                        Teléfono *
                                     </label>
                                     <input
                                         type="text"
                                         inputMode="numeric"
-                                        className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                        className={`w-full border-2 rounded-xl px-4 py-2.5 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white ${errores['telefono'] ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}
                                         value={cliente.telefono}
                                         onChange={(e) => {
-                                            // Solo números
                                             const value = e.target.value.replace(/\D/g, '');
                                             setCliente({ ...cliente, telefono: value });
+                                            if (value.trim()) setErrores(prev => ({ ...prev, telefono: '' }));
                                         }}
                                         placeholder="Ej: 987654321"
                                         maxLength={15}
                                     />
+                                    {errores['telefono'] && (
+                                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                            <AlertCircle className="w-3 h-3" /> {errores['telefono']}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">
                                     <MapPin className="w-4 h-4 inline mr-1.5 text-[#C9A96E]" />
-                                    Dirección
+                                    Dirección *
                                 </label>
                                 <input
                                     type="text"
-                                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                    className={`w-full border-2 rounded-xl px-4 py-2.5 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white ${errores['direccion'] ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}
                                     value={cliente.direccion}
                                     onChange={(e) => {
-                                        // Letras, números, espacios, puntos, comas, guiones, etc.
                                         const value = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s.,#-]/g, '');
                                         setCliente({ ...cliente, direccion: value });
+                                        if (value.trim()) setErrores(prev => ({ ...prev, direccion: '' }));
                                     }}
                                     placeholder="Ej: Av. Principal 123, Urb. Las Flores"
                                 />
+                                {errores['direccion'] && (
+                                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                        <AlertCircle className="w-3 h-3" /> {errores['direccion']}
+                                    </p>
+                                )}
                             </div>
 
                             <div>
@@ -363,6 +435,12 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                     {/* PASO 2: Productos */}
                     {step === 3 && (
                         <div className="space-y-4">
+                            {errores['productos'] && (
+                                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-red-700 text-sm">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    {errores['productos']}
+                                </div>
+                            )}
                             {/* Buscador de productos */}
                             <div className="relative">
                                 <input
@@ -515,7 +593,10 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                     <div>
                         {step > 1 && (
                             <button
-                                onClick={() => setStep(step - 1)}
+                                onClick={() => {
+                                    setErrores({});
+                                    setStep(step - 1);
+                                }}
                                 className="px-4 py-2 rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-100 font-medium text-sm transition"
                                 disabled={cargando}
                             >
@@ -533,7 +614,7 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
                         </button>
                         {step < 4 ? (
                             <button
-                                onClick={() => setStep(step + 1)}
+                                onClick={validarYAvanzar}
                                 className="px-5 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-semibold text-sm transition flex items-center gap-2 shadow-md"
                             >
                                 {step === 1 && 'Siguiente → Cliente'}

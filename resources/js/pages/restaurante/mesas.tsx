@@ -426,7 +426,6 @@ function MesaCard({
 
     const dragDisabled = mesa.estado !== 'libre';
     const isMesero = userRole === 'Mesero';
-
     const rolesAccesoCompleto = [
         'Administración',
         'Gerencia',
@@ -527,14 +526,12 @@ function MesaCard({
         }
 
         const esCobrar = mesa.estado === 'listo_cobrar';
-
         const pedidosPendientes = pedidos.filter(
             (p) =>
                 p.mesa_id === mesa.id &&
                 !['pagado', 'cancelado', 'entregado'].includes(p.estado || ''),
         );
         const tienePedidosPendientes = pedidosPendientes.length > 0;
-
         const estadoActions = [
             {
                 value: 'libre',
@@ -669,7 +666,6 @@ function MesaCard({
             </div>
 
             {renderEstadoActions()}
-
             {renderButtonsRow()}
         </div>
     );
@@ -702,11 +698,9 @@ export default function MesasDistribucion() {
     const [pedidoCobro, setPedidoCobro] = useState<any | null>(null);
     const [modalPinAbierto, setModalPinAbierto] = useState(false);
     const [mesaSeleccionada, setMesaSeleccionada] = useState<Mesa | null>(null);
-
     const [isClient, setIsClient] = useState(false);
     // ===== ESTADOS PARA TICKETS =====
     const [modalTicketsAbierto, setModalTicketsAbierto] = useState(false);
-
     const [ticketsDeMesa, setTicketsDeMesa] = useState<any[]>([]);
     const [pedidosLista, setPedidosLista] = useState<any[]>(() =>
         toArray<any>(pedidosIniciales),
@@ -778,7 +772,6 @@ export default function MesasDistribucion() {
         }
 
         const mesasAnteriores = mesas;
-
         setMesas((prev) =>
             prev.map((m) =>
                 m.id === id

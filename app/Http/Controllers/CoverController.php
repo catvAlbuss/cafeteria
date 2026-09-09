@@ -1,13 +1,11 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use App\Models\Cover;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
-
 class CoverController extends Controller
 {
     public function index()
@@ -49,7 +47,6 @@ class CoverController extends Controller
     
         $imagenPath = $this->guardarImagenBase64($validated['imagen'] ?? null)
                       ?? '/images/default-cover.jpg';
-
         $cover = Cover::create([
             'titulo' => $validated['titulo'],
             'descripcion' => $validated['descripcion'] ?? null,

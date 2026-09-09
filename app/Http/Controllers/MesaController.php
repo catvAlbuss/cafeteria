@@ -232,7 +232,6 @@ class MesaController extends Controller
             return redirect()->back()->with('error', 'La mesa debe tener al menos 1 silla');
         }
 
-        // Si excede la capacidad y no viene confirmado, avisamos sin mover nada
         if (! ($validated['forzar'] ?? false) && ($destino->sillas + 1) > $destino->capacidad) {
             return redirect()->back()->with('aviso_capacidad', [
                 'mesero_origen_id' => $origen->id,
@@ -245,7 +244,6 @@ class MesaController extends Controller
         $destino->increment('sillas');
         broadcast(new MesaActualizada($origen->fresh()));
         broadcast(new MesaActualizada($destino->fresh()));
-
         return redirect()->back()->with('success', 'Silla movida correctamente');
     }
 

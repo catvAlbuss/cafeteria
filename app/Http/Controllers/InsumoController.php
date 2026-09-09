@@ -189,7 +189,6 @@ public function destroy(Insumo $insumo)
         }
 
         $nuevoStock = $insumo->stock - $validated['cantidad'];
-
         $insumo->stock = $nuevoStock;
         $insumo->save();
 
@@ -213,7 +212,6 @@ public function destroy(Insumo $insumo)
     public function export(Request $request)
     {
         $teamId = auth()->user()->current_team_id;
-
         $insumos = Insumo::where('team_id', $teamId)->orderBy('nombre')->get();
 
         return Excel::download(new InsumosExport($insumos), 'insumos_'.now()->format('Y-m-d_His').'.xlsx');
