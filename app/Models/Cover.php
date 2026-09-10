@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Traits\BelongsToTeam;
 use Illuminate\Database\Eloquent\Model;
 
-
 class Cover extends Model
 {
     use BelongsToTeam;

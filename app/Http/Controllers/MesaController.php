@@ -244,6 +244,7 @@ class MesaController extends Controller
         $destino->increment('sillas');
         broadcast(new MesaActualizada($origen->fresh()));
         broadcast(new MesaActualizada($destino->fresh()));
+
         return redirect()->back()->with('success', 'Silla movida correctamente');
     }
 

@@ -1,11 +1,13 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Models\Cover;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+
 class CoverController extends Controller
 {
     public function index()
@@ -44,7 +46,6 @@ class CoverController extends Controller
             'imagen' => 'nullable|string',
         ]);
 
-    
         $imagenPath = $this->guardarImagenBase64($validated['imagen'] ?? null)
                       ?? '/images/default-cover.jpg';
         $cover = Cover::create([
@@ -88,7 +89,7 @@ class CoverController extends Controller
                     // Si es Base64, la convierte a archivo físico
                     $imagenGuardar = $this->guardarImagenBase64($validated['imagen']);
                 } else {
-                  
+
                     $imagenGuardar = $validated['imagen'];
                 }
             }
@@ -135,6 +136,7 @@ class CoverController extends Controller
         $cover = Cover::findOrFail($id);
         $cover->estado = $validated['estado'];
         $cover->save();
+
         return redirect()->back()->with('success', 'Estado actualizado correctamente');
     }
 
@@ -168,6 +170,7 @@ class CoverController extends Controller
             return Storage::url('covers/'.$imageName);
         } catch (\Exception $e) {
             \Log::error('Error al guardar imagen Base64: '.$e->getMessage());
+
             return null;
         }
     }

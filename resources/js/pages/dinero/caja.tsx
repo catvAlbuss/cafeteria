@@ -1,6 +1,8 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import ModalBoleta from '@/components/modals/ModalBoleta';
+import ModalCobro from '@/components/modals/ModalCobro';
+import { useSedeChannel } from '@/hooks/useSedeChannel';
 import {
     Search,
     Plus,
@@ -15,7 +17,9 @@ import {
     Utensils,
     CupSoda,
     LayoutGrid,
-    Receipt
+    Receipt,
+    Clock,
+    ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -36,6 +40,48 @@ interface ItemCarrito {
     cantidad: number;
     imagen: string;
 }
+
+interface MesaSalon {
+    id: number;
+    numero: string;
+    capacidad: number;
+    estado: string;
+    cliente?: string | null;
+    mesero?: string | null;
+}
+
+interface PedidoSalon {
+    id: number;
+    numero: string;
+    mesa_id: number;
+    cliente: string;
+    productos: any[] | string;
+    subtotal?: number | string | null;
+    igv?: number | string | null;
+    total: number | string;
+    hora_pedido: string;
+    created_at?: string;
+    estado: string;
+    mesero?: string | null;
+}
+
+const toArray = <T,>(
+    value: T[] | { data?: T[] } | Record<string, T> | null | undefined,
+): T[] => {
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    if (value && Array.isArray((value as { data?: T[] }).data)) {
+        return (value as { data: T[] }).data;
+    }
+
+    if (value && typeof value === 'object') {
+        return Object.values(value as Record<string, T>);
+    }
+
+    return [];
+};
 
 // ============================================================
 // COMPONENTE: Imagen con fallback
@@ -129,8 +175,14 @@ const CategoriaCard = ({
 
 export default function Caja() {
 
-    const { platos = [] } = usePage().props as any;
+    const { platos = [], mesas = [], pedidos = [] } = usePage().props as any;
     const [productos, setProductos] = useState<Producto[]>([]);
+    const [mesasLista, setMesasLista] = useState<MesaSalon[]>(() =>
+        toArray<MesaSalon>(mesas),
+    );
+    const [pedidosLista, setPedidosLista] = useState<PedidoSalon[]>(() =>
+        toArray<PedidoSalon>(pedidos),
+    );
     // Procesar platos desde la base de datos
     useEffect(() => {
         if (platos && platos.length > 0) {
@@ -161,6 +213,112 @@ export default function Caja() {
     const [metodoPago, setMetodoPago] = useState('efectivo');
     const [datosBoleta, setDatosBoleta] = useState<any>(null);
     const [modalBoletaAbierto, setModalBoletaAbierto] = useState(false);
+    const [modalCobroAbierto, setModalCobroAbierto] = useState(false);
+    const [mesaCobro, setMesaCobro] = useState<MesaSalon | null>(null);
+    const [pedidoCobro, setPedidoCobro] = useState<PedidoSalon[]>([]);
+    const [busquedaSalon, setBusquedaSalon] = useState('');
+    const [visibles, setVisibles] = useState(10);
+
+    // Sincronizar mesas/pedidos cuando llegan nuevas props
+    useEffect(() => {
+        setMesasLista(toArray<MesaSalon>(mesas));
+        setPedidosLista(toArray<PedidoSalon>(pedidos));
+    }, [mesas, pedidos]);
+
+    // ===== BANDEJA DE PEDIDOS DE SALÓN =====
+    const salonPendientes = useMemo(() => {
+        const porMesa = new Map<number, { mesa: MesaSalon; pedidos: PedidoSalon[] }>();
+
+        mesasLista.forEach((mesa) => {
+            porMesa.set(mesa.id, { mesa, pedidos: [] });
+        });
+
+        pedidosLista.forEach((pedido) => {
+            const grupo = porMesa.get(pedido.mesa_id);
+            if (grupo) {
+                grupo.pedidos.push(pedido);
+            }
+        });
+
+        return Array.from(porMesa.values())
+            .filter((g) => g.mesa.estado === 'listo_cobrar' && g.pedidos.length > 0)
+            .map((g) => {
+                const total = g.pedidos.reduce(
+                    (sum, p) => sum + (typeof p.total === 'number' ? p.total : parseFloat(p.total) || 0),
+                    0,
+                );
+                const masAntiguo = g.pedidos.reduce(
+                    (acc, p) => {
+                        const t = new Date(p.hora_pedido || p.created_at || '').getTime() || 0;
+                        return acc === 0 || (t > 0 && t < acc) ? t : acc;
+                    },
+                    0,
+                );
+                return { ...g, total, masAntiguo };
+            })
+            .sort((a, b) => a.masAntiguo - b.masAntiguo);
+    }, [mesasLista, pedidosLista]);
+
+    const pendientesFiltrados = useMemo(() => {
+        const q = busquedaSalon.trim().toLowerCase();
+        if (!q) {
+            return salonPendientes;
+        }
+
+        return salonPendientes.filter(
+            (g) =>
+                g.mesa.numero.toLowerCase().includes(q) ||
+                g.pedidos.some((p) => p.numero.toLowerCase().includes(q)),
+        );
+    }, [salonPendientes, busquedaSalon]);
+
+    const bandejaVisibles = pendientesFiltrados.slice(0, visibles);
+
+    const tiempoRelativo = (timestamp: number) => {
+        if (!timestamp) {
+            return '';
+        }
+
+        const minutos = Math.max(1, Math.floor((Date.now() - timestamp) / 60000));
+        if (minutos < 60) {
+            return `Hace ${minutos} min`;
+        }
+
+        const horas = Math.floor(minutos / 60);
+        const resto = minutos % 60;
+
+        return resto > 0 ? `Hace ${horas} h ${resto} min` : `Hace ${horas} h`;
+    };
+
+    const abrirCobro = (mesa: MesaSalon, pedidosMesa: PedidoSalon[]) => {
+        setMesaCobro(mesa);
+        setPedidoCobro(pedidosMesa);
+        setModalCobroAbierto(true);
+    };
+
+    // Tiempo real: una mesa que llega a listo_cobrar aparece sola en la bandeja
+    useSedeChannel('mesas', {
+        'mesa.actualizada': (payload: any) => {
+            setMesasLista((prev) =>
+                prev.map((m) =>
+                    m.id === payload.id ? { ...m, ...payload } : m,
+                ),
+            );
+        },
+    });
+
+    useSedeChannel('pedidos', {
+        'pedido.actualizado': (payload: any) => {
+            setPedidosLista((prev) =>
+                prev.map((p) => (p.id === payload.id ? { ...p, ...payload } : p)),
+            );
+        },
+        'pedido.creado': (payload: any) => {
+            setPedidosLista((prev) =>
+                prev.some((p) => p.id === payload.id) ? prev : [...prev, payload],
+            );
+        },
+    });
 
     // Guardar carrito en localStorage
     useEffect(() => {
@@ -575,6 +733,105 @@ export default function Caja() {
                                 </button>
                             </div>
 
+                            {/* ============ BANDEJA DE PEDIDOS DE SALÓN ============ */}
+                            {tipoPedido === 'salon' ? (
+                                <div className="space-y-2">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" strokeWidth={2} />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar mesa o pedido... (Ej: M03, #1004)"
+                                            className="w-full p-2 pl-9 border border-black/5 rounded-lg text-sm focus:ring-1 focus:ring-[#C9A96E] outline-none bg-[#FBF7F0]"
+                                            value={busquedaSalon}
+                                            onChange={(e) => {
+                                                setBusquedaSalon(e.target.value);
+                                                setVisibles(10);
+                                            }}
+                                        />
+                                    </div>
+
+                                    {bandejaVisibles.length === 0 ? (
+                                        <div className="flex flex-col items-center gap-2 py-6">
+                                            <Receipt className="w-8 h-8 text-gray-300" strokeWidth={1.5} />
+                                            <p className="text-[#8D6B53] text-sm">
+                                                {busquedaSalon
+                                                    ? 'Sin resultados en la búsqueda'
+                                                    : 'No hay pedidos de Salón por cobrar'}
+                                            </p>
+                                            {!busquedaSalon && (
+                                                <p className="text-xs text-gray-400 text-center">
+                                                    Las mesas con todos sus pedidos entregados aparecerán aquí automáticamente.
+                                                </p>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="max-h-64 overflow-y-auto space-y-2 pr-0.5">
+                                                {bandejaVisibles.map(({ mesa, pedidos: pedidosMesa, total }) => (
+                                                    <div
+                                                        key={mesa.id}
+                                                        className="flex items-center justify-between gap-2 border-b border-black/5 py-2.5"
+                                                    >
+                                                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                            <div className="w-9 h-9 rounded-lg bg-[#F5EDE3] flex-shrink-0 flex items-center justify-center font-bold text-[#C9A96E] text-sm">
+                                                                {mesa.numero}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-medium text-[#2D1B1A] truncate">
+                                                                    Mesa {mesa.numero}
+                                                                </p>
+                                                                <p className="text-xs text-[#8D6B53] truncate">
+                                                                    {pedidosMesa.map((p) => p.numero).join(' · ')}
+                                                                    {total > 0 && (
+                                                                        <span className="ml-1 text-[#C9A96E] font-semibold">
+                                                                            S/ {total.toFixed(2)}
+                                                                        </span>
+                                                                    )}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                            {(() => {
+                                                                const ts = pendientesFiltrados.find((g) => g.mesa.id === mesa.id)?.masAntiguo || 0;
+                                                                const rel = tiempoRelativo(ts);
+                                                                return rel && (
+                                                                    <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                                                                        <Clock className="w-3 h-3" />
+                                                                        {rel}
+                                                                    </span>
+                                                                );
+                                                            })()}
+                                                            <button
+                                                                onClick={() => abrirCobro(mesa, pedidosMesa)}
+                                                                className="px-3 py-1.5 bg-[#2D1B1A] hover:bg-[#1E1211] text-white rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm"
+                                                            >
+                                                                COBRAR
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {pendientesFiltrados.length > visibles && (
+                                                <button
+                                                    onClick={() => setVisibles((v) => v + 10)}
+                                                    className="w-full py-2 border border-[#C9A96E]/30 text-[#C9A96E] rounded-lg text-xs font-semibold transition hover:bg-[#C9A96E]/10 flex items-center justify-center gap-1"
+                                                >
+                                                    <ChevronDown className="w-3.5 h-3.5" />
+                                                    Mostrar más ({pendientesFiltrados.length - visibles} restantes)
+                                                </button>
+                                            )}
+
+                                            <p className="text-xs text-gray-400 text-center pt-1">
+                                                {pendientesFiltrados.length === 1
+                                                    ? '1 pedido pendiente'
+                                                    : `${pendientesFiltrados.length} pedidos pendientes`}
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+                            ) : (
+                                <>
                             {/* Cliente y Mesa */}
                             <div className="space-y-2 mb-3">
                                 <input
@@ -711,6 +968,8 @@ export default function Caja() {
                                     </button>
                                 </div>
                             )}
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -728,6 +987,20 @@ export default function Caja() {
                     setDatosBoleta(null);
 
                     router.reload();
+                }}
+            />
+            {/* ===== MODAL COBRO SALÓN ===== */}
+            <ModalCobro
+                isOpen={modalCobroAbierto}
+                mesa={mesaCobro}
+                pedido={pedidoCobro}
+                onClose={() => setModalCobroAbierto(false)}
+                onSuccess={() => {
+                    setModalCobroAbierto(false);
+                    router.reload({
+                        only: ['mesas', 'pedidos'],
+                        preserveUrl: true,
+                    });
                 }}
             />
         </>

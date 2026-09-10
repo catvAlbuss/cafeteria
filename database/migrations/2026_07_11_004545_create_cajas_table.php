@@ -20,14 +20,14 @@ return new class extends Migration
             $table->text('observaciones')->nullable();
             $table->timestamp('fecha_cierre')->nullable();
             $table->enum('estado', ['Abierta', 'Cerrada'])->default('Abierta');
-            
+
             // Campos para sincronización
             $table->decimal('total_ventas_caja', 10, 2)->default(0);
             $table->decimal('total_deliverys', 10, 2)->default(0);
             $table->decimal('total_pedidos_mesa', 10, 2)->default(0);
             $table->integer('total_pedidos')->default(0);
             $table->json('detalle_pedidos')->nullable();
-            
+
             $table->timestamps();
         });
     }

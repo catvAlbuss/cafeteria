@@ -13,7 +13,7 @@ use Illuminate\Queue\SerializesModels;
 class PedidoCreado implements ShouldBroadcastNow, ShouldRescue
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
-    
+
     public function __construct(public Pedido $pedido) {}
 
     /**
