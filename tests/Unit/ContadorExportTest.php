@@ -6,8 +6,9 @@ use App\Exports\IngresosSheetExport;
 use App\Exports\MovimientosSheetExport;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Facades\Excel;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class);
+uses(TestCase::class);
 
 test('contador export includes its three sheets', function () {
     $export = new ContadorExport(collect(), collect(), collect());

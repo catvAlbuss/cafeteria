@@ -647,11 +647,11 @@ class PedidoController extends Controller
 
         DB::afterCommit(fn () => broadcast(new PedidoActualizado($pedido)));
 
-            DB::afterCommit(fn () => broadcast(new PedidoActualizado($pedido)));
-            return $pedido;
+        DB::afterCommit(fn () => broadcast(new PedidoActualizado($pedido)));
 
         return $pedido;
 
+        return $pedido;
 
         return redirect()->back()->with('success', 'Ticket #'.($pedido->numero ?? $pedido->id).' entregado correctamente');
     }

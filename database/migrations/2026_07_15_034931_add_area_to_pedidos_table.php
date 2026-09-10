@@ -10,9 +10,9 @@ return new class extends Migration
     {
         Schema::table('pedidos', function (Blueprint $table) {
             $table->enum('area', ['cocina', 'bar', 'horno', 'postres'])
-                  ->nullable()
-                  ->after('estado');
-            
+                ->nullable()
+                ->after('estado');
+
             $table->index(['area', 'estado']);
         });
     }

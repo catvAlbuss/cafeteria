@@ -56,7 +56,6 @@ class CardexController extends Controller
         return response()->json($movimientos);
     }
 
-   
     public function resumen()
     {
         $teamId = auth()->user()->current_team_id;

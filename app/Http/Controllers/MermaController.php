@@ -11,47 +11,47 @@ use Inertia\Inertia;
 
 class MermaController extends Controller
 {
-public function index()
-{
-    $teamId = auth()->user()->current_team_id;
-    $platos = Plato::where('team_id', $teamId)->get();
-    $insumos = Insumo::where('team_id', $teamId)->where('activo', true)->get();
-    $mermas = MovimientoInventario::where('team_id', $teamId)
-        ->where('motivo', 'merma')
-        ->with(['user', 'item'])
-        ->orderBy('created_at', 'desc')
-        ->limit(100)
-        ->get();
+    public function index()
+    {
+        $teamId = auth()->user()->current_team_id;
+        $platos = Plato::where('team_id', $teamId)->get();
+        $insumos = Insumo::where('team_id', $teamId)->where('activo', true)->get();
+        $mermas = MovimientoInventario::where('team_id', $teamId)
+            ->where('motivo', 'merma')
+            ->with(['user', 'item'])
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get();
 
-    $totalPerdidas = $mermas->sum(function ($m) {
-        $precio = $m->item?->precio ?? 0;
-        $cantidad = $m->cantidad;
-    
-        if ($m->item_type === 'insumo') {
-            $PESO_POR_UNIDAD = 0.100; // 100 gramos por unidad
-            return $cantidad * $precio * $PESO_POR_UNIDAD;
-        }
-        
-    
-        return $cantidad * $precio;
-    });
+        $totalPerdidas = $mermas->sum(function ($m) {
+            $precio = $m->item?->precio ?? 0;
+            $cantidad = $m->cantidad;
 
-    $totalRegistros = $mermas->count();
-    $ultimaMerma = $mermas->first()?->item?->nombre ?? null;
-    $promedio = $totalRegistros > 0 ? $totalPerdidas / $totalRegistros : 0;
+            if ($m->item_type === 'insumo') {
+                $PESO_POR_UNIDAD = 0.100; // 100 gramos por unidad
 
-    return Inertia::render('inventario/mermas', [
-        'platos' => $platos,
-        'insumos' => $insumos,
-        'mermas' => $mermas,
-        'stats' => [
-            'total_perdidas' => $totalPerdidas,
-            'total_registros' => $totalRegistros,
-            'ultima_merma' => $ultimaMerma,
-            'promedio' => $promedio,
-        ],
-    ]);
-}
+                return $cantidad * $precio * $PESO_POR_UNIDAD;
+            }
+
+            return $cantidad * $precio;
+        });
+
+        $totalRegistros = $mermas->count();
+        $ultimaMerma = $mermas->first()?->item?->nombre ?? null;
+        $promedio = $totalRegistros > 0 ? $totalPerdidas / $totalRegistros : 0;
+
+        return Inertia::render('inventario/mermas', [
+            'platos' => $platos,
+            'insumos' => $insumos,
+            'mermas' => $mermas,
+            'stats' => [
+                'total_perdidas' => $totalPerdidas,
+                'total_registros' => $totalRegistros,
+                'ultima_merma' => $ultimaMerma,
+                'promedio' => $promedio,
+            ],
+        ]);
+    }
 
     public function store(Request $request)
     {
@@ -79,17 +79,20 @@ public function index()
 
                 if (! $modelo) {
                     DB::rollBack();
+
                     return redirect()->back()->with('error', "No se encontró {$item['nombre']}");
                 }
 
                 if ($modelo->stock < $item['cantidad']) {
                     DB::rollBack();
+
                     return redirect()->back()->with('error', "Stock insuficiente para {$modelo->nombre}. Disponible: {$modelo->stock}");
                 }
 
                 // Los platos son unidades enteras; los insumos permiten decimales (kg, litros)
                 if ($esProducto && floor($item['cantidad']) != $item['cantidad']) {
                     DB::rollBack();
+
                     return redirect()->back()->with('error', "La cantidad de {$modelo->nombre} debe ser un número entero");
                 }
 
@@ -116,6 +119,7 @@ public function index()
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
+
             return redirect()->back()->with('error', 'Error al registrar mermas: '.$e->getMessage());
         }
 

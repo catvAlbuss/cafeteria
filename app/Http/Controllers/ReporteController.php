@@ -7,7 +7,6 @@ use App\Models\Mesa;
 use App\Models\Pedido;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
@@ -74,33 +73,33 @@ class ReporteController extends Controller
 
                 // Tickets
                 $ticketsHoy = Pedido::whereDate('created_at', today())
-                ->where('estado', 'pagado')
-                ->count();
+                    ->where('estado', 'pagado')
+                    ->count();
 
-// ============================================================
-// TICKETS POR ORIGEN (Mesa + Caja)
-// ============================================================
+                // ============================================================
+                // TICKETS POR ORIGEN (Mesa + Caja)
+                // ============================================================
 
-$ticketsPorOrigen = Pedido::whereBetween('created_at', [
-    Carbon::parse($fechaInicio)->startOfDay(),
-    Carbon::parse($fechaFin)->endOfDay(),
-])
-->where('estado', 'pagado')
-->select(
-    DB::raw('CASE 
+                $ticketsPorOrigen = Pedido::whereBetween('created_at', [
+                    Carbon::parse($fechaInicio)->startOfDay(),
+                    Carbon::parse($fechaFin)->endOfDay(),
+                ])
+                    ->where('estado', 'pagado')
+                    ->select(
+                        DB::raw('CASE 
         WHEN mesa_id IS NOT NULL THEN CONCAT("Mesa ", mesa_id)
         ELSE "Caja"
     END as origen'),
-    DB::raw('COUNT(*) as tickets')
-)
-->groupBy('origen')
-->get()
-->map(function ($item) {
-    return [
-        'origen' => $item->origen,
-        'tickets' => $item->tickets,
-    ];
-});
+                        DB::raw('COUNT(*) as tickets')
+                    )
+                    ->groupBy('origen')
+                    ->get()
+                    ->map(function ($item) {
+                        return [
+                            'origen' => $item->origen,
+                            'tickets' => $item->tickets,
+                        ];
+                    });
                 // Total cobrado hoy
                 $totalCobradoHoy = Pedido::whereDate('created_at', today())
                     ->where('estado', 'pagado')
@@ -179,109 +178,109 @@ $ticketsPorOrigen = Pedido::whereBetween('created_at', [
                     'margenGanancia' => $totalVentas > 0 ? round(($totalVentas * 0.75 / $totalVentas) * 100, 1) : 0,
                 ];
 
-// ============================================================
-// 6️ VENTAS DEL DÍA - DETALLE (agrupado por venta real, no por ticket individual)
-// ============================================================
+                // ============================================================
+                // 6️ VENTAS DEL DÍA - DETALLE (agrupado por venta real, no por ticket individual)
+                // ============================================================
 
-$mesasMap = Mesa::pluck('numero', 'id');
+                $mesasMap = Mesa::pluck('numero', 'id');
 
-$ventasDelDiaDetalle = Pedido::whereDate('created_at', today())
-    ->where('estado', 'pagado')
-    ->orderByDesc('created_at')
-    ->get()
-    // Agrupa por venta_grupo (varios pedidos de una misma mesa cobrados juntos).
-    // Si no tiene venta_grupo (venta directa de Caja, delivery, o cobro individual
-    // antiguo), se trata como su propio grupo de 1 solo elemento (comportamiento
-    // igual al de antes para esos casos).
-    ->groupBy(fn ($pedido) => $pedido->venta_grupo ?: 'individual-'.$pedido->id)
-    ->map(function ($pedidosDelGrupo) use ($mesasMap) {
-        $primerPedido = $pedidosDelGrupo->first();
+                $ventasDelDiaDetalle = Pedido::whereDate('created_at', today())
+                    ->where('estado', 'pagado')
+                    ->orderByDesc('created_at')
+                    ->get()
+                    // Agrupa por venta_grupo (varios pedidos de una misma mesa cobrados juntos).
+                    // Si no tiene venta_grupo (venta directa de Caja, delivery, o cobro individual
+                    // antiguo), se trata como su propio grupo de 1 solo elemento (comportamiento
+                    // igual al de antes para esos casos).
+                    ->groupBy(fn ($pedido) => $pedido->venta_grupo ?: 'individual-'.$pedido->id)
+                    ->map(function ($pedidosDelGrupo) use ($mesasMap) {
+                        $primerPedido = $pedidosDelGrupo->first();
 
-        // Unir los productos de TODOS los pedidos del grupo (toda la mesa/venta)
-        $items = [];
-        foreach ($pedidosDelGrupo as $pedidoDelGrupo) {
-            $productosRaw = is_string($pedidoDelGrupo->productos)
-                ? json_decode($pedidoDelGrupo->productos, true)
-                : $pedidoDelGrupo->productos;
+                        // Unir los productos de TODOS los pedidos del grupo (toda la mesa/venta)
+                        $items = [];
+                        foreach ($pedidosDelGrupo as $pedidoDelGrupo) {
+                            $productosRaw = is_string($pedidoDelGrupo->productos)
+                                ? json_decode($pedidoDelGrupo->productos, true)
+                                : $pedidoDelGrupo->productos;
 
-            if (is_array($productosRaw)) {
-                foreach ($productosRaw as $item) {
-                    if (is_array($item) && isset($item['nombre'])) {
-                        $items[] = $item;
-                    } elseif (is_array($item) && isset($item['productos']) && is_array($item['productos'])) {
-                        foreach ($item['productos'] as $subItem) {
-                            if (is_array($subItem) && isset($subItem['nombre'])) {
-                                $items[] = $subItem;
+                            if (is_array($productosRaw)) {
+                                foreach ($productosRaw as $item) {
+                                    if (is_array($item) && isset($item['nombre'])) {
+                                        $items[] = $item;
+                                    } elseif (is_array($item) && isset($item['productos']) && is_array($item['productos'])) {
+                                        foreach ($item['productos'] as $subItem) {
+                                            if (is_array($subItem) && isset($subItem['nombre'])) {
+                                                $items[] = $subItem;
+                                            }
+                                        }
+                                    } elseif (is_array($item) && isset($item[0]) && is_array($item[0]) && isset($item[0]['nombre'])) {
+                                        foreach ($item as $subItem) {
+                                            if (is_array($subItem) && isset($subItem['nombre'])) {
+                                                $items[] = $subItem;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
-                    } elseif (is_array($item) && isset($item[0]) && is_array($item[0]) && isset($item[0]['nombre'])) {
-                        foreach ($item as $subItem) {
-                            if (is_array($subItem) && isset($subItem['nombre'])) {
-                                $items[] = $subItem;
-                            }
+
+                        // Normalizar cada línea con precio/subtotal
+                        $itemsConPrecio = collect($items)
+                            ->filter(fn ($p) => is_array($p) && isset($p['nombre']))
+                            ->map(function ($p) {
+                                $precio = (float) ($p['precio'] ?? 0);
+                                $cantidad = (int) ($p['cantidad'] ?? 1);
+                                $subtotal = (float) ($p['subtotal'] ?? $precio * $cantidad);
+
+                                return [
+                                    'nombre' => $p['nombre'] ?? 'Producto',
+                                    'cantidad' => $cantidad,
+                                    'precio' => $precio,
+                                    'subtotal' => $subtotal,
+                                ];
+                            })
+                            // Fusiona líneas del mismo producto (ej: 2 tickets con "Capuccino" -> 1 línea "2x Capuccino")
+                            ->groupBy('nombre')
+                            ->map(function ($grupoProducto) {
+                                $primero = $grupoProducto->first();
+
+                                return [
+                                    'nombre' => $primero['nombre'],
+                                    'cantidad' => $grupoProducto->sum('cantidad'),
+                                    'precio' => $primero['precio'],
+                                    'subtotal' => $grupoProducto->sum('subtotal'),
+                                ];
+                            })
+                            ->values()
+                            ->toArray();
+
+                        $productoTexto = collect($itemsConPrecio)
+                            ->map(fn ($p) => ($p['cantidad'] ?? 1).'x '.($p['nombre'] ?? 'Producto'))
+                            ->implode(', ');
+
+                        // Determinar origen (igual que antes)
+                        if ($primerPedido->mesa_id && isset($mesasMap[$primerPedido->mesa_id])) {
+                            $numeroMesa = $mesasMap[$primerPedido->mesa_id];
+                        } elseif ($primerPedido->tipo === 'delivery') {
+                            $numeroMesa = 'Delivery';
+                        } else {
+                            $numeroMesa = 'Caja';
                         }
-                    }
-                }
-            }
-        }
 
-        // Normalizar cada línea con precio/subtotal
-        $itemsConPrecio = collect($items)
-            ->filter(fn ($p) => is_array($p) && isset($p['nombre']))
-            ->map(function ($p) {
-                $precio = (float) ($p['precio'] ?? 0);
-                $cantidad = (int) ($p['cantidad'] ?? 1);
-                $subtotal = (float) ($p['subtotal'] ?? $precio * $cantidad);
+                        $totalGrupo = $pedidosDelGrupo->sum('total');
+                        $fechaPago = $pedidosDelGrupo->sortByDesc('updated_at')->first()->updated_at
+                            ?? $primerPedido->created_at;
 
-                return [
-                    'nombre' => $p['nombre'] ?? 'Producto',
-                    'cantidad' => $cantidad,
-                    'precio' => $precio,
-                    'subtotal' => $subtotal,
-                ];
-            })
-            // Fusiona líneas del mismo producto (ej: 2 tickets con "Capuccino" -> 1 línea "2x Capuccino")
-            ->groupBy('nombre')
-            ->map(function ($grupoProducto) {
-                $primero = $grupoProducto->first();
-
-                return [
-                    'nombre' => $primero['nombre'],
-                    'cantidad' => $grupoProducto->sum('cantidad'),
-                    'precio' => $primero['precio'],
-                    'subtotal' => $grupoProducto->sum('subtotal'),
-                ];
-            })
-            ->values()
-            ->toArray();
-
-        $productoTexto = collect($itemsConPrecio)
-            ->map(fn ($p) => ($p['cantidad'] ?? 1).'x '.($p['nombre'] ?? 'Producto'))
-            ->implode(', ');
-
-        // Determinar origen (igual que antes)
-        if ($primerPedido->mesa_id && isset($mesasMap[$primerPedido->mesa_id])) {
-            $numeroMesa = $mesasMap[$primerPedido->mesa_id];
-        } elseif ($primerPedido->tipo === 'delivery') {
-            $numeroMesa = 'Delivery';
-        } else {
-            $numeroMesa = 'Caja';
-        }
-
-        $totalGrupo = $pedidosDelGrupo->sum('total');
-        $fechaPago = $pedidosDelGrupo->sortByDesc('updated_at')->first()->updated_at
-            ?? $primerPedido->created_at;
-
-        return [
-            'fecha' => $fechaPago->format('d/m/Y H:i'),
-            'mesa' => $numeroMesa,
-            'producto' => $productoTexto ?: 'Sin productos',
-            'total' => $totalGrupo,
-            'metodo_pago' => $primerPedido->metodo_pago ? ucfirst($primerPedido->metodo_pago) : 'N/A',
-            'productosDetalle' => $itemsConPrecio,
-        ];
-    })
-    ->values();
+                        return [
+                            'fecha' => $fechaPago->format('d/m/Y H:i'),
+                            'mesa' => $numeroMesa,
+                            'producto' => $productoTexto ?: 'Sin productos',
+                            'total' => $totalGrupo,
+                            'metodo_pago' => $primerPedido->metodo_pago ? ucfirst($primerPedido->metodo_pago) : 'N/A',
+                            'productosDetalle' => $itemsConPrecio,
+                        ];
+                    })
+                    ->values();
                 // ============================================================
                 // 7 MÉTODOS DE PAGO
                 // ============================================================

@@ -36,7 +36,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-              
+
                 'user' => fn () => $user ? [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -47,19 +47,17 @@ class HandleInertiaRequests extends Middleware
                 'permissions' => fn () => $user?->getAllPermissions()->pluck('name') ?? [],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-            
-           
+
             'currentTeam' => fn () => $user?->currentTeam ? $user->toUserTeam($user->currentTeam) : null,
-            
+
             'teams' => fn () => $user && ($user->hasRole('Gerente') || ($user->currentTeam && in_array($user->teamRole($user->currentTeam), [TeamRole::Owner, TeamRole::Admin], true)))
                 ? $user->toUserTeams(includeCurrent: true)
                 : [],
 
-            
             'jornadaCaja' => fn () => $user?->current_team_id ? [
                 'abierta' => Caja::where('team_id', $user->current_team_id)
-                                ->where('estado', 'Abierta')
-                                ->exists(),
+                    ->where('estado', 'Abierta')
+                    ->exists(),
                 'puedeAbrir' => $user->can('manage-cash-session'),
             ] : ['abierta' => false, 'puedeAbrir' => false],
 

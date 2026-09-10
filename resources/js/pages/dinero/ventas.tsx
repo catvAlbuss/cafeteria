@@ -336,7 +336,10 @@ export default function Ventas() {
             onSuccess: () => {
                 toast.success('Pedido enviado a cocina', {
 
+
                     description: `Mesa: ${mesaInfo.numero} · Mesero: ${mesaInfo.mesero || 'No asignado'} · Total: S/ ${totalCarrito.toFixed(2)} · Área: ${areaDetectada}`,
+
+
                     description: `Mesa: ${mesaInfo?.numero || 'No asignada'} · Mesero: ${mesaInfo?.mesero || 'No asignado'} · Total: S/ ${totalConIgv.toFixed(2)} · Área: ${areaDetectada}`,
 
                     duration: 5000,
