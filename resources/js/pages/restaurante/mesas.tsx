@@ -1746,8 +1746,8 @@ export default function MesasDistribucion() {
         <>
             <Head title="Distribución de Mesas" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl bg-[#FBF7F0] p-3 sm:p-4">
-                <div className="flex justify-end gap-3">
+<div className="min-h-screen bg-[#FBF7F0] p-4 md:p-6 space-y-4">      
+          <div className="flex justify-end gap-3">
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                         {canManageTables && (
                             <button

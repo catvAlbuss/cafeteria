@@ -514,8 +514,7 @@ export default function Caja() {
     return (
         <>
             <Head title="Caja" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-3 sm:p-4 bg-[#FBF7F0]">
-
+<div className="min-h-screen bg-[#FBF7F0] p-4 md:p-6 space-y-4">
                 <div className="flex items-center justify-end">
                     <div className="flex items-center gap-3 text-sm text-gray-500">
                         <span className="px-3 py-1 bg-white rounded-lg border border-black/5">
