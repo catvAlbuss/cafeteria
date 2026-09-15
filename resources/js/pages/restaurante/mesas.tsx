@@ -75,7 +75,6 @@ function ModalPin({
     };
 
     const borrarDigito = () => setPin(prev => prev.slice(0, -1));
-
     const confirmar = async () => {
         if (pin.length !== 4) {
             setError('Ingresa los 4 dígitos de tu PIN');
@@ -832,7 +831,6 @@ export default function MesasDistribucion() {
     }>().props;
 
     const userRole = auth?.roles?.[0];
-
     const canManageTables =
         auth?.permissions?.includes('gestionar mesas') ??
         false;
@@ -944,7 +942,6 @@ export default function MesasDistribucion() {
         }
 
         const mesasAnteriores = mesas;
-
         setMesas((prev) =>
             prev.map((m) =>
                 m.id === id
@@ -1017,7 +1014,6 @@ export default function MesasDistribucion() {
             toArray<Mesa>(mesasIniciales);
 
         setMesas(mesasArray);
-
         setPedidosLista(
             toArray<any>(pedidosIniciales),
         );

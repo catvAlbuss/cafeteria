@@ -51,7 +51,6 @@ export default function ModalBoleta({ isOpen, onClose, onSuccess, data }: ModalB
 
     const { cliente, mesa, tipo, metodoPago, productos, subtotal, igv, total } = data;
     const numeroBoleta = 'B001-' + String(Math.floor(Math.random() * 100000)).padStart(5, '0');
-
     const now = new Date();
     const fecha = now.toLocaleDateString('es-PE', {
         day: '2-digit',
@@ -65,7 +64,6 @@ export default function ModalBoleta({ isOpen, onClose, onSuccess, data }: ModalB
     });
 
     const tipoTexto = tipo === 'salon' ? '🪑 Salón' : tipo === 'llevar' ? '📦 Llevar' : '🚚 Delivery';
-
     const handleImprimir = () => {
         if (authorizationPin.length !== 4) {
             alert('Ingresa el PIN de 4 dígitos');
@@ -73,7 +71,6 @@ export default function ModalBoleta({ isOpen, onClose, onSuccess, data }: ModalB
         }
 
         setCargando(true);
-
         setTimeout(() => {
             setCargando(false);
             setExito(true);

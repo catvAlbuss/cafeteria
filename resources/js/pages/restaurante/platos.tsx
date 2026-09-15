@@ -40,16 +40,13 @@ const toArray = <T,>(value: T[] | { data?: T[] } | Record<string, T> | null | un
 export default function Platos() {
     //  Recibir platos desde el controlador
     const { platos: platosIniciales = [] } = usePage<{ platos: Plato[] | { data?: Plato[] } | Record<string, Plato> }>().props;
-
     //  Estado - usar datos del controlador
     const [platos, setPlatos] = useState<Plato[]>(() => toArray<Plato>(platosIniciales));
-
     //  Estado del modal
     const [modalAbierto, setModalAbierto] = useState(false);
     const [modalVerAbierto, setModalVerAbierto] = useState(false);
     const [platoSeleccionado, setPlatoSeleccionado] = useState<Plato | null>(null);
     const [esEdicion, setEsEdicion] = useState(false);
-
     //  Estado del formulario
     const [formulario, setFormulario] = useState({
         id: '',
@@ -66,12 +63,10 @@ export default function Platos() {
     const [previewImagen, setPreviewImagen] = useState<string>('');
     //  Archivo real de la imagen a subir (se envía como multipart, nunca como base64)
     const [imagenFile, setImagenFile] = useState<File | null>(null);
-
     //  Filtros
     const [filtroCategoria, setFiltroCategoria] = useState('');
     const [filtroEstado, setFiltroEstado] = useState('');
     const [ordenPor, setOrdenPor] = useState('');
-
     //  Filtrar y ordenar platos
     const platosFiltrados = platos
         .filter(p => {

@@ -11,7 +11,6 @@ use Spatie\Permission\PermissionRegistrar;
 class DemoUsersSeeder extends Seeder
 {
     private const DEMO_PASSWORD = 'password';
-
     public function run(): void
     {
         $team = Team::where('slug', 'sede-principal')->firstOrFail();
