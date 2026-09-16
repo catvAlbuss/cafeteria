@@ -638,21 +638,172 @@ class PedidoController extends Controller
             broadcast(new PedidoActualizado($pedido));
 
             return redirect()->back()->with('success', 'Ticket #'.($pedido->numero ?? $pedido->id).' entregado correctamente');
-
         } catch (\Exception $e) {
             DB::rollBack();
 
             return redirect()->back()->with('error', 'Error al entregar ticket: '.$e->getMessage());
         }
+    }
 
-        DB::afterCommit(fn () => broadcast(new PedidoActualizado($pedido)));
+    // ============================================================
+    // EMITIR COMPROBANTE ELECTRÓNICO (SUNAT)
+    // ============================================================
+public function emitirComprobante(Request $request)
+{
+    $validated = $request->validate([
+        'pedido_ids' => 'required|array|min:1',
+        'pedido_ids.*' => 'exists:pedidos,id',
+        'tipo_documento' => 'required|in:01,03',
+        'documento' => 'required|string|max:11',
+        'nombre' => 'required|string|max:255',
+        'direccion' => 'nullable|string|max:255',
+        // Datos opcionales para cobrar la mesa
+        'mesa_id' => 'nullable|exists:mesas,id',
+        'metodo_pago' => 'nullable|in:efectivo,tarjeta,yape',
+        'authorization_pin' => 'nullable|string|size:4',
+    ]);
 
-        DB::afterCommit(fn () => broadcast(new PedidoActualizado($pedido)));
+    try {
+        DB::beginTransaction();
 
-        return $pedido;
+        // 1. Obtener todos los pedidos
+        $pedidos = Pedido::whereIn('id', $validated['pedido_ids'])->get();
 
-        return $pedido;
+        if ($pedidos->isEmpty()) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'error' => 'No se encontraron pedidos para facturar.',
+            ], 404);
+        }
 
-        return redirect()->back()->with('success', 'Ticket #'.($pedido->numero ?? $pedido->id).' entregado correctamente');
+        // 2. Si viene mesa_id, validar PIN y cobrar la mesa
+        if (!empty($validated['mesa_id'])) {
+            if (empty($validated['authorization_pin']) || empty($validated['metodo_pago'])) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Para cobrar la mesa se requiere PIN y método de pago.',
+                ], 422);
+            }
+
+            $authorizer = $request->user()->currentTeam?->members()
+                ->active()
+                ->where('pin', $validated['authorization_pin'])
+                ->first();
+
+            if (! $authorizer instanceof User || ! $authorizer->hasPermissionTo('procesar pagos')) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'error' => 'PIN inválido. Solo Caja, Administración o Gerencia pueden confirmar el pago.',
+                ], 403);
+            }
+
+            $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
+            $mesa = Mesa::findOrFail($validated['mesa_id']);
+
+            // Marcar los pedidos como pagados
+            foreach ($pedidos as $pedido) {
+                $pedido->estado = 'pagado';
+                $pedido->metodo_pago = $validated['metodo_pago'];
+                $pedido->caja_id = $caja->id;
+                $pedido->save();
+            }
+
+            // Liberar la mesa
+            $mesa->estado = 'libre';
+            $mesa->user_id = null;
+            $mesa->cliente = null;
+            $mesa->personas = null;
+            $mesa->pedido_listo = false;
+            $mesa->save();
+            broadcast(new MesaActualizada($mesa));
+        }
+
+        // 3. Agrupar todos los productos de todos los pedidos
+        $items = [];
+        foreach ($pedidos as $pedido) {
+            $productos = is_string($pedido->productos)
+                ? json_decode($pedido->productos, true)
+                : $pedido->productos;
+
+            foreach ($productos as $producto) {
+                $items[] = [
+                    'code' => (string) ($producto['id'] ?? 'PROD'),
+                    'description' => $producto['nombre'],
+                    'quantity' => (int) $producto['cantidad'],
+                    'unit_price' => (float) $producto['precio'],
+                    'idproducto' => (int) ($producto['id'] ?? 1),
+                ];
+            }
+        }
+
+        // 4. Crear instancia del FacturaController
+        $facturaController = new \App\Http\Controllers\FacturaController();
+
+        // 5. Determinar serie según tipo de documento
+        $serie = $validated['tipo_documento'] === '01' ? 'F001' : 'B001';
+
+        // 6. Obtener el correlativo actual
+        $correlativoResponse = $facturaController->nuevoCorrelativo();
+        $correlativoData = json_decode($correlativoResponse->getContent(), true);
+        $correlativo = $correlativoData['correlativo'] ?? 1;
+
+        // 7. Construir el payload para el FacturaController
+        $payload = [
+            'serie' => $serie,
+            'correlativo' => $correlativo,
+            'tipo_documento' => $validated['tipo_documento'],
+            'incluidoigv' => true,
+            'client' => [
+                'ruc' => $validated['tipo_documento'] === '01' ? $validated['documento'] : null,
+                'dni' => $validated['tipo_documento'] === '03' ? $validated['documento'] : null,
+                'razon_social' => $validated['tipo_documento'] === '01' ? $validated['nombre'] : null,
+                'nombres' => $validated['tipo_documento'] === '03' ? $validated['nombre'] : null,
+                'direccion' => $validated['direccion'] ?? '-',
+                'ubigeo' => '150101',
+                'departamento' => 'LIMA',
+                'provincia' => 'LIMA',
+                'distrito' => 'LIMA',
+            ],
+            'items' => $items,
+            'vendedor' => [
+                'nombre' => auth()->user()->name ?? 'Cajero',
+            ],
+        ];
+
+        // 8. Llamar al método generateInvoice del FacturaController
+        $invoiceRequest = \Illuminate\Http\Request::create('/facturacion/generar', 'POST', $payload);
+        $invoiceRequest->headers->set('Accept', 'application/json');
+        $response = $facturaController->generateInvoice($invoiceRequest);
+        $resultado = json_decode($response->getContent(), true);
+
+        // 9. Guardar la respuesta en los pedidos
+        if ($resultado['success'] ?? false) {
+            foreach ($pedidos as $pedido) {
+                $pedido->factura_estado = 'aceptado';
+                $pedido->factura_numero = $resultado['file'] ?? null;
+                $pedido->factura_pdf_url = $resultado['pdf_url'] ?? null;
+                $pedido->factura_xml_url = $resultado['xml_url'] ?? null;
+                $pedido->factura_cdr_url = $resultado['cdr_url'] ?? null;
+                $pedido->factura_respuesta = $resultado['message'] ?? 'Aceptado';
+                $pedido->save();
+            }
+        }
+
+        DB::commit();
+
+        return response()->json($resultado);
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Error al emitir comprobante: ' . $e->getMessage());
+
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage(),
+        ], 500);
     }
 }
+}  
+

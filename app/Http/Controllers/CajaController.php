@@ -90,7 +90,10 @@ class CajaController extends Controller
 
             DB::commit();
 
-            return redirect()->back()->with('success', 'Pedido registrado correctamente.');
+              return redirect()->back()->with([
+            'success' => 'Pedido registrado correctamente.',
+            'pedido_id' => $pedido->id,  
+    ]);
 
         } catch (\Exception $e) {
             DB::rollBack();

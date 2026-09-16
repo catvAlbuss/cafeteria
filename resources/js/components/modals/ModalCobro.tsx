@@ -1,6 +1,7 @@
 import { router } from '@inertiajs/react';
 import { X, CheckCircle, CreditCard, Banknote, Smartphone, Printer, KeyRound } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react'; 
+
 // ============================================================
 // INTERFACES
 // ============================================================
@@ -51,6 +52,7 @@ export default function ModalCobro({
     const [authorizationPin, setAuthorizationPin] = useState('');
     const [cargando, setCargando] = useState(false);
     const [exito, setExito] = useState(false);
+    const [comprobanteEmitido, setComprobanteEmitido] = useState<any>(null); 
     const ticketRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {

@@ -17,6 +17,7 @@ use App\Http\Controllers\ReporteController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\FacturaController;
 use Inertia\Inertia;
 
 // ============================================================
@@ -148,12 +149,28 @@ Route::middleware(['auth'])->group(function () {
         ->except(['store'])
         ->middlewareFor(['update', 'destroy'], 'cash.session');
     Route::post('/pedidos', [PedidoController::class, 'store'])->middleware(['operating.hours', 'cash.session'])->name('pedidos.store');
-
+     // EMITIR COMPROBANTE ELECTRÓNICO (SUNAT)   ← AGREGAR ESTO
+    Route::post('/pedidos/emitir-comprobante', [PedidoController::class, 'emitirComprobante'])
+        ->name('pedidos.emitir-comprobante');
     // ----------------------------
     //  INVITACIONES (Opcional)
     // ----------------------------
     Route::get('invitations/{invitation}/accept', [TeamInvitationController::class, 'accept'])->name('invitations.accept');
     Route::delete('invitations/{invitation}', [TeamInvitationController::class, 'decline'])->name('invitations.decline');
+
+        // ============================================================
+    //  FACTURACIÓN ELECTRÓNICA (SUNAT)
+    // ============================================================
+    Route::prefix('facturacion')->group(function () {
+        Route::get('buscar-ruc/{ruc}', [FacturaController::class, 'buscarClienteruc'])->name('factura.buscar-ruc');
+        Route::get('buscar-dni/{dni}', [FacturaController::class, 'buscarClientedni'])->name('factura.buscar-dni');
+        Route::get('correlativo', [FacturaController::class, 'nuevoCorrelativo'])->name('factura.correlativo');
+        Route::get('correlativo-actual', [FacturaController::class, 'correlativoActual'])->name('factura.correlativo-actual');
+        Route::post('generar', [FacturaController::class, 'generateInvoice'])->name('factura.generar');
+        Route::get('pdf/{filename}', [FacturaController::class, 'downloadPdf'])->name('factura.pdf');
+        Route::get('xml/{filename}', [FacturaController::class, 'downloadXml'])->name('factura.xml');
+        Route::get('cdr/{filename}', [FacturaController::class, 'downloadCdr'])->name('factura.cdr');
+    });
 
 });
 

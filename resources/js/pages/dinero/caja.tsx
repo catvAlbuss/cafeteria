@@ -1,7 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect, useMemo } from 'react';
 import ModalBoleta from '@/components/modals/ModalBoleta';
-import ModalCobro from '@/components/modals/ModalCobro';
+
 import { useSedeChannel } from '@/hooks/useSedeChannel';
 import {
     Search,
@@ -213,9 +213,7 @@ export default function Caja() {
     const [metodoPago, setMetodoPago] = useState('efectivo');
     const [datosBoleta, setDatosBoleta] = useState<any>(null);
     const [modalBoletaAbierto, setModalBoletaAbierto] = useState(false);
-    const [modalCobroAbierto, setModalCobroAbierto] = useState(false);
-    const [mesaCobro, setMesaCobro] = useState<MesaSalon | null>(null);
-    const [pedidoCobro, setPedidoCobro] = useState<PedidoSalon[]>([]);
+   
     const [busquedaSalon, setBusquedaSalon] = useState('');
     const [visibles, setVisibles] = useState(10);
 
@@ -291,9 +289,36 @@ export default function Caja() {
     };
 
     const abrirCobro = (mesa: MesaSalon, pedidosMesa: PedidoSalon[]) => {
-        setMesaCobro(mesa);
-        setPedidoCobro(pedidosMesa);
-        setModalCobroAbierto(true);
+        // Calcular subtotal, igv y total
+        const total = pedidosMesa.reduce(
+            (sum, p) => sum + (typeof p.total === 'number' ? p.total : parseFloat(p.total) || 0),
+            0,
+        );
+        const igv = pedidosMesa.reduce(
+            (sum, p) => sum + (typeof p.igv === 'number' ? p.igv : parseFloat(p.igv || '0') || 0),
+            0,
+        );
+        const subtotal = total - igv;
+
+        // Aplanar todos los productos
+        const productos = pedidosMesa.flatMap((p) => {
+            const prods = typeof p.productos === 'string' ? JSON.parse(p.productos) : p.productos;
+            return Array.isArray(prods) ? prods : [];
+        });
+
+        setDatosBoleta({
+            pedidoIds: pedidosMesa.map((p) => p.id),
+            mesaId: mesa.id,
+            cliente: 'CLIENTES VARIOS', 
+            mesa: mesa.numero,
+            tipo: 'salon',
+            metodoPago: 'efectivo',
+            productos: productos,
+            subtotal: subtotal,
+            igv: igv,
+            total: total,
+        });
+        setModalBoletaAbierto(true);
     };
 
     // Tiempo real: una mesa que llega a listo_cobrar aparece sola en la bandeja
@@ -475,9 +500,14 @@ export default function Caja() {
 
         router.post('/caja/registrar', pedidoData, {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page: any) => {
+                // Obtener el ID del pedido que devuelve el backend
+                const pedidoId = page.props.flash?.pedido_id;
+                console.log('Pedido ID recibido:', pedidoId);
+
                 // Guardar datos de la boleta y abrir modal
                 setDatosBoleta({
+                    pedido_id: pedidoId, // ← NUEVO: Pasar el ID al ModalBoleta
                     cliente: cliente || 'Anónimo',
                     mesa: mesa || null,
                     tipo: tipoPedido,
@@ -832,142 +862,142 @@ export default function Caja() {
                                 </div>
                             ) : (
                                 <>
-                            {/* Cliente y Mesa */}
-                            <div className="space-y-2 mb-3">
-                                <input
-                                    type="text"
-                                    placeholder="Nombre del cliente"
-                                    className="w-full p-2 border border-black/5 rounded-lg text-sm focus:ring-1 focus:ring-[#C9A96E] outline-none bg-[#FBF7F0]"
-                                    value={cliente}
-                                    onChange={(e) => setCliente(e.target.value)}
-                                />
-                                <select
-                                    className="w-full p-2 border border-black/5 rounded-lg text-sm focus:ring-1 focus:ring-[#C9A96E] outline-none bg-[#FBF7F0]"
-                                    value={mesa}
-                                    onChange={(e) => setMesa(e.target.value)}
-                                >
-                                    <option value="">Seleccionar mesa</option>
-                                    <option value="Mesa 01">Mesa 01</option>
-                                    <option value="Mesa 02">Mesa 02</option>
-                                    <option value="Mesa 03">Mesa 03</option>
-                                    <option value="Mesa 04">Mesa 04</option>
-                                    <option value="Mesa 05">Mesa 05</option>
-                                </select>
-                            </div>
-
-                            {/* Lista del carrito */}
-                            <div className="max-h-52 overflow-y-auto space-y-2">
-                                {carrito.length === 0 ? (
-                                    <div className="flex flex-col items-center gap-2 py-6">
-                                        <ShoppingCart className="w-8 h-8 text-gray-300" strokeWidth={1.5} />
-                                        <p className="text-[#8D6B53] text-sm">Sin productos</p>
+                                    {/* Cliente y Mesa */}
+                                    <div className="space-y-2 mb-3">
+                                        <input
+                                            type="text"
+                                            placeholder="Nombre del cliente"
+                                            className="w-full p-2 border border-black/5 rounded-lg text-sm focus:ring-1 focus:ring-[#C9A96E] outline-none bg-[#FBF7F0]"
+                                            value={cliente}
+                                            onChange={(e) => setCliente(e.target.value)}
+                                        />
+                                        <select
+                                            className="w-full p-2 border border-black/5 rounded-lg text-sm focus:ring-1 focus:ring-[#C9A96E] outline-none bg-[#FBF7F0]"
+                                            value={mesa}
+                                            onChange={(e) => setMesa(e.target.value)}
+                                        >
+                                            <option value="">Seleccionar mesa</option>
+                                            <option value="Mesa 01">Mesa 01</option>
+                                            <option value="Mesa 02">Mesa 02</option>
+                                            <option value="Mesa 03">Mesa 03</option>
+                                            <option value="Mesa 04">Mesa 04</option>
+                                            <option value="Mesa 05">Mesa 05</option>
+                                        </select>
                                     </div>
-                                ) : (
-                                    carrito.map((item) => (
-                                        <div key={item.id} className="flex items-center justify-between border-b border-black/5 py-2">
-                                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-[#F5EDE3]">
-                                                    <ProductImage
-                                                        src={item.imagen}
-                                                        alt={item.nombre}
-                                                        className="w-full h-full object-cover"
-                                                    />
+
+                                    {/* Lista del carrito */}
+                                    <div className="max-h-52 overflow-y-auto space-y-2">
+                                        {carrito.length === 0 ? (
+                                            <div className="flex flex-col items-center gap-2 py-6">
+                                                <ShoppingCart className="w-8 h-8 text-gray-300" strokeWidth={1.5} />
+                                                <p className="text-[#8D6B53] text-sm">Sin productos</p>
+                                            </div>
+                                        ) : (
+                                            carrito.map((item) => (
+                                                <div key={item.id} className="flex items-center justify-between border-b border-black/5 py-2">
+                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                        <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-[#F5EDE3]">
+                                                            <ProductImage
+                                                                src={item.imagen}
+                                                                alt={item.nombre}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-medium text-[#2D1B1A] truncate">{item.nombre}</p>
+                                                            <p className="text-xs text-[#8D6B53]">S/ {item.precio.toFixed(2)} x {item.cantidad}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                                        <button
+                                                            onClick={() => quitarProducto(item.id)}
+                                                            className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition flex items-center justify-center active:scale-90"
+                                                        >
+                                                            <Minus className="w-3.5 h-3.5" strokeWidth={2.5} />
+                                                        </button>
+                                                        <span className="text-sm font-bold text-[#2D1B1A] w-4 text-center">{item.cantidad}</span>
+                                                        <button
+                                                            onClick={() => {
+                                                                const producto = productos.find(p => p.id === item.id);
+                                                                if (producto) {
+                                                                    agregarProducto(producto);
+                                                                }
+                                                            }}
+                                                            className="w-6 h-6 rounded-full bg-[#2D1B1A]/5 text-[#2D1B1A] hover:bg-[#2D1B1A]/10 transition flex items-center justify-center active:scale-90"
+                                                        >
+                                                            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => eliminarProducto(item.id)}
+                                                            className="ml-1 text-red-400 hover:text-red-600 transition text-sm"
+                                                        >
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-medium text-[#2D1B1A] truncate">{item.nombre}</p>
-                                                    <p className="text-xs text-[#8D6B53]">S/ {item.precio.toFixed(2)} x {item.cantidad}</p>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    {/* Totales y acciones */}
+                                    {carrito.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-black/5">
+                                            <div className="space-y-1 text-sm">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Subtotal</span>
+                                                    <span className="font-medium">S/ {subtotal.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">IGV (18%)</span>
+                                                    <span className="font-medium">S/ {igv.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-base font-bold pt-2 border-t border-black/5">
+                                                    <span className="text-[#2D1B1A]">Total</span>
+                                                    <span className="text-[#C9A96E]">S/ {total.toFixed(2)}</span>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-1 flex-shrink-0">
+
+                                            {/* Método de pago */}
+                                            <div className="grid grid-cols-3 gap-1 mt-3">
                                                 <button
-                                                    onClick={() => quitarProducto(item.id)}
-                                                    className="w-6 h-6 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition flex items-center justify-center active:scale-90"
+                                                    onClick={() => setMetodoPago('efectivo')}
+                                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'efectivo'
+                                                        ? 'bg-green-500 text-white'
+                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                        }`}
                                                 >
-                                                    <Minus className="w-3.5 h-3.5" strokeWidth={2.5} />
-                                                </button>
-                                                <span className="text-sm font-bold text-[#2D1B1A] w-4 text-center">{item.cantidad}</span>
-                                                <button
-                                                    onClick={() => {
-                                                        const producto = productos.find(p => p.id === item.id);
-                                                        if (producto) {
-                                                            agregarProducto(producto);
-                                                        }
-                                                    }}
-                                                    className="w-6 h-6 rounded-full bg-[#2D1B1A]/5 text-[#2D1B1A] hover:bg-[#2D1B1A]/10 transition flex items-center justify-center active:scale-90"
-                                                >
-                                                    <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
+                                                    💵 Efectivo
                                                 </button>
                                                 <button
-                                                    onClick={() => eliminarProducto(item.id)}
-                                                    className="ml-1 text-red-400 hover:text-red-600 transition text-sm"
+                                                    onClick={() => setMetodoPago('tarjeta')}
+                                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'tarjeta'
+                                                        ? 'bg-blue-500 text-white'
+                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                        }`}
                                                 >
-                                                    <X className="w-3.5 h-3.5" />
+                                                    💳 Tarjeta
+                                                </button>
+                                                <button
+                                                    onClick={() => setMetodoPago('yape')}
+                                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'yape'
+                                                        ? 'bg-purple-500 text-white'
+                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                        }`}
+                                                >
+                                                    📱 Yape
                                                 </button>
                                             </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
 
-                            {/* Totales y acciones */}
-                            {carrito.length > 0 && (
-                                <div className="mt-4 pt-4 border-t border-black/5">
-                                    <div className="space-y-1 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-500">Subtotal</span>
-                                            <span className="font-medium">S/ {subtotal.toFixed(2)}</span>
+                                            <button
+                                                onClick={realizarPedido}
+                                                className="w-full mt-3 py-2.5 bg-[#2D1B1A] hover:bg-[#1E1211] text-white rounded-xl font-semibold text-sm transition flex items-center justify-center gap-2 active:scale-95 shadow-sm"
+                                            >
+                                                <Receipt className="w-4 h-4" strokeWidth={2.25} />
+                                                Realizar Pedido
+                                                <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.25} />
+                                            </button>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-500">IGV (18%)</span>
-                                            <span className="font-medium">S/ {igv.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-base font-bold pt-2 border-t border-black/5">
-                                            <span className="text-[#2D1B1A]">Total</span>
-                                            <span className="text-[#C9A96E]">S/ {total.toFixed(2)}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Método de pago */}
-                                    <div className="grid grid-cols-3 gap-1 mt-3">
-                                        <button
-                                            onClick={() => setMetodoPago('efectivo')}
-                                            className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'efectivo'
-                                                ? 'bg-green-500 text-white'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                }`}
-                                        >
-                                            💵 Efectivo
-                                        </button>
-                                        <button
-                                            onClick={() => setMetodoPago('tarjeta')}
-                                            className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'tarjeta'
-                                                ? 'bg-blue-500 text-white'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                }`}
-                                        >
-                                            💳 Tarjeta
-                                        </button>
-                                        <button
-                                            onClick={() => setMetodoPago('yape')}
-                                            className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'yape'
-                                                ? 'bg-purple-500 text-white'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                }`}
-                                        >
-                                            📱 Yape
-                                        </button>
-                                    </div>
-
-                                    <button
-                                        onClick={realizarPedido}
-                                        className="w-full mt-3 py-2.5 bg-[#2D1B1A] hover:bg-[#1E1211] text-white rounded-xl font-semibold text-sm transition flex items-center justify-center gap-2 active:scale-95 shadow-sm"
-                                    >
-                                        <Receipt className="w-4 h-4" strokeWidth={2.25} />
-                                        Realizar Pedido
-                                        <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.25} />
-                                    </button>
-                                </div>
-                            )}
+                                    )}
                                 </>
                             )}
                         </div>
@@ -989,20 +1019,7 @@ export default function Caja() {
                     router.reload();
                 }}
             />
-            {/* ===== MODAL COBRO SALÓN ===== */}
-            <ModalCobro
-                isOpen={modalCobroAbierto}
-                mesa={mesaCobro}
-                pedido={pedidoCobro}
-                onClose={() => setModalCobroAbierto(false)}
-                onSuccess={() => {
-                    setModalCobroAbierto(false);
-                    router.reload({
-                        only: ['mesas', 'pedidos'],
-                        preserveUrl: true,
-                    });
-                }}
-            />
+   
         </>
     );
 
