@@ -210,10 +210,9 @@ export default function Caja() {
     const [cliente, setCliente] = useState('');
     const [mesa, setMesa] = useState('');
     const [tipoPedido, setTipoPedido] = useState('llevar');
-    const [metodoPago, setMetodoPago] = useState('efectivo');
     const [datosBoleta, setDatosBoleta] = useState<any>(null);
     const [modalBoletaAbierto, setModalBoletaAbierto] = useState(false);
-   
+
     const [busquedaSalon, setBusquedaSalon] = useState('');
     const [visibles, setVisibles] = useState(10);
 
@@ -309,10 +308,9 @@ export default function Caja() {
         setDatosBoleta({
             pedidoIds: pedidosMesa.map((p) => p.id),
             mesaId: mesa.id,
-            cliente: 'CLIENTES VARIOS', 
+            cliente: 'CLIENTES VARIOS',
             mesa: mesa.numero,
             tipo: 'salon',
-            metodoPago: 'efectivo',
             productos: productos,
             subtotal: subtotal,
             igv: igv,
@@ -485,7 +483,6 @@ export default function Caja() {
             cliente: cliente || 'Anónimo',
             mesa: mesa || null,
             tipo: tipoPedido,
-            metodoPago: metodoPago,
             productos: carrito.map(item => ({
                 id: item.id,
                 nombre: item.nombre,
@@ -507,11 +504,10 @@ export default function Caja() {
 
                 // Guardar datos de la boleta y abrir modal
                 setDatosBoleta({
-                    pedido_id: pedidoId, // ← NUEVO: Pasar el ID al ModalBoleta
+                    pedidoIds: pedidoId ? [pedidoId] : [],
                     cliente: cliente || 'Anónimo',
                     mesa: mesa || null,
                     tipo: tipoPedido,
-                    metodoPago: metodoPago,
                     productos: carrito.map(item => ({
                         id: item.id,
                         nombre: item.nombre,
@@ -957,37 +953,6 @@ export default function Caja() {
                                                 </div>
                                             </div>
 
-                                            {/* Método de pago */}
-                                            <div className="grid grid-cols-3 gap-1 mt-3">
-                                                <button
-                                                    onClick={() => setMetodoPago('efectivo')}
-                                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'efectivo'
-                                                        ? 'bg-green-500 text-white'
-                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                        }`}
-                                                >
-                                                    💵 Efectivo
-                                                </button>
-                                                <button
-                                                    onClick={() => setMetodoPago('tarjeta')}
-                                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'tarjeta'
-                                                        ? 'bg-blue-500 text-white'
-                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                        }`}
-                                                >
-                                                    💳 Tarjeta
-                                                </button>
-                                                <button
-                                                    onClick={() => setMetodoPago('yape')}
-                                                    className={`py-1.5 rounded-lg text-xs font-medium transition ${metodoPago === 'yape'
-                                                        ? 'bg-purple-500 text-white'
-                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                        }`}
-                                                >
-                                                    📱 Yape
-                                                </button>
-                                            </div>
-
                                             <button
                                                 onClick={realizarPedido}
                                                 className="w-full mt-3 py-2.5 bg-[#2D1B1A] hover:bg-[#1E1211] text-white rounded-xl font-semibold text-sm transition flex items-center justify-center gap-2 active:scale-95 shadow-sm"
@@ -1019,7 +984,7 @@ export default function Caja() {
                     router.reload();
                 }}
             />
-   
+
         </>
     );
 

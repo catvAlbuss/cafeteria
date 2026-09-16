@@ -443,11 +443,14 @@ return "invoices/{$filename}.pdf";
         return response()->json(['correlativo' => $correlativo]);
     }
 
-    public function nuevoCorrelativo()
-    {
-        $correlativo = Factura::max('correlativo');
-        return response()->json(['correlativo' => ($correlativo ?? 0) + 1]);
-    }
+   public function nuevoCorrelativo(Request $request)
+{
+    $serie = $request->input('serie', 'B001');
+    
+    $correlativo = Factura::where('serie', $serie)->max('correlativo');
+    
+    return response()->json(['correlativo' => ($correlativo ?? 0) + 1]);
+}
 
     public function verificarCorreltaivo($correlativo)
     {

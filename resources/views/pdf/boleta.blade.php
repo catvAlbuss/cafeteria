@@ -3,18 +3,19 @@
 <head>
     <meta charset="utf-8">
     <style>
-        @page {
-    size: 80mm 297mm;
+@page {
+    size: 80mm auto;
     margin: 0;
 }
-        body {
-            font-family: 'Courier New', monospace;
-            font-size: 10px;
-            margin: 0;
-            padding: 5px;
-            width: 80mm;
-            color: #000;
-        }
+body {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    margin: 0;
+    padding: 3mm;
+    width: 74mm;   /* 80mm - 6mm (3mm padding de cada lado) */
+    color: #000;
+    box-sizing: border-box;
+}
         .text-center { text-align: center; }
         .text-right { text-align: right; }
         .text-left { text-align: left; }

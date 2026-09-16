@@ -678,48 +678,48 @@ public function emitirComprobante(Request $request)
         }
 
         // 2. Si viene mesa_id, validar PIN y cobrar la mesa
-        if (!empty($validated['mesa_id'])) {
-            if (empty($validated['authorization_pin']) || empty($validated['metodo_pago'])) {
-                DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Para cobrar la mesa se requiere PIN y método de pago.',
-                ], 422);
-            }
+// 2. Validar PIN y método de pago (siempre)
+if (empty($validated['authorization_pin']) || empty($validated['metodo_pago'])) {
+    DB::rollBack();
+    return response()->json([
+        'success' => false,
+        'error' => 'Se requiere PIN y método de pago.',
+    ], 422);
+}
 
-            $authorizer = $request->user()->currentTeam?->members()
-                ->active()
-                ->where('pin', $validated['authorization_pin'])
-                ->first();
+$authorizer = $request->user()->currentTeam?->members()
+    ->active()
+    ->where('pin', $validated['authorization_pin'])
+    ->first();
 
-            if (! $authorizer instanceof User || ! $authorizer->hasPermissionTo('procesar pagos')) {
-                DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'error' => 'PIN inválido. Solo Caja, Administración o Gerencia pueden confirmar el pago.',
-                ], 403);
-            }
+if (! $authorizer instanceof User || ! $authorizer->hasPermissionTo('procesar pagos')) {
+    DB::rollBack();
+    return response()->json([
+        'success' => false,
+        'error' => 'PIN inválido. Solo Caja, Administración o Gerencia pueden confirmar el pago.',
+    ], 403);
+}
 
-            $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
-            $mesa = Mesa::findOrFail($validated['mesa_id']);
+// 3. Si viene mesa_id, cobrar la mesa
+if (!empty($validated['mesa_id'])) {
+    $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
+    $mesa = Mesa::findOrFail($validated['mesa_id']);
 
-            // Marcar los pedidos como pagados
-            foreach ($pedidos as $pedido) {
-                $pedido->estado = 'pagado';
-                $pedido->metodo_pago = $validated['metodo_pago'];
-                $pedido->caja_id = $caja->id;
-                $pedido->save();
-            }
+    foreach ($pedidos as $pedido) {
+        $pedido->estado = 'pagado';
+        $pedido->metodo_pago = $validated['metodo_pago'];
+        $pedido->caja_id = $caja->id;
+        $pedido->save();
+    }
 
-            // Liberar la mesa
-            $mesa->estado = 'libre';
-            $mesa->user_id = null;
-            $mesa->cliente = null;
-            $mesa->personas = null;
-            $mesa->pedido_listo = false;
-            $mesa->save();
-            broadcast(new MesaActualizada($mesa));
-        }
+    $mesa->estado = 'libre';
+    $mesa->user_id = null;
+    $mesa->cliente = null;
+    $mesa->personas = null;
+    $mesa->pedido_listo = false;
+    $mesa->save();
+    broadcast(new MesaActualizada($mesa));
+}
 
         // 3. Agrupar todos los productos de todos los pedidos
         $items = [];
@@ -743,12 +743,14 @@ public function emitirComprobante(Request $request)
         $facturaController = new \App\Http\Controllers\FacturaController();
 
         // 5. Determinar serie según tipo de documento
-        $serie = $validated['tipo_documento'] === '01' ? 'F001' : 'B001';
+$serie = $validated['tipo_documento'] === '01' ? 'F001' : 'B001';
 
-        // 6. Obtener el correlativo actual
-        $correlativoResponse = $facturaController->nuevoCorrelativo();
-        $correlativoData = json_decode($correlativoResponse->getContent(), true);
-        $correlativo = $correlativoData['correlativo'] ?? 1;
+// 6. Obtener el correlativo actual (según la serie)
+$correlativoResponse = $facturaController->nuevoCorrelativo(
+    new \Illuminate\Http\Request(['serie' => $serie])
+);
+$correlativoData = json_decode($correlativoResponse->getContent(), true);
+$correlativo = $correlativoData['correlativo'] ?? 1;
 
         // 7. Construir el payload para el FacturaController
         $payload = [
