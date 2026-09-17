@@ -18,6 +18,9 @@ class Pedido extends Model
         'delivery_id',
         'mesa',
         'cliente',
+        'tipo_documento',
+        'documento_cliente',
+        'nombre_cliente',
         'tipo',
         'productos',
         'total',
@@ -32,6 +35,8 @@ class Pedido extends Model
 
         'subtotal',
         'igv',
+        // Flag para saber si la venta descontó stock (para anularla)
+        'stock_descontado',
         // Campos de delivery
         'codigo',
         'telefono',
@@ -46,6 +51,7 @@ class Pedido extends Model
         'hora_pedido' => 'datetime',
         'hora_entrega' => 'datetime',
         'total' => 'decimal:2',
+        'stock_descontado' => 'boolean',
     ];
 
     /**

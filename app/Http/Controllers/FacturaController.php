@@ -3,21 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\Factura;
-use App\Models\Plato;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\Request;
+use Endroid\QrCode\Encoding\Encoding;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
 use Greenter\Model\Client\Client;
 use Greenter\Model\Company\Address;
 use Greenter\Model\Company\Company;
-use Greenter\Model\Sale\Invoice;
-use Greenter\Model\Sale\SaleDetail;
-use Greenter\Model\Sale\Legend;
 use Greenter\Model\Sale\FormaPagos\FormaPagoContado;
+use Greenter\Model\Sale\Invoice;
+use Greenter\Model\Sale\Legend;
+use Greenter\Model\Sale\SaleDetail;
 use Greenter\See;
-use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Encoding\Encoding;
-use Endroid\QrCode\Writer\PngWriter;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class FacturaController extends Controller
 {
@@ -25,7 +25,7 @@ class FacturaController extends Controller
 
     public function __construct()
     {
-        $this->see = new See();
+        $this->see = new See;
         $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
         $this->see->setService(env('SUNAT_URL'));
     }
@@ -56,11 +56,11 @@ class FacturaController extends Controller
             ]);
 
             // Configurar empresa emisora - DATOS DE PRUEBA
-            $company = new Company();
+            $company = new Company;
             $company->setRuc('20000000001')
                 ->setRazonSocial('DOLCE CAFFE SAC')
                 ->setNombreComercial('DOLCE CAFFE')
-                ->setAddress((new Address())
+                ->setAddress((new Address)
                     ->setUbigueo('150101')
                     ->setDepartamento('LIMA')
                     ->setProvincia('LIMA')
@@ -70,7 +70,7 @@ class FacturaController extends Controller
                     ->setCodLocal('0000'));
 
             // Configurar cliente según tipo de documento
-            $client = new Client();
+            $client = new Client;
             if ($request->input('tipo_documento') === '01') {
                 $client->setTipoDoc('6')
                     ->setNumDoc($request->input('client.ruc'))
@@ -80,7 +80,7 @@ class FacturaController extends Controller
                     ->setNumDoc($request->input('client.dni'))
                     ->setRznSocial($request->input('client.nombres'));
             }
-            $client->setAddress((new Address())
+            $client->setAddress((new Address)
                 ->setUbigueo($request->input('client.ubigeo'))
                 ->setDepartamento($request->input('client.departamento'))
                 ->setProvincia($request->input('client.provincia'))
@@ -89,14 +89,14 @@ class FacturaController extends Controller
                 ->setDireccion($request->input('client.direccion')));
 
             // Crear factura/boleta
-            $invoice = (new Invoice())
+            $invoice = (new Invoice)
                 ->setUblVersion('2.1')
                 ->setTipoOperacion('0101')
                 ->setTipoDoc($request->input('tipo_documento'))
                 ->setSerie($request->input('serie'))
                 ->setCorrelativo($request->input('correlativo'))
-                ->setFechaEmision(new \DateTime())
-                ->setFormaPago(new FormaPagoContado())
+                ->setFechaEmision(new \DateTime)
+                ->setFormaPago(new FormaPagoContado)
                 ->setTipoMoneda('PEN')
                 ->setCompany($company)
                 ->setClient($client);
@@ -112,9 +112,10 @@ class FacturaController extends Controller
                 $cantidad = floatval($item['quantity']);
 
                 if ($incluidoIgv) {
-                    $valorUnitario = round($precioUnitario / 1.18, 2);
-                    $valorVenta = round($valorUnitario * $cantidad, 2);
-                    $igv = round($valorVenta * 0.18, 2);
+                    $mtoPrecio = round($precioUnitario * $cantidad, 2);
+                    $valorVenta = round($mtoPrecio / 1.18, 2);
+                    $igv = round($mtoPrecio - $valorVenta, 2);
+                    $valorUnitario = round($valorVenta / $cantidad, 2);
                     $precioUnitarioFinal = $precioUnitario;
                 } else {
                     $valorUnitario = $precioUnitario;
@@ -123,7 +124,7 @@ class FacturaController extends Controller
                     $precioUnitarioFinal = $precioUnitario;
                 }
 
-                $detail = (new SaleDetail())
+                $detail = (new SaleDetail)
                     ->setCodProducto($item['code'])
                     ->setUnidad('NIU')
                     ->setDescripcion($item['description'])
@@ -153,9 +154,9 @@ class FacturaController extends Controller
                 ->setMtoImpVenta($totalVenta)
                 ->setDetails($details)
                 ->setLegends([
-                    (new Legend())
+                    (new Legend)
                         ->setCode('1000')
-                        ->setValue($this->numberToWords($totalVenta))
+                        ->setValue($this->numberToWords($totalVenta)),
                 ]);
 
             // Enviar a SUNAT
@@ -179,17 +180,17 @@ class FacturaController extends Controller
 
                 $vendedor = $request->input('vendedor.nombre');
 
-                $factura = new Factura();
+                $factura = new Factura;
                 $factura->serie = $request->input('serie');
                 $factura->correlativo = $request->input('correlativo');
                 $factura->vendedor = $request->input('vendedor.nombre');
                 $factura->montototal = $totalVenta;
                 $factura->fecha_emitido = now();
                 $factura->Cliente = $request->input('client.razon_social') ?? $request->input('client.nombres');
-                $factura->documento = $filename . '.pdf';
+                $factura->documento = $filename.'.pdf';
 
-                if (!$factura->save()) {
-                    throw new \Exception("Error al guardar la factura en la base de datos");
+                if (! $factura->save()) {
+                    throw new \Exception('Error al guardar la factura en la base de datos');
                 }
 
                 $this->generatePdfFromXml($filename, $vendedor);
@@ -203,21 +204,21 @@ class FacturaController extends Controller
                     'factura_id' => $factura->idfactura,
                     'pdf_url' => url("facturacion/pdf/{$filename}"),
                     'xml_url' => url("facturacion/xml/{$filename}"),
-                    'cdr_url' => url("facturacion/cdr/{$filename}")
+                    'cdr_url' => url("facturacion/cdr/{$filename}"),
                 ];
             } else {
                 $response = [
                     'success' => false,
-                    'error' => $result->getError()->getMessage()
+                    'error' => $result->getError()->getMessage(),
                 ];
             }
 
             return response()->json($response);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'error' => 'Error de validación',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
@@ -234,19 +235,20 @@ class FacturaController extends Controller
         $intPart = floor($number);
         $decPart = round(($number - $intPart) * 100);
         $words = strtoupper($formatter->format($intPart));
+
         return "SON {$words} CON {$decPart}/100 SOLES";
     }
 
     private function generatePdfFromXml($filename, $vendedor)
     {
         try {
-        $xmlPath = "invoices/{$filename}.xml";
-        if (!Storage::exists($xmlPath)) {
-            throw new \Exception("XML no encontrado: {$xmlPath}");
-        }
+            $xmlPath = "invoices/{$filename}.xml";
+            if (! Storage::exists($xmlPath)) {
+                throw new \Exception("XML no encontrado: {$xmlPath}");
+            }
 
             $xmlContent = Storage::get($xmlPath);
-            $dom = new \DOMDocument();
+            $dom = new \DOMDocument;
             $dom->loadXML($xmlContent, LIBXML_NOCDATA);
             $xpath = new \DOMXPath($dom);
 
@@ -258,16 +260,16 @@ class FacturaController extends Controller
             $details = [];
             $invoiceLines = $xpath->query('//cac:InvoiceLine');
             foreach ($invoiceLines as $line) {
-                $details[] = (object)[
+                $details[] = (object) [
                     'quantity' => floatval($xpath->evaluate('string(./cbc:InvoicedQuantity)', $line)),
                     'code' => $xpath->evaluate('string(./cac:Item/cac:SellersItemIdentification/cbc:ID)', $line),
                     'description' => $xpath->evaluate('string(./cac:Item/cbc:Description)', $line),
                     'unitValue' => floatval($xpath->evaluate('string(./cac:Price/cbc:PriceAmount)', $line)),
-                    'totalValue' => floatval($xpath->evaluate('string(./cbc:LineExtensionAmount)', $line))
+                    'totalValue' => floatval($xpath->evaluate('string(./cbc:LineExtensionAmount)', $line)),
                 ];
             }
 
-                        // ============================================================
+            // ============================================================
             // GENERAR CÓDIGO QR (obligatorio para SUNAT)
             // ============================================================
             $ruc = $xpath->evaluate('string(//cac:AccountingSupplierParty/cac:Party/cac:PartyIdentification/cbc:ID)');
@@ -296,20 +298,20 @@ class FacturaController extends Controller
                 $hashQr,
             ]);
 
-          // Generar la imagen del QR (versión 6.x)
-$qrCode = new QrCode(
-    data: $qrData,
-    encoding: new Encoding('UTF-8'),
-    size: 200,
-    margin: 5,
-);
+            // Generar la imagen del QR (versión 6.x)
+            $qrCode = new QrCode(
+                data: $qrData,
+                encoding: new Encoding('UTF-8'),
+                size: 200,
+                margin: 5,
+            );
 
-$writer = new PngWriter();
-$result = $writer->write($qrCode);
+            $writer = new PngWriter;
+            $result = $writer->write($qrCode);
 
-// Guardar el QR temporalmente
-$qrPath = storage_path("app/qr_{$filename}.png");
-$result->saveToFile($qrPath);
+            // Guardar el QR temporalmente
+            $qrPath = storage_path("app/qr_{$filename}.png");
+            $result->saveToFile($qrPath);
 
             $data = [
                 'company' => [
@@ -341,33 +343,34 @@ $result->saveToFile($qrPath);
                 ],
             ];
 
-$partes = explode('-', $filename);
-$tipoDoc = $partes[1] ?? '03';
-$titulo = $tipoDoc === '01' ? 'FACTURA' : 'BOLETA DE VENTA';
-$etiquetaDoc = $tipoDoc === '01' ? 'RUC' : 'DNI';
+            $partes = explode('-', $filename);
+            $tipoDoc = $partes[1] ?? '03';
+            $titulo = $tipoDoc === '01' ? 'FACTURA' : 'BOLETA DE VENTA';
+            $etiquetaDoc = $tipoDoc === '01' ? 'RUC' : 'DNI';
 
-if ($tipoDoc === '01') {
-    // Factura → vista A4
-    $pdf = Pdf::loadView('pdf.factura', array_merge($data, [
-        'titulo' => $titulo,
-        'etiquetaDoc' => $etiquetaDoc,
-        'partes' => $partes,
-    ]))->setPaper('a4', 'portrait');
-} else {
-    // Boleta → vista ticket 80mm
-    // Tamaño: 80mm de ancho x alto automático
-    $pdf = Pdf::loadView('pdf.boleta', array_merge($data, [
-        'titulo' => $titulo,
-        'etiquetaDoc' => $etiquetaDoc,
-        'partes' => $partes,
-    ]))->setPaper([0, 0, 226.77, 500], 'portrait');
-}
+            if ($tipoDoc === '01') {
+                // Factura → vista A4
+                $pdf = Pdf::loadView('pdf.factura', array_merge($data, [
+                    'titulo' => $titulo,
+                    'etiquetaDoc' => $etiquetaDoc,
+                    'partes' => $partes,
+                ]))->setPaper('a4', 'portrait');
+            } else {
+                // Boleta → vista ticket 80mm
+                // Tamaño: 80mm de ancho x alto automático
+                $pdf = Pdf::loadView('pdf.boleta', array_merge($data, [
+                    'titulo' => $titulo,
+                    'etiquetaDoc' => $etiquetaDoc,
+                    'partes' => $partes,
+                ]))->setPaper([0, 0, 226.77, 500], 'portrait');
+            }
 
-$pdfContent = $pdf->output();
-Storage::put("invoices/{$filename}.pdf", $pdfContent);
-return "invoices/{$filename}.pdf";
+            $pdfContent = $pdf->output();
+            Storage::put("invoices/{$filename}.pdf", $pdfContent);
+
+            return "invoices/{$filename}.pdf";
         } catch (\Exception $e) {
-            \Log::error('Error generando PDF: ' . $e->getMessage());
+            \Log::error('Error generando PDF: '.$e->getMessage());
             throw $e;
         }
     }
@@ -375,27 +378,30 @@ return "invoices/{$filename}.pdf";
     public function downloadXml($filename)
     {
         $path = "invoices/{$filename}.xml";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'XML file not found'], 404);
         }
+
         return Storage::download($path);
     }
 
     public function downloadCdr($filename)
     {
         $path = "invoices/cdr/{$filename}.zip";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'CDR file not found'], 404);
         }
+
         return Storage::download($path);
     }
 
     public function downloadPdf($filename)
     {
         $path = "invoices/{$filename}.pdf";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'PDF no encontrado'], 404);
         }
+
         return Storage::download($path);
     }
 
@@ -404,17 +410,18 @@ return "invoices/{$filename}.pdf";
         $token = 'apis-token-10424.XUaCDKAX2Wgac4w6lR7-u39Ael3LTdCc';
         $curl = curl_init();
         curl_setopt_array($curl, [
-            CURLOPT_URL => 'https://api.apis.net.pe/v2/sunat/ruc?numero=' . $ruccliente,
+            CURLOPT_URL => 'https://api.apis.net.pe/v2/sunat/ruc?numero='.$ruccliente,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => 0,
             CURLOPT_CUSTOMREQUEST => 'GET',
             CURLOPT_HTTPHEADER => [
                 'Referer: http://apis.net.pe/api-ruc',
-                'Authorization: Bearer ' . $token
+                'Authorization: Bearer '.$token,
             ],
         ]);
         $response = curl_exec($curl);
         curl_close($curl);
+
         return response()->json(json_decode($response));
     }
 
@@ -423,38 +430,41 @@ return "invoices/{$filename}.pdf";
         $token = 'apis-token-10424.XUaCDKAX2Wgac4w6lR7-u39Ael3LTdCc';
         $curl = curl_init();
         curl_setopt_array($curl, [
-            CURLOPT_URL => 'https://api.apis.net.pe/v2/reniec/dni?numero=' . $dnicliente,
+            CURLOPT_URL => 'https://api.apis.net.pe/v2/reniec/dni?numero='.$dnicliente,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => 0,
             CURLOPT_CUSTOMREQUEST => 'GET',
             CURLOPT_HTTPHEADER => [
                 'Referer: https://apis.net.pe/consulta-dni-api',
-                'Authorization: Bearer ' . $token
+                'Authorization: Bearer '.$token,
             ],
         ]);
         $response = curl_exec($curl);
         curl_close($curl);
+
         return response()->json(json_decode($response));
     }
 
     public function correlativoActual()
     {
         $correlativo = Factura::max('correlativo');
+
         return response()->json(['correlativo' => $correlativo]);
     }
 
-   public function nuevoCorrelativo(Request $request)
-{
-    $serie = $request->input('serie', 'B001');
-    
-    $correlativo = Factura::where('serie', $serie)->max('correlativo');
-    
-    return response()->json(['correlativo' => ($correlativo ?? 0) + 1]);
-}
+    public function nuevoCorrelativo(Request $request)
+    {
+        $serie = $request->input('serie', 'B001');
+
+        $correlativo = Factura::where('serie', $serie)->max('correlativo');
+
+        return response()->json(['correlativo' => ($correlativo ?? 0) + 1]);
+    }
 
     public function verificarCorreltaivo($correlativo)
     {
         $factura = Factura::where('correlativo', $correlativo)->first();
+
         return response()->json(['existe' => $factura !== null]);
     }
 }

@@ -447,10 +447,11 @@ export default function Caja() {
         setCarrito(prev => prev.filter(item => item.id !== id));
     };
 
-    // Calcular totales
-    const subtotal = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-    const igv = subtotal * 0.18;
-    const total = subtotal + igv;
+    // Calcular totales (el precio del producto ya incluye IGV)
+    const bruto = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+    const subtotal = Math.round((bruto / 1.18) * 100) / 100;
+    const igv = Math.round((bruto - subtotal) * 100) / 100;
+    const total = Math.round(bruto * 100) / 100;
 
     // Limpiar carrito
     const limpiarCarrito = () => {

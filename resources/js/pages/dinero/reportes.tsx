@@ -649,26 +649,34 @@ export default function Reportes() {
                             </div>
                             {/* DESGLOSE DE TOTALES CON IGV */}
                             <div className="border-t border-[#F3E1C8] pt-3 space-y-1">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">Subtotal</span>
-                                    <span className="font-medium text-[#2D1B1A]">
-                                        {formatCurrency(ventaSeleccionada.productosDetalle.reduce((sum: number, item: any) => sum + (item.subtotal || item.precio * item.cantidad), 0))}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">IGV (18%)</span>
-                                    <span className="font-medium text-[#2D1B1A]">
-                                        {formatCurrency(ventaSeleccionada.productosDetalle.reduce((sum: number, item: any) => sum + (item.subtotal || item.precio * item.cantidad), 0) * 0.18)}
-                                    </span>
-                                </div>
-                                <div className="border-t-2 border-[#C9A96E]/30 pt-2 flex justify-between">
-                                    <span className="font-bold text-[#2D1B1A] text-lg">TOTAL</span>
-                                    <span className="font-bold text-[#C9A96E] text-lg">
-                                        {formatCurrency(
-                                            ventaSeleccionada.productosDetalle.reduce((sum: number, item: any) => sum + (item.subtotal || item.precio * item.cantidad), 0) * 1.18
-                                        )}
-                                    </span>
-                                </div>
+                                {(() => {
+                                    const totalDetalle = ventaSeleccionada.productosDetalle.reduce((sum: number, item: any) => sum + (item.subtotal || item.precio * item.cantidad), 0);
+                                    const base = Math.round((totalDetalle / 1.18) * 100) / 100;
+                                    const igvDetalle = Math.round((totalDetalle - base) * 100) / 100;
+
+                                    return (
+                                        <>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-500">Subtotal</span>
+                                                <span className="font-medium text-[#2D1B1A]">
+                                                    {formatCurrency(base)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-gray-500">IGV (18%)</span>
+                                                <span className="font-medium text-[#2D1B1A]">
+                                                    {formatCurrency(igvDetalle)}
+                                                </span>
+                                            </div>
+                                            <div className="border-t-2 border-[#C9A96E]/30 pt-2 flex justify-between">
+                                                <span className="font-bold text-[#2D1B1A] text-lg">TOTAL</span>
+                                                <span className="font-bold text-[#C9A96E] text-lg">
+                                                    {formatCurrency(totalDetalle)}
+                                                </span>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
                         <div className="border-t border-[#F3E1C8] p-6 flex justify-end">
