@@ -354,8 +354,7 @@ if ($tipoDoc === '01') {
         'partes' => $partes,
     ]))->setPaper('a4', 'portrait');
 } else {
-    // Boleta → vista ticket 80mm
-    // Tamaño: 80mm de ancho x alto automático
+  
     $pdf = Pdf::loadView('pdf.boleta', array_merge($data, [
         'titulo' => $titulo,
         'etiquetaDoc' => $etiquetaDoc,
