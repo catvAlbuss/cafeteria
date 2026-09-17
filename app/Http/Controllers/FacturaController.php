@@ -360,7 +360,7 @@ if ($tipoDoc === '01') {
         'titulo' => $titulo,
         'etiquetaDoc' => $etiquetaDoc,
         'partes' => $partes,
-    ]))->setPaper([0, 0, 226.77, 800], 'portrait');
+    ]))->setPaper([0, 0, 226.77, 500], 'portrait');
 }
 
 $pdfContent = $pdf->output();

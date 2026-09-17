@@ -124,8 +124,12 @@ export default function ModalBoleta({ isOpen, onClose, onSuccess, data }: ModalB
             const payload: any = {
                 pedido_ids: pedidoIds,
                 tipo_documento: tipoComprobante === 'factura' ? '01' : '03',
-                documento: tipoComprobante === 'factura' ? documento : '00000000',
-                nombre: tipoComprobante === 'factura' ? nombre : 'CLIENTES VARIOS',
+                documento: tipoComprobante === 'factura'
+                    ? documento
+                    : (documento.length === 8 ? documento : '00000000'),
+                nombre: tipoComprobante === 'factura'
+                    ? nombre
+                    : 'CLIENTES VARIOS',
                 direccion: tipoComprobante === 'factura' ? direccion : '-',
                 metodo_pago: metodoPago,
                 authorization_pin: authorizationPin,
@@ -249,6 +253,38 @@ export default function ModalBoleta({ isOpen, onClose, onSuccess, data }: ModalB
                                     <span className="text-[#C9A96E]">S/ {total.toFixed(2)}</span>
                                 </div>
                             </div>
+                            {/* DNI OPCIONAL (solo boleta) */}
+                            {tipoComprobante === 'boleta' && (
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                                        DNI del cliente <span className="text-gray-400">(opcional)</span>
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            maxLength={8}
+                                            placeholder="Ej: 12345678"
+                                            value={documento}
+                                            onChange={(e) => {
+                                                const valor = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                                setDocumento(valor);
+                                            }}
+                                            className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                        />
+                                    </div>
+                                    {documento.length > 0 && documento.length < 8 && (
+                                        <p className="text-[10px] text-red-500 mt-1">
+                                            El DNI debe tener 8 dígitos ({documento.length}/8)
+                                        </p>
+                                    )}
+                                    {documento.length === 0 && (
+                                        <p className="text-[10px] text-gray-400 mt-1">
+                                            Si no lo ingresa, se emitirá como CLIENTES VARIOS
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
                             {/* DATOS DE LA FACTURA (solo factura) */}
                             {tipoComprobante === 'factura' && (
