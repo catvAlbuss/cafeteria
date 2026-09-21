@@ -270,10 +270,14 @@ export default function Mermas() {
                             <Plus className="w-4 h-4" />
                             Nueva merma
                         </button>
-                        <button className="inline-flex items-center gap-2 bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm">
-                            <Download className="w-4 h-4" />
-                            Exportar
-                        </button>
+                     <button
+    type="button"
+    onClick={() => window.open('/mermas/exportar-pdf', '_blank')}
+    className="inline-flex items-center gap-2 bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm"
+>
+    <Download className="w-4 h-4" />
+    Exportar PDF
+</button>
                     </div>
                 </div>
 

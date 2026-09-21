@@ -2,29 +2,128 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\CardexExport;
 use App\Models\Insumo;
 use App\Models\MovimientoInventario;
 use App\Models\Plato;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
 
 class CardexController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * Mostrar Cardex
+     */
+    public function index(Request $request): Response
     {
-        $teamId = auth()->user()->current_team_id;
+        $user = $request->user();
 
-        // Obtener todos los platos
-        $platos = Plato::where('team_id', $teamId)->get();
+        if (!$user) {
+            abort(403);
+        }
 
-        $insumos = Insumo::where('team_id', $teamId)->get();
+        $teamId = $user->current_team_id;
 
-        // Obtener movimientos con relaciones (platos E insumos)
-        $movimientos = MovimientoInventario::where('team_id', $teamId)
-            ->with(['user', 'item'])
-            ->orderBy('created_at', 'desc')
-            ->limit(100)
-            ->get();
+        // =====================================================
+        // PLATOS
+        // =====================================================
+
+        $platos = Plato::query()
+            ->where('team_id', $teamId)
+            ->orderBy('nombre')
+            ->get()
+            ->map(function ($plato) {
+                return [
+                    'id' => $plato->id,
+                    'nombre' => $plato->nombre,
+                    'categoria' => $plato->categoria ?? '',
+                    'stock' => (float) ($plato->stock ?? 0),
+                    'item_type' => 'plato',
+                ];
+            });
+
+        // =====================================================
+        // INSUMOS
+        // =====================================================
+
+        $insumos = Insumo::query()
+            ->where('team_id', $teamId)
+            ->orderBy('nombre')
+            ->get()
+            ->map(function ($insumo) {
+                return [
+                    'id' => $insumo->id,
+                    'nombre' => $insumo->nombre,
+                    'categoria' => $insumo->categoria ?? '',
+                    'stock' => (float) ($insumo->stock ?? 0),
+                    'unidad' => $insumo->unidad ?? '',
+                    'item_type' => 'insumo',
+                ];
+            });
+
+        // =====================================================
+        // MOVIMIENTOS
+        // =====================================================
+
+        $movimientos = MovimientoInventario::query()
+            ->where('team_id', $teamId)
+            ->with([
+                'user:id,name',
+                'item',
+            ])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($movimiento) {
+
+                $item = $movimiento->item;
+
+                return [
+                    'id' => $movimiento->id,
+
+                    'item_type' => $movimiento->item_type,
+
+                    'item_id' => $movimiento->item_id,
+
+                    'tipo' => $movimiento->tipo,
+
+                    'cantidad' => (float) ($movimiento->cantidad ?? 0),
+
+                    'stock_resultante' => (float) (
+                        $movimiento->stock_resultante ?? 0
+                    ),
+
+                    'motivo' => $movimiento->motivo ?? '',
+
+                    'submotivo' => $movimiento->submotivo ?? '',
+
+                    'observaciones' => $movimiento->observaciones ?? '',
+
+                    'user' => $movimiento->user
+                        ? [
+                            'name' => $movimiento->user->name,
+                        ]
+                        : [
+                            'name' => 'Sistema',
+                        ],
+
+                    'item' => $item
+                        ? [
+                            'nombre' => $item->nombre ?? '-',
+                            'categoria' => $item->categoria ?? '-',
+                        ]
+                        : [
+                            'nombre' => '-',
+                            'categoria' => '-',
+                        ],
+
+                    'created_at' => $movimiento->created_at
+                        ? $movimiento->created_at->toISOString()
+                        : '',
+                ];
+            });
 
         return Inertia::render('inventario/cardex', [
             'platos' => $platos,
@@ -33,50 +132,191 @@ class CardexController extends Controller
         ]);
     }
 
-    //  Obtener movimientos por producto específico (plato o insumo)
-    public function getMovimientosPorProducto($tipo, $id)
+    /**
+     * =========================================================
+     * REGISTRAR MOVIMIENTO
+     * =========================================================
+     */
+    public function store(Request $request)
     {
-        $teamId = auth()->user()->current_team_id;
+        $user = $request->user();
 
-        $movimientos = MovimientoInventario::where('team_id', $teamId)
-            ->where('item_type', $tipo) // 'plato' o 'insumo'
-            ->where('item_id', $id)
-            ->with(['user'])
-            ->orderBy('created_at', 'asc')
-            ->get();
-
-        // Calcular saldo acumulado
-        $saldo = 0;
-        foreach ($movimientos as $mov) {
-            $mov->saldo_anterior = $saldo;
-            $saldo += $mov->tipo === 'entrada' ? $mov->cantidad : -$mov->cantidad;
-            $mov->saldo_actual = $saldo;
+        if (!$user) {
+            abort(403);
         }
 
-        return response()->json($movimientos);
+        $teamId = $user->current_team_id;
+
+        $validated = $request->validate([
+            'item_type' => [
+                'required',
+                'in:plato,insumo',
+            ],
+
+            'item_id' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+
+            'tipo' => [
+                'required',
+                'in:entrada,salida',
+            ],
+
+            'cantidad' => [
+                'required',
+                'numeric',
+                'min:0.01',
+            ],
+
+            'motivo' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'observaciones' => [
+                'nullable',
+                'string',
+                'max:1000',
+            ],
+        ]);
+
+        return DB::transaction(function () use (
+            $validated,
+            $user,
+            $teamId
+        ) {
+
+            $itemType = $validated['item_type'];
+            $itemId = (int) $validated['item_id'];
+            $tipo = $validated['tipo'];
+            $cantidad = (float) $validated['cantidad'];
+
+            // =================================================
+            // BUSCAR PRODUCTO / INSUMO
+            // =================================================
+
+            if ($itemType === 'plato') {
+
+                $item = Plato::query()
+                    ->where('team_id', $teamId)
+                    ->lockForUpdate()
+                    ->find($itemId);
+
+            } else {
+
+                $item = Insumo::query()
+                    ->where('team_id', $teamId)
+                    ->lockForUpdate()
+                    ->find($itemId);
+            }
+
+            if (!$item) {
+                return redirect()
+                    ->back()
+                    ->with('error', 'El producto o insumo no existe.');
+            }
+
+            // =================================================
+            // STOCK ACTUAL
+            // =================================================
+
+            $stockActual = (float) ($item->stock ?? 0);
+
+            // =================================================
+            // CALCULAR NUEVO STOCK
+            // =================================================
+
+            if ($tipo === 'entrada') {
+
+                $nuevoStock = $stockActual + $cantidad;
+
+            } else {
+
+                if ($stockActual < $cantidad) {
+
+                    return redirect()
+                        ->back()
+                        ->with(
+                            'error',
+                            'Stock insuficiente. Stock actual: ' .
+                            $stockActual
+                        );
+                }
+
+                $nuevoStock = $stockActual - $cantidad;
+            }
+
+            // =================================================
+            // ACTUALIZAR STOCK
+            // =================================================
+
+            $item->stock = $nuevoStock;
+            $item->save();
+
+            // =================================================
+            // GUARDAR MOVIMIENTO
+            // =================================================
+
+            MovimientoInventario::create([
+                'team_id' => $teamId,
+
+                'item_type' => $itemType,
+
+                'item_id' => $item->id,
+
+                'tipo' => $tipo,
+
+                'cantidad' => $cantidad,
+
+                'stock_resultante' => $nuevoStock,
+
+                'motivo' => $validated['motivo'],
+
+                'user_id' => $user->id,
+
+                'observaciones' =>
+                    $validated['observaciones'] ?? null,
+            ]);
+
+            return redirect()
+                ->back()
+                ->with(
+                    'success',
+                    'Movimiento registrado correctamente.'
+                );
+        });
     }
 
-    public function resumen()
+    /**
+     * =========================================================
+     * EXPORTAR CARDEX
+     * =========================================================
+     */
+    public function export(Request $request)
     {
-        $teamId = auth()->user()->current_team_id;
+        $user = $request->user();
 
-        $totalEntradas = MovimientoInventario::where('team_id', $teamId)
-            ->where('tipo', 'entrada')
-            ->sum('cantidad');
+        if (!$user) {
+            abort(403);
+        }
 
-        $totalSalidas = MovimientoInventario::where('team_id', $teamId)
-            ->where('tipo', 'salida')
-            ->sum('cantidad');
+        $teamId = $user->current_team_id;
 
-        $resumenPorMotivo = MovimientoInventario::where('team_id', $teamId)
-            ->select('motivo', \DB::raw('count(*) as total'))
-            ->groupBy('motivo')
+        $movimientos = MovimientoInventario::query()
+            ->where('team_id', $teamId)
+            ->with([
+                'user:id,name',
+                'item',
+            ])
+            ->orderByDesc('created_at')
             ->get();
 
-        return response()->json([
-            'total_entradas' => $totalEntradas,
-            'total_salidas' => $totalSalidas,
-            'resumen_por_motivo' => $resumenPorMotivo,
-        ]);
+        return Excel::download(
+            new CardexExport($movimientos),
+            'cardex_' . now()->format('Y-m-d_His') . '.xlsx'
+        );
     }
 }

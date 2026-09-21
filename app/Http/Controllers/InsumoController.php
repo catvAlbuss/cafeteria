@@ -12,16 +12,28 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class InsumoController extends Controller
 {
+    /**
+     * Inventario operativo para Cocina y Bar.
+     */
     public function operativo(Request $request): Response
     {
         $user = $request->user();
-        $area = match (true) {
-            $user->hasRole('Bar') => 'bar',
-            $user->hasRole('Cocinero') => 'cocina',
-            default => null,
-        };
 
-        abort_unless($area, 403);
+        if (!$user) {
+            abort(403);
+        }
+
+        $area = null;
+
+        if ($user->hasRole('Bar')) {
+            $area = 'bar';
+        } elseif ($user->hasRole('Cocinero')) {
+            $area = 'cocina';
+        }
+
+        if ($area === null) {
+            abort(403);
+        }
 
         $insumos = Insumo::query()
             ->where('team_id', $user->current_team_id)
@@ -29,28 +41,41 @@ class InsumoController extends Controller
             ->where('activo', true)
             ->orderBy('nombre')
             ->get()
-            ->map(fn (Insumo $insumo) => [
-                'id' => $insumo->id,
-                'nombre' => $insumo->nombre,
-                'categoria' => $insumo->categoria,
-                'unidad' => $insumo->unidad,
-                'stock' => (float) $insumo->stock,
-                'stock_minimo' => (float) $insumo->stock_minimo,
-                'fecha_vencimiento' => $insumo->fecha_vencimiento?->toDateString(),
-            ]);
+            ->map(function (Insumo $insumo) {
+                return [
+                    'id' => $insumo->id,
+                    'nombre' => $insumo->nombre,
+                    'categoria' => $insumo->categoria,
+                    'unidad' => $insumo->unidad,
+                    'stock' => (float) $insumo->stock,
+                    'stock_minimo' => (float) $insumo->stock_minimo,
+                    'fecha_vencimiento' => $insumo->fecha_vencimiento
+                        ? $insumo->fecha_vencimiento->toDateString()
+                        : null,
+                ];
+            });
 
         return Inertia::render('inventario/operativo', [
             'insumos' => $insumos,
         ]);
     }
 
-    public function index()
+    /**
+     * Mostrar todos los insumos.
+     */
+    public function index(Request $request): Response
     {
-        $user = auth()->user();
+        $user = $request->user();
+
+        if (!$user) {
+            abort(403);
+        }
+
         $teamId = $user->current_team_id;
         $userRole = $user->roles->first()?->name;
 
-        $insumos = Insumo::where('team_id', $teamId)
+        $insumos = Insumo::query()
+            ->where('team_id', $teamId)
             ->orderBy('nombre')
             ->get();
 
@@ -60,9 +85,18 @@ class InsumoController extends Controller
         ]);
     }
 
+    /**
+     * Registrar nuevo insumo.
+     */
     public function store(Request $request)
     {
-        $teamId = auth()->user()->current_team_id;
+        $user = $request->user();
+
+        if (!$user) {
+            abort(403);
+        }
+
+        $teamId = $user->current_team_id;
 
         $validated = $request->validate([
             'nombre' => 'required|string|max:255',
@@ -76,37 +110,44 @@ class InsumoController extends Controller
             'proveedor' => 'nullable|string|max:255',
         ]);
 
+        $stockInicial = (float) ($validated['stock'] ?? 0);
+
         $insumo = Insumo::create([
             'team_id' => $teamId,
             'nombre' => $validated['nombre'],
             'categoria' => $validated['categoria'] ?? null,
             'area' => $validated['area'],
             'unidad' => $validated['unidad'],
-            'stock' => $validated['stock'] ?? 0,
-            'stock_minimo' => $validated['stock_minimo'] ?? 5,
+            'stock' => $stockInicial,
+            'stock_minimo' => (float) ($validated['stock_minimo'] ?? 5),
             'fecha_vencimiento' => $validated['fecha_vencimiento'] ?? null,
-            'precio' => $validated['precio'] ?? 0,
+            'precio' => (float) ($validated['precio'] ?? 0),
             'proveedor' => $validated['proveedor'] ?? null,
             'activo' => true,
         ]);
 
-        if (($validated['stock'] ?? 0) > 0) {
+        if ($stockInicial > 0) {
             MovimientoInventario::create([
                 'team_id' => $teamId,
                 'item_type' => 'insumo',
                 'item_id' => $insumo->id,
                 'tipo' => 'entrada',
-                'cantidad' => $validated['stock'],
-                'stock_resultante' => $validated['stock'],
+                'cantidad' => $stockInicial,
+                'stock_resultante' => $stockInicial,
                 'motivo' => 'compra',
-                'user_id' => auth()->id(),
+                'user_id' => $user->id,
                 'observaciones' => 'Stock inicial',
             ]);
         }
 
-        return redirect()->back()->with('success', 'Insumo creado correctamente');
+        return redirect()
+            ->back()
+            ->with('success', 'Insumo creado correctamente');
     }
 
+    /**
+     * Actualizar insumo.
+     */
     public function update(Request $request, Insumo $insumo)
     {
         $validated = $request->validate([
@@ -123,37 +164,57 @@ class InsumoController extends Controller
 
         $insumo->update($validated);
 
-        return redirect()->back()->with('success', 'Insumo actualizado correctamente');
+        return redirect()
+            ->back()
+            ->with('success', 'Insumo actualizado correctamente');
     }
 
+    /**
+     * Eliminar insumo.
+     */
     public function destroy(Insumo $insumo)
     {
-        $tieneMovimientos = MovimientoInventario::where('item_type', 'insumo')
+        $tieneMovimientos = MovimientoInventario::query()
+            ->where('item_type', 'insumo')
             ->where('item_id', $insumo->id)
             ->exists();
 
         if ($tieneMovimientos) {
-            return redirect()->back()->withErrors([
-                'insumo' => 'No se puede eliminar porque tiene movimientos en Cardex',
-            ]);
+            return redirect()
+                ->back()
+                ->withErrors([
+                    'insumo' => 'No se puede eliminar porque tiene movimientos en Cardex',
+                ]);
         }
 
         $insumo->delete();
 
-        return redirect()->back()->with('success', 'Insumo eliminado correctamente');
+        return redirect()
+            ->back()
+            ->with('success', 'Insumo eliminado correctamente');
     }
 
-    // Registrar compra (entrada de stock)
+    /**
+     * Registrar compra.
+     */
     public function comprar(Request $request, Insumo $insumo)
     {
-        $teamId = auth()->user()->current_team_id;
+        $user = $request->user();
+
+        if (!$user) {
+            abort(403);
+        }
+
+        $teamId = $user->current_team_id;
 
         $validated = $request->validate([
             'cantidad' => 'required|numeric|min:0.01',
             'observaciones' => 'nullable|string',
         ]);
 
-        $nuevoStock = $insumo->stock + $validated['cantidad'];
+        $cantidad = (float) $validated['cantidad'];
+        $stockActual = (float) $insumo->stock;
+        $nuevoStock = $stockActual + $cantidad;
 
         $insumo->stock = $nuevoStock;
         $insumo->save();
@@ -163,21 +224,31 @@ class InsumoController extends Controller
             'item_type' => 'insumo',
             'item_id' => $insumo->id,
             'tipo' => 'entrada',
-            'cantidad' => $validated['cantidad'],
+            'cantidad' => $cantidad,
             'stock_resultante' => $nuevoStock,
             'motivo' => 'compra',
             'referencia_type' => 'compra',
-            'user_id' => auth()->id(),
+            'user_id' => $user->id,
             'observaciones' => $validated['observaciones'] ?? 'Compra de insumo',
         ]);
 
-        return redirect()->back()->with('success', 'Compra registrada correctamente');
+        return redirect()
+            ->back()
+            ->with('success', 'Compra registrada correctamente');
     }
 
-    // Registrar merma de insumo (salida de stock)
+    /**
+     * Registrar merma.
+     */
     public function mermar(Request $request, Insumo $insumo)
     {
-        $teamId = auth()->user()->current_team_id;
+        $user = $request->user();
+
+        if (!$user) {
+            abort(403);
+        }
+
+        $teamId = $user->current_team_id;
 
         $validated = $request->validate([
             'cantidad' => 'required|numeric|min:0.01',
@@ -185,11 +256,17 @@ class InsumoController extends Controller
             'observaciones' => 'nullable|string',
         ]);
 
-        if ($insumo->stock < $validated['cantidad']) {
-            return redirect()->back()->with('error', 'Stock insuficiente para esta merma');
+        $cantidad = (float) $validated['cantidad'];
+        $stockActual = (float) $insumo->stock;
+
+        if ($stockActual < $cantidad) {
+            return redirect()
+                ->back()
+                ->with('error', 'Stock insuficiente para esta merma');
         }
 
-        $nuevoStock = $insumo->stock - $validated['cantidad'];
+        $nuevoStock = $stockActual - $cantidad;
+
         $insumo->stock = $nuevoStock;
         $insumo->save();
 
@@ -198,23 +275,41 @@ class InsumoController extends Controller
             'item_type' => 'insumo',
             'item_id' => $insumo->id,
             'tipo' => 'salida',
-            'cantidad' => $validated['cantidad'],
+            'cantidad' => $cantidad,
             'stock_resultante' => $nuevoStock,
             'motivo' => 'merma',
             'submotivo' => $validated['motivo'],
             'referencia_type' => 'merma',
-            'user_id' => auth()->id(),
+            'user_id' => $user->id,
             'observaciones' => $validated['observaciones'] ?? null,
         ]);
 
-        return redirect()->back()->with('success', 'Merma registrada correctamente');
+        return redirect()
+            ->back()
+            ->with('success', 'Merma registrada correctamente');
     }
 
+    /**
+     * Exportar insumos a Excel.
+     */
     public function export(Request $request)
     {
-        $teamId = auth()->user()->current_team_id;
-        $insumos = Insumo::where('team_id', $teamId)->orderBy('nombre')->get();
+        $user = $request->user();
 
-        return Excel::download(new InsumosExport($insumos), 'insumos_'.now()->format('Y-m-d_His').'.xlsx');
+        if (!$user) {
+            abort(403);
+        }
+
+        $teamId = $user->current_team_id;
+
+        $insumos = Insumo::query()
+            ->where('team_id', $teamId)
+            ->orderBy('nombre')
+            ->get();
+
+        return Excel::download(
+            new InsumosExport($insumos),
+            'insumos_' . now()->format('Y-m-d_His') . '.xlsx'
+        );
     }
 }
