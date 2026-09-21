@@ -235,7 +235,7 @@ export default function Produccion() {
     return (
         <>
             <Head title={areaActiva === 'bar' ? 'Bar' : 'Cocina'} />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto bg-neutral-50 p-4">
+<div className="min-h-screen bg-[#FBF7F0] p-4 md:p-6 space-y-4">
                 <section className="rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm">
                     <div className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center">
                         <div className="relative flex-1">

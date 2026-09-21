@@ -151,7 +151,21 @@ export default function Reportes() {
     const formatNumber = (num: number): string => {
         return num.toLocaleString('es-PE');
     };
+const exportarReporte = (formato: 'pdf' | 'excel') => {
+    const params = new URLSearchParams();
 
+    if (fechaInicio) {
+        params.set('fecha_inicio', fechaInicio);
+    }
+
+    if (fechaFin) {
+        params.set('fecha_fin', fechaFin);
+    }
+
+    params.set('formato', formato);
+
+    window.open(`/reportes/export?${params.toString()}`, '_blank');
+};
     const totalVentas = ventasDiarias.reduce((sum: number, v) => sum + v.ventas, 0);
     const totalGastos = ventasDiarias.reduce((sum: number, v) => sum + v.gastos, 0);
     const totalGanancia = ventasDiarias.reduce((sum: number, v) => sum + v.ganancia, 0);
@@ -298,8 +312,7 @@ export default function Reportes() {
     return (
         <>
             <Head title="Reportes - Dolce Cafe" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-3xl p-6 bg-[#FBF3E7]">
-
+<div className="min-h-screen bg-[#FBF7F0] p-4 md:p-6 space-y-4">
                 {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
@@ -309,14 +322,20 @@ export default function Reportes() {
                         <p className="text-[#5A3D2B] text-sm mt-1 ml-1">Análisis de ventas, clientes y rendimiento</p>
                     </div>
                     <div className="flex flex-wrap gap-3">
-                        <button className="inline-flex items-center gap-2 bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm hover:shadow-lg active:scale-95">
-                            <Printer className="w-4 h-4" />
-                            Generar PDF
-                        </button>
-                        <button className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm hover:shadow-lg active:scale-95">
-                            <FileSpreadsheet className="w-4 h-4" />
-                            Exportar Excel
-                        </button>
+                       <button
+    onClick={() => exportarReporte('pdf')}
+    className="inline-flex items-center gap-2 bg-[#2D1B1A] hover:bg-[#1A0F0E] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm hover:shadow-lg active:scale-95"
+>
+    <Printer className="w-4 h-4" />
+    Generar PDF
+</button>
+                      <button
+    onClick={() => exportarReporte('excel')}
+    className="inline-flex items-center gap-2 bg-[#C9A96E] hover:bg-[#B8975D] text-white px-5 py-2.5 rounded-xl shadow-md transition font-semibold text-sm hover:shadow-lg active:scale-95"
+>
+    <FileSpreadsheet className="w-4 h-4" />
+    Exportar Excel
+</button>
                     </div>
                 </div>
 

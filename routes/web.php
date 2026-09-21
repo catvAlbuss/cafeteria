@@ -58,9 +58,16 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/contador/cerrar/{id}', [ContadorController::class, 'cerrar'])->middleware('can:manage-cash-session')->name('contador.cerrar');
     Route::post('/contador/movimientos', [MovimientoCajaController::class, 'store'])->middleware('cash.session')->name('contador.movimientos.store');
     Route::delete('/contador/{id}', [ContadorController::class, 'destroy'])->name('contador.destroy');
-    // Reportes
+// Reportes
 
-    Route::get('/reportes', [ReporteController::class, 'index'])->middleware('can:ver reportes')->name('reportes.index');
+Route::get('/reportes', [ReporteController::class, 'index'])
+    ->middleware('can:ver reportes')
+    ->name('reportes.index');
+
+Route::get('/reportes/export', [ReporteController::class, 'export'])
+    ->middleware('can:ver reportes')
+    ->name('reportes.export');
+
 
     // ----------------------------
     //  RESTAURANTE
