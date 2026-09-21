@@ -35,18 +35,26 @@ import type { NavItem } from '@/types';
 
 export function AppSidebar() {
     const page = usePage();
+
     const dashboardUrl = '/dashboard';
     const permissions = page.props.auth?.permissions ?? [];
-const roles = page.props.auth?.roles ?? [];
+    const roles = page.props.auth?.roles ?? [];
 
     const currentTeam = page.props.currentTeam;
-    const canManageTeams = roles.includes('Gerente') || ['owner', 'admin'].includes(currentTeam?.role ?? '');
-    const canManageCashSession = roles.includes('Gerente') || roles.includes('Cajero') || ['owner', 'admin'].includes(currentTeam?.role ?? '');
-    const isProductionOperator = roles.includes('Cocinero') || roles.includes('Bar');
 
-    //  TODAS LAS PÁGINAS (se filtran según el permiso de "ver" de cada rol)
+    const canManageTeams =
+        roles.includes('Gerente') ||
+        ['owner', 'admin'].includes(currentTeam?.role ?? '');
+
+    const canManageCashSession =
+        roles.includes('Gerente') ||
+        roles.includes('Cajero') ||
+        ['owner', 'admin'].includes(currentTeam?.role ?? '');
+
+    const isProductionOperator =
+        roles.includes('Cocinero') || roles.includes('Bar');
+
     const allNavItems: NavItem[] = [
-        // DASHBOARD - siempre visible, sin permiso asociado
         {
             title: 'Inicio',
             href: '/dashboard',
@@ -76,8 +84,6 @@ const roles = page.props.auth?.roles ?? [];
             icon: Coins,
             permission: 'ver contador',
         },
-
-        //  RESTAURANTE - TÍTULO SEPARADOR
         {
             title: ' Platos',
             href: '/platos',
@@ -96,7 +102,6 @@ const roles = page.props.auth?.roles ?? [];
             icon: Ticket,
             permission: 'ver covers',
         },
-
         {
             title: 'Cocina',
             href: '/produccion?area=cocina',
@@ -127,7 +132,6 @@ const roles = page.props.auth?.roles ?? [];
             icon: Trash2,
             permission: 'ver mermas',
         },
-
         {
             title: 'Clientes',
             href: '/clientes',
@@ -142,9 +146,11 @@ const roles = page.props.auth?.roles ?? [];
         },
     ];
 
-    const mainNavItems: NavItem[] = allNavItems.filter((item) => item.href === '/contador'
-        ? canManageCashSession
-        : !item.permission || permissions.includes(item.permission));
+    const mainNavItems: NavItem[] = allNavItems.filter((item) =>
+        item.href === '/contador'
+            ? canManageCashSession
+            : !item.permission || permissions.includes(item.permission)
+    );
 
     if (isProductionOperator) {
         mainNavItems.push({
@@ -155,7 +161,10 @@ const roles = page.props.auth?.roles ?? [];
     }
 
     return (
-        <Sidebar collapsible="icon" variant="inset">
+        <Sidebar
+            collapsible="icon"
+            variant="sidebar"
+        >
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
@@ -166,6 +175,7 @@ const roles = page.props.auth?.roles ?? [];
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
+
                 {canManageTeams && (
                     <SidebarMenu>
                         <SidebarMenuItem>
