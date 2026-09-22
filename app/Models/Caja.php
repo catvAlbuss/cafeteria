@@ -39,6 +39,7 @@ class Caja extends Model
         'total_deliverys',
         'total_pedidos_mesa',
         'total_pedidos',
+        'contador_pedidos',
         'detalle_pedidos',
         'resumen_cierre',
     ];

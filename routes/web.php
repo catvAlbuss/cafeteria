@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CajaController;
 use App\Http\Controllers\CardexController;
+use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\ContadorController;
 use App\Http\Controllers\CoverController;
 use App\Http\Controllers\DashboardController;
@@ -46,6 +47,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/caja', [CajaController::class, 'index'])->middleware('can:ver caja')->name('caja');
     Route::post('/caja/registrar', [CajaController::class, 'registrar'])->middleware(['operating.hours', 'cash.session'])->name('caja.registrar');
+    Route::post('/caja/{pedido}/cancelar', [CajaController::class, 'cancelar'])->middleware(['cash.session'])->name('caja.cancelar');
     Route::get('/caja/estado', [CajaController::class, 'estado'])->name('caja.estado');
     Route::get('/ventas', [PedidoController::class, 'index'])->middleware('can:ver ventas')->name('ventas');
     Route::patch('/pedidos/{id}/marcar-listo', [PedidoController::class, 'marcarListo'])->middleware('cash.session')->name('pedidos.marcar-listo');
@@ -57,9 +59,16 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/contador/cerrar/{id}', [ContadorController::class, 'cerrar'])->middleware('can:manage-cash-session')->name('contador.cerrar');
     Route::post('/contador/movimientos', [MovimientoCajaController::class, 'store'])->middleware('cash.session')->name('contador.movimientos.store');
     Route::delete('/contador/{id}', [ContadorController::class, 'destroy'])->name('contador.destroy');
-    // Reportes
+// Reportes
 
-    Route::get('/reportes', [ReporteController::class, 'index'])->middleware('can:ver reportes')->name('reportes.index');
+Route::get('/reportes', [ReporteController::class, 'index'])
+    ->middleware('can:ver reportes')
+    ->name('reportes.index');
+
+Route::get('/reportes/export', [ReporteController::class, 'export'])
+    ->middleware('can:ver reportes')
+    ->name('reportes.export');
+
 
     // ----------------------------
     //  RESTAURANTE
@@ -97,7 +106,12 @@ Route::middleware(['auth'])->group(function () {
     // ----------------------------
     // 🧾 CLIENTES
     // ----------------------------
-    Route::get('/clientes', fn () => Inertia::render('clientes/clientes'))->middleware('can:ver clientes')->name('clientes');
+    Route::get('/clientes', [ClienteController::class, 'index'])->middleware('can:ver clientes')->name('clientes');
+    Route::get('/clientes/buscar', [ClienteController::class, 'buscarPorDocumento'])->name('clientes.buscar');
+    Route::post('/clientes', [ClienteController::class, 'store'])->middleware('cash.session')->name('clientes.store');
+    Route::patch('/clientes/configuracion', [ClienteController::class, 'updateConfiguracion'])->middleware('cash.session')->name('clientes.configuracion');
+    Route::patch('/clientes/{cliente}', [ClienteController::class, 'update'])->middleware('cash.session')->name('clientes.update');
+    Route::delete('/clientes/{cliente}', [ClienteController::class, 'destroy'])->middleware('cash.session')->name('clientes.destroy');
 
     Route::get('/delivery', [DeliveryController::class, 'index'])->middleware('can:ver delivery')->name('delivery');
     Route::post('/delivery', [DeliveryController::class, 'store'])->middleware(['operating.hours', 'cash.session'])->name('delivery.store');
@@ -150,7 +164,7 @@ Route::middleware(['auth'])->group(function () {
         ->except(['store'])
         ->middlewareFor(['update', 'destroy'], 'cash.session');
     Route::post('/pedidos', [PedidoController::class, 'store'])->middleware(['operating.hours', 'cash.session'])->name('pedidos.store');
-     // EMITIR COMPROBANTE ELECTRÓNICO (SUNAT)   ← AGREGAR ESTO
+    // EMITIR COMPROBANTE ELECTRÓNICO (SUNAT)   ← AGREGAR ESTO
     Route::post('/pedidos/emitir-comprobante', [PedidoController::class, 'emitirComprobante'])
         ->name('pedidos.emitir-comprobante');
     // ----------------------------
@@ -159,7 +173,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('invitations/{invitation}/accept', [TeamInvitationController::class, 'accept'])->name('invitations.accept');
     Route::delete('invitations/{invitation}', [TeamInvitationController::class, 'decline'])->name('invitations.decline');
 
-        // ============================================================
+    // ============================================================
     //  FACTURACIÓN ELECTRÓNICA (SUNAT)
     // ============================================================
     Route::prefix('facturacion')->group(function () {

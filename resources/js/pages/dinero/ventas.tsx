@@ -218,9 +218,9 @@ export default function Ventas() {
     // ============================================================
     // FUNCIONES DE CARRITO
     // ============================================================
-    const totalCarrito = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-    const igvCarrito = totalCarrito * 0.18;
-    const totalConIgv = totalCarrito + igvCarrito;
+    const totalConIgv = carrito.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+    const subtotalCarrito = Math.round((totalConIgv / 1.18) * 100) / 100;
+    const igvCarrito = Math.round((totalConIgv - subtotalCarrito) * 100) / 100;
     const agregarProducto = (producto: Producto) => {
         if (!producto.disponible) {
             toast.warning('Este producto no está disponible');
@@ -326,7 +326,7 @@ export default function Ventas() {
             mesa_id: mesaInfo.id, // ✅ Ya no puede ser null gracias a la validación
             cliente: 'Anónimo',
             productos: productosConCategoria,
-            subtotal: totalCarrito,
+            subtotal: subtotalCarrito,
             igv: igvCarrito,
             total: totalConIgv,
             area: areaDetectada,
@@ -335,13 +335,7 @@ export default function Ventas() {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Pedido enviado a cocina', {
-
-
-                    description: `Mesa: ${mesaInfo.numero} · Mesero: ${mesaInfo.mesero || 'No asignado'} · Total: S/ ${totalCarrito.toFixed(2)} · Área: ${areaDetectada}`,
-
-
                     description: `Mesa: ${mesaInfo?.numero || 'No asignada'} · Mesero: ${mesaInfo?.mesero || 'No asignado'} · Total: S/ ${totalConIgv.toFixed(2)} · Área: ${areaDetectada}`,
-
                     duration: 5000,
                     style: {
                         background: '#2D1B1A',
@@ -373,8 +367,7 @@ export default function Ventas() {
     return (
         <>
             <Head title="Ventas" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-3 sm:p-4 bg-[#FBF7F0]">
-
+<div className="min-h-screen bg-[#FBF7F0] p-4 md:p-6 space-y-4">
                 {/* Información de la mesa */}
                 {mesaInfo && carrito.length === 0 && pedidosActivos.length === 0 && (
                     <div className="relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-black/5">
@@ -583,7 +576,7 @@ export default function Ventas() {
                             <div className="mt-4 pt-4 border-t border-black/5 space-y-1">
                                 <div className="flex justify-between text-sm text-gray-500">
                                     <span>Subtotal</span>
-                                    <span>S/ {totalCarrito.toFixed(2)}</span>
+                                    <span>S/ {subtotalCarrito.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm text-gray-500">
                                     <span>IGV (18%)</span>

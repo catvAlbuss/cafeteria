@@ -41,12 +41,12 @@ test('a mixed waiter order is split and broadcast to kitchen and bar', function 
         ->and($orders->keys()->all())->toEqualCanonicalizing(['cocina', 'bar'])
         ->and($orders['cocina']->productos)->toHaveCount(1)
         ->and($orders['bar']->productos)->toHaveCount(1)
-        ->and((float) $orders['cocina']->subtotal)->toBe(25.0)
-        ->and((float) $orders['bar']->subtotal)->toBe(15.0)
-        ->and((float) $orders['cocina']->igv)->toBe(4.5)
-        ->and((float) $orders['bar']->igv)->toBe(2.7)
-        ->and((float) $orders['cocina']->total)->toBe(29.5)
-        ->and((float) $orders['bar']->total)->toBe(17.7);
+        ->and((float) $orders['cocina']->subtotal)->toBe(21.19)
+        ->and((float) $orders['bar']->subtotal)->toBe(12.71)
+        ->and((float) $orders['cocina']->igv)->toBe(3.81)
+        ->and((float) $orders['bar']->igv)->toBe(2.29)
+        ->and((float) $orders['cocina']->total)->toBe(25.0)
+        ->and((float) $orders['bar']->total)->toBe(15.0);
 
     Event::assertDispatchedTimes(PedidoCreado::class, 2);
     Event::assertDispatched(PedidoCreado::class, fn (PedidoCreado $event) => $event->pedido->area === 'cocina');

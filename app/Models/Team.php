@@ -26,7 +26,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Membership> $memberships
  * @property-read Collection<int, User> $members
  */
-#[Fillable(['name', 'slug', 'is_personal'])]
+#[Fillable(['name', 'slug', 'is_personal', 'clientes_min_compras'])]
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -104,6 +104,7 @@ class Team extends Model
     {
         return [
             'is_personal' => 'boolean',
+            'clientes_min_compras' => 'integer',
         ];
     }
 

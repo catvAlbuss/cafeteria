@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\PedidoActualizado;
 use App\Models\Caja;
 use App\Models\Mesa;
+use App\Models\MovimientoInventario;
 use App\Models\Pedido;
 use App\Models\Plato;
 use Illuminate\Http\Request;
@@ -29,10 +31,16 @@ class CajaController extends Controller
             ->get()
             ->values();
 
+        $caja = Caja::query()
+            ->where('team_id', $teamId)
+            ->where('estado', 'Abierta')
+            ->first();
+
         return Inertia::render('dinero/caja', [
             'platos' => $platos,
             'mesas' => $mesas->values()->all(),
             'pedidos' => $pedidos->values()->all(),
+            'caja' => $caja,
         ]);
     }
 
@@ -42,7 +50,7 @@ class CajaController extends Controller
             'cliente' => 'nullable|string|max:100',
             'mesa' => 'nullable|string|max:50',
             'tipo' => 'required|in:salon,llevar,delivery',
-            'metodoPago' => 'nullable|in:efectivo,tarjeta,yape', 
+            'metodoPago' => 'nullable|in:efectivo,tarjeta,yape',
             'productos' => 'required|array|min:1',
             'productos.*.id' => 'required|integer',
             'productos.*.nombre' => 'required|string',
@@ -61,9 +69,21 @@ class CajaController extends Controller
         }
         DB::beginTransaction();
         try {
+            // Bloquear la caja para garantizar una secuencia de numero_pedido sin colisiones
+            $caja = Caja::query()->whereKey($caja->id)->lockForUpdate()->first();
+
+            if (! $caja) {
+                DB::rollBack();
+
+                return redirect()->back()->with('error', 'No hay caja abierta. Debes abrir caja primero.');
+            }
+
+            $caja->contador_pedidos = (int) $caja->contador_pedidos + 1;
+
             // Crear el pedido
             $pedido = Pedido::create([
                 'numero' => Pedido::generarNumero(),
+                'numero_pedido' => $caja->contador_pedidos,
                 'cliente' => $validated['cliente'],
                 'mesa' => $validated['mesa'],
                 'tipo' => $validated['tipo'],
@@ -83,17 +103,43 @@ class CajaController extends Controller
             $caja->total_ventas_caja = $caja->total_ventas_caja + $validated['total'];
             $caja->total_pedidos = $caja->total_pedidos + 1;
             $caja->save();
-            // Actualizar stock
+            // Actualizar stock + cardex
             foreach ($validated['productos'] as $producto) {
-                Plato::where('id', $producto['id'])->decrement('stock', $producto['cantidad']);
+                $plato = Plato::lockForUpdate()
+                    ->where('id', $producto['id'])
+                    ->first();
+
+                if (! $plato) {
+                    continue;
+                }
+
+                $plato->stock -= $producto['cantidad'];
+                $plato->save();
+
+                MovimientoInventario::create([
+                    'team_id' => $request->user()->current_team_id,
+                    'item_type' => 'plato',
+                    'item_id' => $plato->id,
+                    'tipo' => 'salida',
+                    'cantidad' => $producto['cantidad'],
+                    'stock_resultante' => $plato->stock,
+                    'motivo' => 'venta',
+                    'referencia_type' => 'pedido',
+                    'referencia_id' => $pedido->id,
+                    'user_id' => $request->user()->id,
+                    'observaciones' => 'Venta #'.$pedido->numero,
+                ]);
             }
+
+            $pedido->stock_descontado = true;
+            $pedido->save();
 
             DB::commit();
 
-              return redirect()->back()->with([
-            'success' => 'Pedido registrado correctamente.',
-            'pedido_id' => $pedido->id,  
-    ]);
+            return redirect()->back()->with([
+                'success' => 'Pedido registrado correctamente.',
+                'pedido_id' => $pedido->id,
+            ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -116,5 +162,82 @@ class CajaController extends Controller
             'abierta' => $caja !== null,
             'caja' => $caja,
         ]);
+    }
+
+    public function cancelar(Request $request, Pedido $pedido)
+    {
+        if ($pedido->team_id !== (int) $request->user()->current_team_id) {
+            abort(403, 'Este pedido no pertenece a tu sede.');
+        }
+
+        if (! $pedido->stock_descontado || $pedido->estado === 'cancelado') {
+            return response()->json(['success' => false, 'error' => 'Las existencias de esta venta ya fueron restauradas']);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $productos = is_string($pedido->productos)
+                ? json_decode($pedido->productos, true)
+                : ($pedido->productos ?? []);
+
+            foreach ((array) $productos as $producto) {
+                $plato = Plato::lockForUpdate()
+                    ->where('id', $producto['id'] ?? null)
+                    ->first();
+
+                if (! $plato) {
+                    continue;
+                }
+
+                $plato->stock += $producto['cantidad'];
+                $plato->save();
+
+                MovimientoInventario::create([
+                    'team_id' => $request->user()->current_team_id,
+                    'item_type' => 'plato',
+                    'item_id' => $plato->id,
+                    'tipo' => 'entrada',
+                    'cantidad' => $producto['cantidad'],
+                    'stock_resultante' => $plato->stock,
+                    'motivo' => 'ajuste',
+                    'referencia_type' => 'pedido',
+                    'referencia_id' => $pedido->id,
+                    'user_id' => $request->user()->id,
+                    'observaciones' => 'Anulación de venta #'.$pedido->numero,
+                ]);
+            }
+
+            $pedido->estado = 'cancelado';
+            $pedido->stock_descontado = false;
+            $pedido->save();
+
+            $caja = Caja::query()
+                ->where('id', $pedido->caja_id)
+                ->where('estado', 'Abierta')
+                ->first();
+
+            if ($caja) {
+                $caja->total_ventas_caja = max(0, (float) $caja->total_ventas_caja - (float) $pedido->total);
+                $caja->total_pedidos = max(0, (int) $caja->total_pedidos - 1);
+                $caja->save();
+            }
+
+            DB::commit();
+
+            broadcast(new PedidoActualizado($pedido));
+
+            return response()->json(['success' => true, 'message' => 'Venta cancelada; el stock fue restaurado']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            \Log::error('? Error al anular venta:', [
+                'mensaje' => $e->getMessage(),
+                'linea' => $e->getLine(),
+                'archivo' => $e->getFile(),
+            ]);
+
+            return response()->json(['success' => false, 'error' => 'Error al anular la venta: '.$e->getMessage()], 500);
+        }
     }
 }

@@ -54,7 +54,7 @@ test('CajaController registrar stores subtotal and IGV on the Pedido', function 
         ->and((float) $pedido->total)->toBe($total);
 });
 
-test('PedidoController store persists subtotal and IGV on the Pedido', function () {
+test('PedidoController store persists base, IGV and charged total on the Pedido', function () {
     $user = igvUser();
     Event::fake([PedidoCreado::class]);
 
@@ -63,22 +63,24 @@ test('PedidoController store persists subtotal and IGV on the Pedido', function 
         'productos' => [
             ['id' => 1, 'nombre' => 'Café Americano', 'categoria' => 'Bebidas', 'cantidad' => 2, 'precio' => 50, 'subtotal' => 100],
         ],
-        'subtotal' => 100,
-        'igv' => 18,
-        'total' => 118,
+        'subtotal' => 84.75,
+        'igv' => 15.25,
+        'total' => 100,
     ])->assertSessionHasNoErrors();
 
     $pedido = Pedido::query()->where('cliente', 'Mesa IGV Test')->first();
     expect($pedido)->not->toBeNull()
-        ->and((float) $pedido->subtotal)->toBe(100.0)
-        ->and((float) $pedido->igv)->toBe(18.0)
-        ->and((float) $pedido->total)->toBe(118.0);
+        ->and((float) $pedido->subtotal)->toBe(84.75)
+        ->and((float) $pedido->igv)->toBe(15.25)
+        ->and((float) $pedido->total)->toBe(100.0);
 });
 
-test('IGV rate is consistently 18 percent', function () {
-    $subtotal = 250.00;
-    $expectedIgv = $subtotal * 0.18;
+test('IGV is always derived from the charged total (subtotal + IGV = total)', function () {
+    $montoCargo = 100.00;
+    $subtotal = round($montoCargo / 1.18, 2);
+    $igv = round($montoCargo - $subtotal, 2);
 
-    expect(round($expectedIgv, 2))->toBe(45.00)
-        ->and(round($subtotal + $expectedIgv, 2))->toBe(295.00);
+    expect($subtotal)->toBe(84.75)
+        ->and($igv)->toBe(15.25)
+        ->and(round($subtotal + $igv, 2))->toBe($montoCargo);
 });

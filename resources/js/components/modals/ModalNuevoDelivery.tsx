@@ -69,10 +69,11 @@ export default function ModalDelivery({ isOpen, onClose, onSuccess }: ModalDeliv
         { id: 8, nombre: 'Café Latte', precio: 12.00 },
     ];
 
-    // Calcular totales
-    const subtotal = productos.reduce((sum, p) => sum + p.subtotal, 0);
-    const igv = subtotal * 0.18;
-    const total = subtotal + igv;
+    // Calcular totales (el precio del producto ya incluye IGV)
+    const montoTotal = productos.reduce((sum, p) => sum + p.subtotal, 0);
+    const subtotal = Math.round((montoTotal / 1.18) * 100) / 100;
+    const igv = Math.round((montoTotal - subtotal) * 100) / 100;
+    const total = Math.round(montoTotal * 100) / 100;
 
     // Agregar producto
     const agregarProducto = (producto: any) => {
