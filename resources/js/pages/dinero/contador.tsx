@@ -238,8 +238,7 @@ setFormCierre({ montoFinal: '', observaciones: '' });        setModalCierreAbier
     return (
         <>
             <Head title="Turno de caja - Dolce Cafe" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-3xl bg-[#FBF3E7] p-6">
-
+<div className="min-h-screen bg-[#FBF7F0] p-4 md:p-6 space-y-4">
                 <div className="flex justify-end">
                     <div className="flex flex-wrap gap-3">
                         {!cajaActiva ? puedeAbrir && (

@@ -334,11 +334,9 @@ export default function Ventas() {
         }, {
             preserveScroll: true,
             onSuccess: () => {
+<<<<<<< HEAD
                 toast.success('Pedido enviado a cocina', {
-
-
                     description: `Mesa: ${mesaInfo?.numero || 'No asignada'} · Mesero: ${mesaInfo?.mesero || 'No asignado'} · Total: S/ ${totalConIgv.toFixed(2)} · Área: ${areaDetectada}`,
-
                     duration: 5000,
                     style: {
                         background: '#2D1B1A',
@@ -370,8 +368,7 @@ export default function Ventas() {
     return (
         <>
             <Head title="Ventas" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-3 sm:p-4 bg-[#FBF7F0]">
-
+<div className="min-h-screen bg-[#FBF7F0] p-4 md:p-6 space-y-4">
                 {/* Información de la mesa */}
                 {mesaInfo && carrito.length === 0 && pedidosActivos.length === 0 && (
                     <div className="relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-black/5">
