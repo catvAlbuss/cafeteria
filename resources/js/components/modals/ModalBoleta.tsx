@@ -235,7 +235,16 @@ export default function ModalBoleta({
                     onSuccess();
                 }, 1500);
             } else {
-                toast.error(response.error || 'Error al emitir comprobante');
+                // Mostrar el error de SUNAT con más detalle
+                toast.error('SUNAT rechazó el comprobante', {
+                    description: response.error || 'Error desconocido',
+                    duration: 10000,
+                    style: {
+                        background: '#FEE2E2',
+                        color: '#991B1B',
+                        border: '1px solid #FCA5A5',
+                    },
+                });
             }
         } catch (error: any) {
             const errorMsg =

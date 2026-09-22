@@ -12,10 +12,12 @@ use App\Http\Controllers\InsumoController;
 use App\Http\Controllers\MermaController;
 use App\Http\Controllers\MesaController;
 use App\Http\Controllers\MovimientoCajaController;
+use App\Http\Controllers\NotaCreditoController;
 use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\PinController;
 use App\Http\Controllers\PlatoController;
 use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\ResumenController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
@@ -27,7 +29,6 @@ use Inertia\Inertia;
 
 Route::inertia('/', 'auth/login')->name('home');
 
-// 🔐 RUTAS CON AUTENTICACIÓN
 Route::middleware(['auth'])->group(function () {
 
     // ----------------------------
@@ -58,16 +59,15 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/contador/cerrar/{id}', [ContadorController::class, 'cerrar'])->middleware('can:manage-cash-session')->name('contador.cerrar');
     Route::post('/contador/movimientos', [MovimientoCajaController::class, 'store'])->middleware('cash.session')->name('contador.movimientos.store');
     Route::delete('/contador/{id}', [ContadorController::class, 'destroy'])->name('contador.destroy');
-// Reportes
+    // Reportes
 
-Route::get('/reportes', [ReporteController::class, 'index'])
-    ->middleware('can:ver reportes')
-    ->name('reportes.index');
+    Route::get('/reportes', [ReporteController::class, 'index'])
+        ->middleware('can:ver reportes')
+        ->name('reportes.index');
 
-Route::get('/reportes/export', [ReporteController::class, 'export'])
-    ->middleware('can:ver reportes')
-    ->name('reportes.export');
-
+    Route::get('/reportes/export', [ReporteController::class, 'export'])
+        ->middleware('can:ver reportes')
+        ->name('reportes.export');
 
     // ----------------------------
     //  RESTAURANTE
@@ -184,6 +184,21 @@ Route::get('/reportes/export', [ReporteController::class, 'export'])
         Route::get('pdf/{filename}', [FacturaController::class, 'downloadPdf'])->name('factura.pdf');
         Route::get('xml/{filename}', [FacturaController::class, 'downloadXml'])->name('factura.xml');
         Route::get('cdr/{filename}', [FacturaController::class, 'downloadCdr'])->name('factura.cdr');
+    });
+    Route::prefix('sunat/resumen')->group(function () {
+        Route::post('enviar', [ResumenController::class, 'enviar'])->name('sunat.resumen.enviar');
+        Route::get('xml/{filename}', [ResumenController::class, 'downloadXml'])->name('sunat.resumen.xml');
+        Route::get('cdr/{filename}', [ResumenController::class, 'downloadCdr'])->name('sunat.resumen.cdr');
+        Route::post('consultar-cdr', [ResumenController::class, 'consultarCdr'])->name('sunat.resumen.consultar');
+    });
+    // ============================================================
+    // NOTAS DE CRÉDITO (SUNAT)
+    // ============================================================
+    Route::prefix('sunat/nota-credito')->group(function () {
+        Route::post('emitir', [NotaCreditoController::class, 'emitir'])->name('sunat.nota-credito.emitir');
+        Route::get('xml/{filename}', [NotaCreditoController::class, 'downloadXml'])->name('sunat.nota-credito.xml');
+        Route::get('cdr/{filename}', [NotaCreditoController::class, 'downloadCdr'])->name('sunat.nota-credito.cdr');
+        Route::get('pdf/{filename}', [NotaCreditoController::class, 'downloadPdf'])->name('sunat.nota-credito.pdf');
     });
 
 });

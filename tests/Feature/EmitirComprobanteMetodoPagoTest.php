@@ -51,10 +51,6 @@ test('emitir comprobante de una venta directa persiste el metodo_pago en el pedi
     ]);
 
     $this->mock(FacturaController::class, function ($mock) {
-        $mock->shouldReceive('nuevoCorrelativo')
-            ->once()
-            ->andReturn(response()->json(['correlativo' => 1]));
-
         $mock->shouldReceive('generateInvoice')
             ->once()
             ->andReturn(response()->json([
@@ -72,7 +68,7 @@ test('emitir comprobante de una venta directa persiste el metodo_pago en el pedi
         'pedido_ids' => [$pedido->id],
         'tipo_documento' => '03',
         'documento' => '00000000',
-        'nombre' => '',
+        'nombre' => 'Venta Directa',
         'direccion' => '-',
         'metodo_pago' => 'tarjeta',
         'authorization_pin' => '0000',

@@ -1,7 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState, useEffect, useMemo } from 'react';
 import ModalBoleta from '@/components/modals/ModalBoleta';
-
 import { useSedeChannel } from '@/hooks/useSedeChannel';
 import {
     Search,
@@ -96,7 +95,6 @@ const ProductImage = ({
     className?: string;
 }) => {
     const [hasError, setHasError] = useState(false);
-
 
     if (!src || hasError) {
         return (
@@ -274,7 +272,6 @@ export default function Caja() {
         }
     }, [platos]);
 
-    //  Estado del carrito
     const [carrito, setCarrito] = useState<ItemCarrito[]>(() => {
         const saved = localStorage.getItem('carritoCaja');
         return saved ? JSON.parse(saved) : [];
@@ -287,11 +284,9 @@ export default function Caja() {
     const [tipoPedido, setTipoPedido] = useState('llevar');
     const [datosBoleta, setDatosBoleta] = useState<any>(null);
     const [modalBoletaAbierto, setModalBoletaAbierto] = useState(false);
-
     const [busquedaSalon, setBusquedaSalon] = useState('');
     const [visibles, setVisibles] = useState(10);
 
-    // Sincronizar mesas/pedidos cuando llegan nuevas props
     useEffect(() => {
         setMesasLista(toArray<MesaSalon>(mesas));
         setPedidosLista(toArray<PedidoSalon>(pedidos));
@@ -455,7 +450,6 @@ export default function Caja() {
         return true;
     });
 
-    // Iconos por categoría
     const getIconoCategoria = (categoria: string) => {
         const icons: Record<string, any> = {
             'Todos': LayoutGrid,
@@ -468,7 +462,6 @@ export default function Caja() {
         return icons[categoria] || CoffeeIcon;
     };
 
-    // Agregar producto
     const agregarProducto = (producto: Producto) => {
         if (!producto.disponible) {
             toast.warning('Este producto no está disponible');
@@ -528,7 +521,6 @@ export default function Caja() {
     const igv = Math.round((bruto - subtotal) * 100) / 100;
     const total = Math.round(bruto * 100) / 100;
 
-    // Limpiar carrito
     const limpiarCarrito = () => {
         setCarrito([]);
         setCliente('');

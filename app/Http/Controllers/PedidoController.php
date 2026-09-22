@@ -13,7 +13,6 @@ use App\Models\Mesa;
 use App\Models\Pedido;
 use App\Models\Plato;
 use App\Models\User;
-use App\Services\ClienteService;
 use App\Services\ProductionAreaClassifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,10 +21,7 @@ use Inertia\Inertia;
 
 class PedidoController extends Controller
 {
-    public function __construct(
-        private readonly ProductionAreaClassifier $productionAreaClassifier,
-        private readonly ClienteService $clienteService,
-    ) {}
+    public function __construct(private readonly ProductionAreaClassifier $productionAreaClassifier) {}
 
     public function index(Request $request)
     {
@@ -660,7 +656,7 @@ class PedidoController extends Controller
             'pedido_ids.*' => 'exists:pedidos,id',
             'tipo_documento' => 'required|in:01,03',
             'documento' => 'required|string|max:11',
-            'nombre' => 'nullable|string|max:255',
+            'nombre' => 'required|string|max:255',
             'direccion' => 'nullable|string|max:255',
             // Datos opcionales para cobrar la mesa
             'mesa_id' => 'nullable|exists:mesas,id',
@@ -747,30 +743,25 @@ class PedidoController extends Controller
                 }
             }
 
-            // 4. Crear instancia del FacturaController
+            // 4. Crear instancia del FacturaController (vía contenedor para poder simularlo en pruebas)
             $facturaController = app(FacturaController::class);
 
             // 5. Determinar serie según tipo de documento
+            // 5. Determinar serie según tipo de documento
             $serie = $validated['tipo_documento'] === '01' ? 'F001' : 'B001';
 
-            // 6. Obtener el correlativo actual (según la serie)
-            $correlativoResponse = $facturaController->nuevoCorrelativo(
-                new Request(['serie' => $serie])
-            );
-            $correlativoData = json_decode($correlativoResponse->getContent(), true);
-            $correlativo = $correlativoData['correlativo'] ?? 1;
+            // 6. El correlativo se calcula DENTRO del FacturaController (con lockForUpdate)
 
             // 7. Construir el payload para el FacturaController
             $payload = [
                 'serie' => $serie,
-                'correlativo' => $correlativo,
                 'tipo_documento' => $validated['tipo_documento'],
                 'incluidoigv' => true,
                 'client' => [
                     'ruc' => $validated['tipo_documento'] === '01' ? $validated['documento'] : null,
                     'dni' => $validated['tipo_documento'] === '03' ? $validated['documento'] : null,
-                    'razon_social' => $validated['tipo_documento'] === '01' ? ($validated['nombre'] ?? null) : null,
-                    'nombres' => $validated['tipo_documento'] === '03' ? 'CLIENTES VARIOS' : null,
+                    'razon_social' => $validated['tipo_documento'] === '01' ? $validated['nombre'] : null,
+                    'nombres' => $validated['tipo_documento'] === '03' ? $validated['nombre'] : null,
                     'direccion' => $validated['direccion'] ?? '-',
                     'ubigeo' => '150101',
                     'departamento' => 'LIMA',
@@ -792,26 +783,28 @@ class PedidoController extends Controller
             // 9. Guardar la respuesta en los pedidos
             if ($resultado['success'] ?? false) {
                 foreach ($pedidos as $pedido) {
-                    $pedido->tipo_documento = $validated['tipo_documento'];
-                    $pedido->documento_cliente = $validated['documento'];
-                    $pedido->nombre_cliente = 'CLIENTES VARIOS';
-                    $pedido->metodo_pago = $validated['metodo_pago']; // Persistir el método elegido en el modal
                     $pedido->factura_estado = 'aceptado';
                     $pedido->factura_numero = $resultado['file'] ?? null;
                     $pedido->factura_pdf_url = $resultado['pdf_url'] ?? null;
                     $pedido->factura_xml_url = $resultado['xml_url'] ?? null;
                     $pedido->factura_cdr_url = $resultado['cdr_url'] ?? null;
                     $pedido->factura_respuesta = $resultado['message'] ?? 'Aceptado';
+                    $pedido->error_sunat = null;
+                    $pedido->metodo_pago = $validated['metodo_pago'];
+                    $pedido->save();
+                }
+            } else {
+                // SUNAT rechazó el comprobante
+                $errorMessage = $resultado['error'] ?? 'Error desconocido';
+
+                foreach ($pedidos as $pedido) {
+                    $pedido->factura_estado = 'rechazado';
+                    $pedido->factura_respuesta = $errorMessage;
+                    $pedido->error_sunat = $errorMessage;
                     $pedido->save();
                 }
 
-                // 10. Identificar/actualizar al cliente a partir del comprobante
-                $this->clienteService->sincronizarDesdeVenta(
-                    (int) auth()->user()->current_team_id,
-                    $validated['tipo_documento'],
-                    $validated['documento'],
-                    $validated['nombre'] ?? null,
-                );
+                \Log::error('SUNAT rechazó el comprobante: '.$errorMessage);
             }
 
             DB::commit();

@@ -16,6 +16,7 @@ use Greenter\Model\Sale\Legend;
 use Greenter\Model\Sale\SaleDetail;
 use Greenter\See;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -30,13 +31,58 @@ class FacturaController extends Controller
         $this->see->setService(env('SUNAT_URL'));
     }
 
+    private function reservarCorrelativoYCrearFactura(string $serie, Request $request): Factura
+    {
+        return DB::transaction(function () use ($serie, $request) {
+            $control = DB::table('correlativos_control')
+                ->where('serie', $serie)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $control) {
+                DB::table('correlativos_control')->insert([
+                    'serie' => $serie,
+                    'ultimo_correlativo' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $control = DB::table('correlativos_control')
+                    ->where('serie', $serie)
+                    ->lockForUpdate()
+                    ->first();
+            }
+
+            $nuevoCorrelativo = $control->ultimo_correlativo + 1;
+
+            DB::table('correlativos_control')
+                ->where('serie', $serie)
+                ->update([
+                    'ultimo_correlativo' => $nuevoCorrelativo,
+                    'updated_at' => now(),
+                ]);
+
+            $factura = new Factura;
+            $factura->serie = $serie;
+            $factura->correlativo = $nuevoCorrelativo;
+            $factura->vendedor = $request->input('vendedor.nombre');
+            $factura->fecha_emitido = now();
+            $factura->Cliente = $request->input('client.razon_social') ?? $request->input('client.nombres');
+            $factura->documento = $request->input('client.ruc') ?? $request->input('client.dni') ?? '00000000';
+            $factura->estado_sunat = 'procesando';
+            $factura->montototal = 0;
+            $factura->save();
+
+            return $factura;
+        });
+    }
+
     public function generateInvoice(Request $request)
     {
         try {
             // Validación de datos requeridos
             $request->validate([
                 'serie' => 'required|string',
-                'correlativo' => 'required|integer',
+
                 'tipo_documento' => 'required|in:01,03',
                 'incluidoigv' => 'boolean',
                 'client' => 'required|array',
@@ -88,13 +134,20 @@ class FacturaController extends Controller
                 ->setUrbanizacion('-')
                 ->setDireccion($request->input('client.direccion')));
 
+            // ============================================================
+            // GENERAR CORRELATIVO DENTRO DE UNA TRANSACCIÓN
+            // ============================================================
+            $serie = $request->input('serie');
+            $factura = $this->reservarCorrelativoYCrearFactura($serie, $request);
+            $correlativo = $factura->correlativo;
+
             // Crear factura/boleta
             $invoice = (new Invoice)
                 ->setUblVersion('2.1')
                 ->setTipoOperacion('0101')
                 ->setTipoDoc($request->input('tipo_documento'))
-                ->setSerie($request->input('serie'))
-                ->setCorrelativo($request->input('correlativo'))
+                ->setSerie($serie)
+                ->setCorrelativo($correlativo)
                 ->setFechaEmision(new \DateTime)
                 ->setFormaPago(new FormaPagoContado)
                 ->setTipoMoneda('PEN')
@@ -112,10 +165,9 @@ class FacturaController extends Controller
                 $cantidad = floatval($item['quantity']);
 
                 if ($incluidoIgv) {
-                    $mtoPrecio = round($precioUnitario * $cantidad, 2);
-                    $valorVenta = round($mtoPrecio / 1.18, 2);
-                    $igv = round($mtoPrecio - $valorVenta, 2);
-                    $valorUnitario = round($valorVenta / $cantidad, 2);
+                    $valorUnitario = round($precioUnitario / 1.18, 2);
+                    $valorVenta = round($valorUnitario * $cantidad, 2);
+                    $igv = round($valorVenta * 0.18, 2);
                     $precioUnitarioFinal = $precioUnitario;
                 } else {
                     $valorUnitario = $precioUnitario;
@@ -159,16 +211,19 @@ class FacturaController extends Controller
                         ->setValue($this->numberToWords($totalVenta)),
                 ]);
 
-            // Enviar a SUNAT
             $result = $this->see->send($invoice);
 
             if ($result->isSuccess()) {
                 $cdr = $result->getCdrResponse();
                 $filename = $invoice->getName();
 
+                if (Storage::exists("invoices/{$filename}.xml")) {
+                    \Log::critical("Intento de sobrescribir un comprobante ya emitido: {$filename}");
+                    throw new \Exception("Ya existe un comprobante emitido con el nombre {$filename}. Posible correlativo duplicado.");
+                }
+
                 Storage::makeDirectory('invoices');
                 Storage::makeDirectory('invoices/cdr');
-
                 Storage::put(
                     "invoices/{$filename}.xml",
                     $this->see->getFactory()->getLastXml()
@@ -179,15 +234,19 @@ class FacturaController extends Controller
                 );
 
                 $vendedor = $request->input('vendedor.nombre');
-
-                $factura = new Factura;
-                $factura->serie = $request->input('serie');
-                $factura->correlativo = $request->input('correlativo');
-                $factura->vendedor = $request->input('vendedor.nombre');
                 $factura->montototal = $totalVenta;
-                $factura->fecha_emitido = now();
-                $factura->Cliente = $request->input('client.razon_social') ?? $request->input('client.nombres');
                 $factura->documento = $filename.'.pdf';
+                $factura->estado_sunat = 'aceptado';
+                $factura->codigo_sunat = $cdr->getCode();
+
+                if (! $factura->save()) {
+                    throw new \Exception('Error al guardar la factura en la base de datos');
+                }
+
+                $factura->montototal = $totalVenta;
+                $factura->documento = $filename.'.pdf';
+                $factura->estado_sunat = 'aceptado';
+                $factura->codigo_sunat = $cdr->getCode();
 
                 if (! $factura->save()) {
                     throw new \Exception('Error al guardar la factura en la base de datos');
@@ -207,13 +266,32 @@ class FacturaController extends Controller
                     'cdr_url' => url("facturacion/cdr/{$filename}"),
                 ];
             } else {
+                // ============================================================
+                // SUNAT RECHAZÓ EL COMPROBANTE
+                // ============================================================
+                $errorMessage = $result->getError()->getMessage();
+                $factura->montototal = $totalVenta;
+                $factura->documento = 'rechazado.pdf';
+                $factura->estado_sunat = 'rechazado';
+                $factura->error_sunat = $errorMessage;
+                $factura->codigo_sunat = 'ERROR';
+                $factura->save();
+                // Registrar el error en el log
+                \Log::error('SUNAT rechazó el comprobante: '.$errorMessage, [
+                    'serie' => $request->input('serie'),
+                    'correlativo' => $request->input('correlativo'),
+                    'tipo_documento' => $request->input('tipo_documento'),
+                ]);
+
                 $response = [
                     'success' => false,
-                    'error' => $result->getError()->getMessage(),
+                    'error' => $errorMessage,
+                    'factura_id' => $factura->idfactura,
                 ];
             }
 
             return response()->json($response);
+
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -221,10 +299,22 @@ class FacturaController extends Controller
                 'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
+            if (isset($factura) && $factura->exists) {
+                $factura->estado_sunat = 'error_tecnico';
+                $factura->error_sunat = $e->getMessage();
+                $factura->save();
+            }
+
+            \Log::error('Error generando comprobante: '.$e->getMessage(), [
+                'serie' => $serie ?? null,
+                'correlativo' => $correlativo ?? null,
+            ]);
+
             return response()->json([
                 'success' => false,
                 'error' => $e->getMessage(),
                 'file' => $filename ?? null,
+                'factura_id' => $factura->idfactura ?? null,
             ], 500);
         }
     }
@@ -251,7 +341,6 @@ class FacturaController extends Controller
             $dom = new \DOMDocument;
             $dom->loadXML($xmlContent, LIBXML_NOCDATA);
             $xpath = new \DOMXPath($dom);
-
             $xpath->registerNamespace('cbc', 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2');
             $xpath->registerNamespace('cac', 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2');
             $xpath->registerNamespace('ds', 'http://www.w3.org/2000/09/xmldsig#');
@@ -356,8 +445,7 @@ class FacturaController extends Controller
                     'partes' => $partes,
                 ]))->setPaper('a4', 'portrait');
             } else {
-                // Boleta → vista ticket 80mm
-                // Tamaño: 80mm de ancho x alto automático
+
                 $pdf = Pdf::loadView('pdf.boleta', array_merge($data, [
                     'titulo' => $titulo,
                     'etiquetaDoc' => $etiquetaDoc,
@@ -456,9 +544,13 @@ class FacturaController extends Controller
     {
         $serie = $request->input('serie', 'B001');
 
-        $correlativo = Factura::where('serie', $serie)->max('correlativo');
+        return \DB::transaction(function () use ($serie) {
+            $correlativo = Factura::where('serie', $serie)
+                ->lockForUpdate()
+                ->max('correlativo');
 
-        return response()->json(['correlativo' => ($correlativo ?? 0) + 1]);
+            return response()->json(['correlativo' => ($correlativo ?? 0) + 1]);
+        });
     }
 
     public function verificarCorreltaivo($correlativo)

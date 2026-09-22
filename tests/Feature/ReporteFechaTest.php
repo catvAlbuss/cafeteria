@@ -4,7 +4,7 @@ use App\Models\Caja;
 use App\Models\Pedido;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -49,12 +49,9 @@ test('la fecha de las ventas del día se muestra en hora local de Lima (UTC-5)',
         'caja_id' => Caja::query()->where('estado', 'Abierta')->first()->id,
     ]);
 
-    DB::table('pedidos')
-        ->where('id', $pedido->id)
-        ->update([
-            'created_at' => '2026-09-22 16:05:48',
-            'updated_at' => '2026-09-22 16:05:48',
-        ]);
+    $pedido->created_at = Carbon::parse('2026-09-22 11:05:48', 'America/Lima');
+    $pedido->updated_at = Carbon::parse('2026-09-22 11:05:48', 'America/Lima');
+    $pedido->save();
 
     test()->actingAs($user)
         ->get(route('reportes.index'))
