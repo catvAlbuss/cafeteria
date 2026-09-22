@@ -748,7 +748,7 @@ class PedidoController extends Controller
             }
 
             // 4. Crear instancia del FacturaController
-            $facturaController = new FacturaController;
+            $facturaController = app(FacturaController::class);
 
             // 5. Determinar serie según tipo de documento
             $serie = $validated['tipo_documento'] === '01' ? 'F001' : 'B001';
@@ -795,6 +795,7 @@ class PedidoController extends Controller
                     $pedido->tipo_documento = $validated['tipo_documento'];
                     $pedido->documento_cliente = $validated['documento'];
                     $pedido->nombre_cliente = 'CLIENTES VARIOS';
+                    $pedido->metodo_pago = $validated['metodo_pago']; // Persistir el método elegido en el modal
                     $pedido->factura_estado = 'aceptado';
                     $pedido->factura_numero = $resultado['file'] ?? null;
                     $pedido->factura_pdf_url = $resultado['pdf_url'] ?? null;

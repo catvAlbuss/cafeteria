@@ -31,10 +31,16 @@ class CajaController extends Controller
             ->get()
             ->values();
 
+        $caja = Caja::query()
+            ->where('team_id', $teamId)
+            ->where('estado', 'Abierta')
+            ->first();
+
         return Inertia::render('dinero/caja', [
             'platos' => $platos,
             'mesas' => $mesas->values()->all(),
             'pedidos' => $pedidos->values()->all(),
+            'caja' => $caja,
         ]);
     }
 
@@ -63,9 +69,21 @@ class CajaController extends Controller
         }
         DB::beginTransaction();
         try {
+            // Bloquear la caja para garantizar una secuencia de numero_pedido sin colisiones
+            $caja = Caja::query()->whereKey($caja->id)->lockForUpdate()->first();
+
+            if (! $caja) {
+                DB::rollBack();
+
+                return redirect()->back()->with('error', 'No hay caja abierta. Debes abrir caja primero.');
+            }
+
+            $caja->contador_pedidos = (int) $caja->contador_pedidos + 1;
+
             // Crear el pedido
             $pedido = Pedido::create([
                 'numero' => Pedido::generarNumero(),
+                'numero_pedido' => $caja->contador_pedidos,
                 'cliente' => $validated['cliente'],
                 'mesa' => $validated['mesa'],
                 'tipo' => $validated['tipo'],

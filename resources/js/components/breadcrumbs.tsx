@@ -208,7 +208,7 @@ export function Breadcrumbs({
     };
 
     return (
-        <div className="flex w-full min-w-0 flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full min-w-0 items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
                 <p className="truncate text-base font-extrabold text-neutral-950 md:text-lg">{currentTitle}</p>
                 {breadcrumbs.length > 1 && (
@@ -241,7 +241,7 @@ export function Breadcrumbs({
                 )}
             </div>
 
-            <div className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
+            <div className="flex shrink-0 items-center gap-2">
                 <div className="relative breadcrumb-notifications">
                     <button
                         type="button"
@@ -322,7 +322,7 @@ export function Breadcrumbs({
                     )}
                 </div>
 
-                <div className="flex h-10 min-w-0 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 text-xs font-bold text-neutral-800 shadow-sm sm:px-3">
+                <div className="hidden h-10 min-w-0 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 text-xs font-bold text-neutral-800 shadow-sm sm:px-3 sm:flex">
                     <CalendarClock className="h-4 w-4 text-orange-600" />
                     <span suppressHydrationWarning className="truncate whitespace-nowrap">{currentDateTime}</span>
                 </div>

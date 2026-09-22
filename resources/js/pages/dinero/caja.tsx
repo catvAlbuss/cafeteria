@@ -136,38 +136,112 @@ const CategoriaCard = ({
     return (
         <div
             onClick={onClick}
-            className={`rounded-xl p-5 cursor-pointer transition-all duration-300 group ${isActive
-                ? 'bg-gradient-to-br from-[#C9A96E] to-[#B8975D] text-white shadow-md shadow-[#C9A96E]/25 scale-[1.02]'
-                : 'bg-white text-gray-800 shadow-sm border border-black/5 hover:shadow-md hover:border-[#C9A96E]/40 hover:scale-[1.02]'
-                }`}
+            className={`
+                group cursor-pointer rounded-xl
+                px-3.5 py-3
+                transition-all duration-200
+                select-none
+                ${
+                    isActive
+                        ? `
+                            bg-gradient-to-br
+                            from-[#C9A96E] to-[#B8975D]
+                            text-white
+                            shadow-md
+                            shadow-[#C9A96E]/20
+                            ring-1 ring-[#C9A96E]/20
+                            scale-[1.01]
+                        `
+                        : `
+                            bg-white
+                            text-gray-800
+                            border border-black/5
+                            shadow-sm
+                            hover:border-[#C9A96E]/40
+                            hover:shadow-md
+                            hover:-translate-y-0.5
+                        `
+                }
+            `}
         >
-            <div className="flex items-start justify-between">
-                <div className={`p-1.5 rounded-lg transition-all duration-300 ${isActive
-                    ? 'bg-white/20 text-white'
-                    : 'bg-[#FBF7F0] text-[#C9A96E] group-hover:bg-[#C9A96E]/10'
-                    }`}>
-                    <IconComponent className="w-4 h-4" strokeWidth={2} />
+            <div className="flex items-center gap-3">
+                {/* Icono */}
+                <div
+                    className={`
+                        flex h-9 w-9 shrink-0 items-center justify-center
+                        rounded-lg
+                        transition-colors duration-200
+                        ${
+                            isActive
+                                ? 'bg-white/20 text-white'
+                                : `
+                                    bg-[#FBF7F0]
+                                    text-[#C9A96E]
+                                    group-hover:bg-[#C9A96E]/10
+                                `
+                        }
+                    `}
+                >
+                    <IconComponent
+                        className="h-4.5 w-4.5"
+                        strokeWidth={2}
+                    />
                 </div>
-                {stockStatus === 'bajo' && !isActive && (
-                    <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[9px] font-semibold flex items-center gap-1">
-                        <span className="w-1 h-1 bg-orange-500 rounded-full animate-pulse" />
-                        Stock bajo
-                    </span>
-                )}
-                {isActive && (
-                    <span className="bg-white/20 text-white px-2 py-0.5 rounded-full text-[9px] font-semibold backdrop-blur-sm">
-                        Activo
-                    </span>
-                )}
-            </div>
-            <div className="mt-2">
-                <h3 className={`font-bold text-sm ${isActive ? 'text-white' : 'text-[#2D1B1A]'}`}>
-                    {categoria}
-                </h3>
-                <p className={`text-xs mt-0.5 flex items-center gap-1 ${isActive ? 'text-white/80' : 'text-gray-500'}`}>
-                    <span className="text-base font-bold">{count}</span>
-                    <span>prod.</span>
-                </p>
+
+                {/* Información */}
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                        <h3
+                            className={`truncate text-sm font-bold leading-tight
+                                ${
+                                    isActive
+                                        ? 'text-white': 'text-[#2D1B1A]'
+                                }
+                            `}
+                        >
+                            {categoria}
+                        </h3>
+
+                        {/* Stock bajo */}
+                        {stockStatus === 'bajo' && (
+                            <span
+                                className={`flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold
+                                    ${
+                                        isActive
+                                            ? 'bg-white/20 text-white'
+                                            : 'bg-orange-100 text-orange-700'
+                                    }
+                                `}
+                            >
+                                <span
+                                    className={`
+                                        h-1.5 w-1.5 rounded-full
+                                        ${
+                                            isActive
+                                                ? 'bg-white animate-pulse'
+                                                : 'bg-orange-500 animate-pulse'
+                                        }
+                                    `}
+                                />
+                                Bajo
+                            </span>
+                        )}
+                    </div>
+
+                    <p
+                        className={`
+                            mt-0.5 text-xs
+                            ${
+                                isActive
+                                    ? 'text-white/75'
+                                    : 'text-gray-500'
+                            }
+                        `}
+                    >
+                        <span className="font-semibold">{count}</span>{' '}
+                        {count === 1 ? 'producto' : 'productos'}
+                    </p>
+                </div>
             </div>
         </div>
     );
@@ -175,7 +249,8 @@ const CategoriaCard = ({
 
 export default function Caja() {
 
-    const { platos = [], mesas = [], pedidos = [] } = usePage().props as any;
+    const { platos = [], mesas = [], pedidos = [], caja = null } = usePage().props as any;
+    const siguienteNumeroPedido = String((Number(caja?.contador_pedidos) || 0) + 1).padStart(3, '0');
     const [productos, setProductos] = useState<Producto[]>([]);
     const [mesasLista, setMesasLista] = useState<MesaSalon[]>(() =>
         toArray<MesaSalon>(mesas),
@@ -541,26 +616,30 @@ export default function Caja() {
     return (
         <>
             <Head title="Caja" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-3 sm:p-4 bg-[#FBF7F0]">
+            <div className="flex min-h-full flex-1 flex-col gap-4 overflow-x-clip rounded-xl bg-[#FBF7F0] p-3 sm:p-4 lg:p-6">
 
-                <div className="flex items-center justify-end">
+                <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 text-sm text-gray-500">
-                        <span className="px-3 py-1 bg-white rounded-lg border border-black/5">
-                            Pedido #27362
+                        <span className="px-3 py-1 bg-white rounded-lg border border-black/5 font-semibold text-[#2D1B1A]">
+                            Pedido #{siguienteNumeroPedido}
                         </span>
-                        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-lg">
-                            Abierta
+                        <span className="px-3 py-1 bg-white rounded-lg border border-black/5">
+                            Caja {caja?.caja || '—'}
                         </span>
                     </div>
+                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-lg flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        ABIERTA
+                    </span>
                 </div>
 
                 {/* Layout Principal */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_400px] gap-4 items-start">
 
                     {/* ============================================================ */}
-                    {/* COLUMNA IZQUIERDA: Productos (2/3) */}
+                    {/* COLUMNA IZQUIERDA: Productos */}
                     {/* ============================================================ */}
-                    <div className="lg:col-span-2">
+                    <div className="min-w-0">
 
                         {/* Buscador */}
                         <div className="relative mb-4">
@@ -588,7 +667,7 @@ export default function Caja() {
                         </div>
 
                         {/* Categorías */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
                             <CategoriaCard
                                 categoria="Todos"
                                 icon={LayoutGrid}
@@ -713,11 +792,11 @@ export default function Caja() {
                     {/* ============================================================ */}
                     {/* COLUMNA DERECHA: Pedido (1/3) */}
                     {/* ============================================================ */}
-                    <div className="lg:col-span-1">
-                        <div className="bg-white rounded-2xl border border-black/5 p-4 shadow-sm h-fit">
+                    <div className="min-w-0 md:sticky md:top-20 md:self-start md:h-fit">
+                        <div className="bg-white rounded-2xl border border-black/5 p-4 shadow-sm h-fit md:max-h-[calc(100dvh_-_8rem)] md:flex md:flex-col mb-3">
 
                             {/* Cabecera */}
-                            <div className="flex justify-between items-center mb-3">
+                            <div className="flex justify-between items-center mb-3 shrink-0">
                                 <h2 className="flex items-center gap-2 font-bold text-[#2D1B1A]">
                                     <ShoppingCart className="w-4 h-4" strokeWidth={2.25} />
                                     Pedido
@@ -730,7 +809,7 @@ export default function Caja() {
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-1 mb-3">
+                            <div className="grid grid-cols-3 gap-1 mb-3 shrink-0">
                                 <button
                                     onClick={() => setTipoPedido('salon')}
                                     className={`py-1.5 rounded-lg text-xs font-medium transition ${tipoPedido === 'salon'
@@ -762,8 +841,8 @@ export default function Caja() {
 
                             {/* ============ BANDEJA DE PEDIDOS DE SALÓN ============ */}
                             {tipoPedido === 'salon' ? (
-                                <div className="space-y-2">
-                                    <div className="relative">
+                                <div className="flex flex-col gap-2 md:min-h-0 md:flex-1">
+                                    <div className="relative shrink-0">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" strokeWidth={2} />
                                         <input
                                             type="text"
@@ -792,8 +871,8 @@ export default function Caja() {
                                             )}
                                         </div>
                                     ) : (
-                                        <>
-                                            <div className="max-h-64 overflow-y-auto space-y-2 pr-0.5">
+                                        <div className="md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-0.5">
+                                            <div className="space-y-2">
                                                 {bandejaVisibles.map(({ mesa, pedidos: pedidosMesa, total }) => (
                                                     <div
                                                         key={mesa.id}
@@ -854,36 +933,12 @@ export default function Caja() {
                                                     ? '1 pedido pendiente'
                                                     : `${pendientesFiltrados.length} pedidos pendientes`}
                                             </p>
-                                        </>
+                                        </div>
                                     )}
                                 </div>
                             ) : (
-                                <>
-                                    {/* Cliente y Mesa */}
-                                    <div className="space-y-2 mb-3">
-                                        <input
-                                            type="text"
-                                            placeholder="Nombre del cliente"
-                                            className="w-full p-2 border border-black/5 rounded-lg text-sm focus:ring-1 focus:ring-[#C9A96E] outline-none bg-[#FBF7F0]"
-                                            value={cliente}
-                                            onChange={(e) => setCliente(e.target.value)}
-                                        />
-                                        <select
-                                            className="w-full p-2 border border-black/5 rounded-lg text-sm focus:ring-1 focus:ring-[#C9A96E] outline-none bg-[#FBF7F0]"
-                                            value={mesa}
-                                            onChange={(e) => setMesa(e.target.value)}
-                                        >
-                                            <option value="">Seleccionar mesa</option>
-                                            <option value="Mesa 01">Mesa 01</option>
-                                            <option value="Mesa 02">Mesa 02</option>
-                                            <option value="Mesa 03">Mesa 03</option>
-                                            <option value="Mesa 04">Mesa 04</option>
-                                            <option value="Mesa 05">Mesa 05</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Lista del carrito */}
-                                    <div className="max-h-52 overflow-y-auto space-y-2">
+                                <div className="flex flex-col md:min-h-0 md:flex-1">
+                                    <div className="md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-0.5">
                                         {carrito.length === 0 ? (
                                             <div className="flex flex-col items-center gap-2 py-6">
                                                 <ShoppingCart className="w-8 h-8 text-gray-300" strokeWidth={1.5} />
@@ -938,7 +993,7 @@ export default function Caja() {
 
                                     {/* Totales y acciones */}
                                     {carrito.length > 0 && (
-                                        <div className="mt-4 pt-4 border-t border-black/5">
+                                        <div className="mt-4 pt-4 border-t border-black/5 shrink-0">
                                             <div className="space-y-1 text-sm">
                                                 <div className="flex justify-between">
                                                     <span className="text-gray-500">Subtotal</span>
@@ -964,7 +1019,7 @@ export default function Caja() {
                                             </button>
                                         </div>
                                     )}
-                                </>
+                                </div>
                             )}
                         </div>
                     </div>

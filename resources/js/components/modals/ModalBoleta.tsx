@@ -61,7 +61,7 @@ export default function ModalBoleta({
         useState<TipoComprobante | null>(null);
 
     // Estados del formulario
-    const [metodoPago, setMetodoPago] = useState('efectivo');
+    const [metodoPago, setMetodoPago] = useState<string>(() => data?.metodoPago || 'efectivo');
     const [authorizationPin, setAuthorizationPin] = useState('');
     const [documento, setDocumento] = useState('');
     const [nombre, setNombre] = useState('');
@@ -77,7 +77,7 @@ export default function ModalBoleta({
     useEffect(() => {
         if (isOpen) {
             setTipoComprobante(null);
-            setMetodoPago('efectivo');
+            setMetodoPago(data?.metodoPago || 'efectivo');
             setAuthorizationPin('');
             setDocumento('');
             setNombre('');
@@ -87,7 +87,7 @@ export default function ModalBoleta({
             setConfirmandoSalida(false);
             setCancelandoVenta(false);
         }
-    }, [isOpen]);
+    }, [isOpen, data?.metodoPago]);
 
     if (!isOpen || !data) {
         return null;

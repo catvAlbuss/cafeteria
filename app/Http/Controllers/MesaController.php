@@ -168,39 +168,6 @@ class MesaController extends Controller
         return redirect()->back()->with('success', 'Pedido entregado');
     }
 
-    //  Cobrar la cuenta completa de una mesa (agrupa TODOS los pedidos no pagados/cancelados)
-    public function cobrarCuenta(Request $request, Mesa $mesa)
-    {
-        $validated = $request->validate([
-            'metodo_pago' => 'required|in:efectivo,tarjeta,yape',
-            'monto_recibido' => 'nullable|numeric|min:0',
-        ]);
-
-        $pedidos = Pedido::where('mesa_id', $mesa->id)
-            ->whereNotIn('estado', ['pagado', 'cancelado'])
-            ->get();
-
-        if ($pedidos->isEmpty()) {
-            return redirect()->back()->with('error', 'Esta mesa no tiene pedidos por cobrar');
-        }
-
-        foreach ($pedidos as $pedido) {
-            $pedido->estado = 'pagado';
-            $pedido->save();
-            broadcast(new PedidoActualizado($pedido));
-        }
-
-        $mesa->estado = 'libre';
-        $mesa->user_id = null;
-        $mesa->cliente = null;
-        $mesa->personas = null;
-        $mesa->pedido_listo = false;
-        $mesa->save();
-        broadcast(new MesaActualizada($mesa));
-
-        return redirect()->back()->with('success', 'Cuenta cobrada correctamente');
-    }
-
     //  Tomar pedido: asigna mesero autenticado y ocupa la mesa
     public function tomarPedido(Request $request, Mesa $mesa)
     {
