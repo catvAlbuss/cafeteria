@@ -10,8 +10,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -118,33 +118,14 @@ class ReporteController extends Controller
                     Carbon::parse($fechaFin)->endOfDay(),
                 ])
                     ->where('estado', 'pagado')
-                    ->select(
-                        DB::raw(
-                            'CASE
-                                WHEN mesa_id IS NOT NULL
-                                THEN CONCAT("Mesa ", mesa_id)
-                                ELSE "Caja"
-                            END as origen'
-                        ),
-                        DB::raw('COUNT(*) as tickets')
-                    )
-                    ->groupBy('origen')
-                    ->get()
-                    ->map(function ($item) {
-                        return [
-                            'origen' => $item->origen,
-                            'tickets' => (int) $item->tickets,
-                        ];
-                    });
-
-                // ============================================================
-                // 6. TOTAL COBRADO HOY
-                // ============================================================
-
-                $totalCobradoHoy = Pedido::whereDate(
-                    'created_at',
-                    today()
-                )
+                    ->pluck('mesa_id')
+                    // CONCAT() es solo MySQL y rompe en SQLite (tests); se agrupa en PHP
+                    ->map(fn ($mesaId) => $mesaId ? "Mesa {$mesaId}" : 'Caja')
+                    ->countBy()
+                    ->map(fn ($tickets, $origen) => ['origen' => $origen, 'tickets' => $tickets])
+                    ->values();
+                // Total cobrado hoy
+                $totalCobradoHoy = Pedido::whereDate('created_at', today())
                     ->where('estado', 'pagado')
                     ->sum('total');
 
@@ -296,8 +277,7 @@ class ReporteController extends Controller
                     ->orderByDesc('created_at')
                     ->get()
                     ->groupBy(
-                        fn ($pedido) =>
-                            $pedido->venta_grupo
+                        fn ($pedido) => $pedido->venta_grupo
                             ?: 'individual-'.$pedido->id
                     )
                     ->map(function ($pedidosDelGrupo) use ($mesasMap) {
@@ -318,7 +298,7 @@ class ReporteController extends Controller
                                 )
                                 : $pedidoDelGrupo->productos;
 
-                            if (!is_array($productosRaw)) {
+                            if (! is_array($productosRaw)) {
                                 continue;
                             }
 
@@ -335,8 +315,7 @@ class ReporteController extends Controller
                                     && is_array($item['productos'])
                                 ) {
                                     foreach (
-                                        $item['productos']
-                                        as $subItem
+                                        $item['productos'] as $subItem
                                     ) {
                                         if (
                                             is_array($subItem)
@@ -365,8 +344,7 @@ class ReporteController extends Controller
 
                         $itemsConPrecio = collect($items)
                             ->filter(
-                                fn ($p) =>
-                                    is_array($p)
+                                fn ($p) => is_array($p)
                                     && isset($p['nombre'])
                             )
                             ->map(function ($p) {
@@ -385,8 +363,7 @@ class ReporteController extends Controller
                                 );
 
                                 return [
-                                    'nombre' =>
-                                        $p['nombre'] ?? 'Producto',
+                                    'nombre' => $p['nombre'] ?? 'Producto',
 
                                     'cantidad' => $cantidad,
 
@@ -402,19 +379,15 @@ class ReporteController extends Controller
                                     $grupoProducto->first();
 
                                 return [
-                                    'nombre' =>
-                                        $primero['nombre'],
+                                    'nombre' => $primero['nombre'],
 
-                                    'cantidad' =>
-                                        $grupoProducto
-                                            ->sum('cantidad'),
+                                    'cantidad' => $grupoProducto
+                                        ->sum('cantidad'),
 
-                                    'precio' =>
-                                        $primero['precio'],
+                                    'precio' => $primero['precio'],
 
-                                    'subtotal' =>
-                                        $grupoProducto
-                                            ->sum('subtotal'),
+                                    'subtotal' => $grupoProducto
+                                        ->sum('subtotal'),
                                 ];
                             })
                             ->values()
@@ -424,8 +397,7 @@ class ReporteController extends Controller
                             $itemsConPrecio
                         )
                             ->map(
-                                fn ($p) =>
-                                    ($p['cantidad'] ?? 1)
+                                fn ($p) => ($p['cantidad'] ?? 1)
                                     .'x '
                                     .($p['nombre'] ?? 'Producto')
                             )
@@ -462,28 +434,22 @@ class ReporteController extends Controller
                             ?? $primerPedido->created_at;
 
                         return [
-                            'fecha' =>
-                                $fechaPago->format(
-                                    'd/m/Y H:i'
-                                ),
-
+                            // app.timezone es UTC; la hora se muestra en hora local de Lima
+                            'fecha' => Carbon::parse($fechaPago)->setTimezone('America/Lima')->format('d/m/Y H:i'),
                             'mesa' => $numeroMesa,
 
-                            'producto' =>
-                                $productoTexto
+                            'producto' => $productoTexto
                                 ?: 'Sin productos',
 
                             'total' => $totalGrupo,
 
-                            'metodo_pago' =>
-                                $primerPedido->metodo_pago
+                            'metodo_pago' => $primerPedido->metodo_pago
                                     ? ucfirst(
                                         $primerPedido->metodo_pago
                                     )
                                     : 'N/A',
 
-                            'productosDetalle' =>
-                                $itemsConPrecio,
+                            'productosDetalle' => $itemsConPrecio,
                         ];
                     })
                     ->values();
@@ -516,18 +482,14 @@ class ReporteController extends Controller
                         ];
 
                         return [
-                            'metodo' =>
-                                $mapa[$item->metodo_pago]
+                            'metodo' => $mapa[$item->metodo_pago]
                                 ?? $item->metodo_pago,
 
-                            'total' =>
-                                (float) $item->total,
+                            'total' => (float) $item->total,
 
-                            'cantidad' =>
-                                (int) $item->cantidad,
+                            'cantidad' => (int) $item->cantidad,
 
-                            'porcentaje' =>
-                                $totalCobradoHoy > 0
+                            'porcentaje' => $totalCobradoHoy > 0
                                     ? round(
                                         (
                                             $item->total
@@ -545,26 +507,19 @@ class ReporteController extends Controller
                 return [
                     'resumen' => $resumen,
 
-                    'ventasDiarias' =>
-                        $ventasDiarias,
+                    'ventasDiarias' => $ventasDiarias,
 
-                    'ventasDelDiaDetalle' =>
-                        $ventasDelDiaDetalle,
+                    'ventasDelDiaDetalle' => $ventasDelDiaDetalle,
 
-                    'productosMasVendidos' =>
-                        $productosMasVendidos,
+                    'productosMasVendidos' => $productosMasVendidos,
 
-                    'metodosPago' =>
-                        $metodosPago,
+                    'metodosPago' => $metodosPago,
 
-                    'totales' =>
-                        $totales,
+                    'totales' => $totales,
 
-                    'ventasPorTipo' =>
-                        $ventasPorTipo,
+                    'ventasPorTipo' => $ventasPorTipo,
 
-                    'ticketsPorOrigen' =>
-                        $ticketsPorOrigen,
+                    'ticketsPorOrigen' => $ticketsPorOrigen,
 
                     'estadoMesas' => [
                         'total' => $totalMesas,
@@ -685,22 +640,17 @@ class ReporteController extends Controller
                     $venta = (float) ($item->ventas ?? 0);
 
                     return [
-                        'fecha' =>
-                            Carbon::parse(
-                                $item->fecha
-                            )->format('d/m/Y'),
+                        'fecha' => Carbon::parse(
+                            $item->fecha
+                        )->format('d/m/Y'),
 
-                        'tickets' =>
-                            (int) $item->tickets,
+                        'tickets' => (int) $item->tickets,
 
-                        'ventas' =>
-                            $venta,
+                        'ventas' => $venta,
 
-                        'gastos' =>
-                            round($venta * 0.25, 2),
+                        'gastos' => round($venta * 0.25, 2),
 
-                        'ganancia' =>
-                            round($venta * 0.75, 2),
+                        'ganancia' => round($venta * 0.75, 2),
                     ];
                 });
 
@@ -742,18 +692,14 @@ class ReporteController extends Controller
                     ];
 
                     return [
-                        'metodo' =>
-                            $mapa[$item->metodo_pago]
+                        'metodo' => $mapa[$item->metodo_pago]
                             ?? $item->metodo_pago,
 
-                        'cantidad' =>
-                            (int) $item->cantidad,
+                        'cantidad' => (int) $item->cantidad,
 
-                        'total' =>
-                            (float) $item->total,
+                        'total' => (float) $item->total,
 
-                        'porcentaje' =>
-                            $totalVentas > 0
+                        'porcentaje' => $totalVentas > 0
                                 ? round(
                                     (
                                         $item->total
@@ -772,35 +718,26 @@ class ReporteController extends Controller
                 'fechaInicio' => $fechaInicio,
                 'fechaFin' => $fechaFin,
 
-                'ventasDiarias' =>
-                    $ventasDiarias->values()->all(),
+                'ventasDiarias' => $ventasDiarias->values()->all(),
 
-                'metodosPago' =>
-                    $metodosPago->values()->all(),
+                'metodosPago' => $metodosPago->values()->all(),
 
-                'productosMasVendidos' =>
-                    $productosMasVendidos,
+                'productosMasVendidos' => $productosMasVendidos,
 
                 'totales' => [
-                    'totalVentas' =>
-                        $totalVentas,
+                    'totalVentas' => $totalVentas,
 
-                    'totalTickets' =>
-                        $totalTickets,
+                    'totalTickets' => $totalTickets,
 
-                    'totalGastos' =>
-                        $totalGastos,
+                    'totalGastos' => $totalGastos,
 
-                    'totalGanancia' =>
-                        $totalGanancia,
+                    'totalGanancia' => $totalGanancia,
 
-                    'ticketPromedio' =>
-                        $totalTickets > 0
+                    'ticketPromedio' => $totalTickets > 0
                             ? $totalVentas / $totalTickets
                             : 0,
 
-                    'margenGanancia' =>
-                        $totalVentas > 0
+                    'margenGanancia' => $totalVentas > 0
                             ? 75
                             : 0,
                 ],
@@ -876,7 +813,7 @@ class ReporteController extends Controller
                 )
                 : $pedido->productos;
 
-            if (!is_array($items)) {
+            if (! is_array($items)) {
                 continue;
             }
 
@@ -898,8 +835,7 @@ class ReporteController extends Controller
                     $productos[$nombre] = [
                         'nombre' => $nombre,
                         'cantidad' => $cantidad,
-                        'icono' =>
-                            $this->getIcono($nombre),
+                        'icono' => $this->getIcono($nombre),
                     ];
                 }
             }

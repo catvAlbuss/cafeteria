@@ -334,7 +334,6 @@ export default function Ventas() {
         }, {
             preserveScroll: true,
             onSuccess: () => {
-<<<<<<< HEAD
                 toast.success('Pedido enviado a cocina', {
                     description: `Mesa: ${mesaInfo?.numero || 'No asignada'} · Mesero: ${mesaInfo?.mesero || 'No asignado'} · Total: S/ ${totalConIgv.toFixed(2)} · Área: ${areaDetectada}`,
                     duration: 5000,
