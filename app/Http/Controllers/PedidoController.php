@@ -1,8 +1,8 @@
-```php
 <?php
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use App\Events\MesaActualizada;
 use App\Events\PedidoActualizado;
 use App\Events\PedidoCreado;
@@ -1073,8 +1073,7 @@ class PedidoController extends Controller
                     $pedido->documento_cliente =
                         $validated['documento'];
 
-                    $pedido->nombre_cliente =
-                        'CLIENTES VARIOS';
+                    $pedido->nombre_cliente = $validated['nombre'] ?? 'CLIENTES VARIOS';
 
                     // Persistir el método elegido en el modal
                     $pedido->metodo_pago =
@@ -1125,6 +1124,33 @@ class PedidoController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+        /**
+     * Devuelve los datos necesarios para enviar el comprobante
+     * por WhatsApp o Email desde el frontend.
+     */
+    public function datosEnvio(Request $request, Pedido $pedido)
+    {
+        abort_if(
+            $pedido->team_id !== $request->user()->current_team_id,
+            403
+        );
+
+        $tipoDoc = $pedido->tipo_documento === '01' ? 'FACTURA' : 'BOLETA';
+
+        return response()->json([
+            'pedido_id' => $pedido->id,
+            'numero' => $pedido->numero,
+            'cliente' => $pedido->nombre_cliente
+                ?? $pedido->cliente
+                ?? 'Cliente',
+            'documento' => $pedido->documento_cliente,
+            'tipo_documento' => $tipoDoc,
+            'total' => (float) $pedido->total,
+            'pdf_url' => $pedido->factura_pdf_url,
+            'factura_numero' => $pedido->factura_numero,
+            'telefono' => $pedido->telefono,
+        ]);
     }
 }
 

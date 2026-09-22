@@ -38,11 +38,9 @@ const toArray = <T,>(value: T[] | { data?: T[] } | Record<string, T> | null | un
 };
 
 export default function Platos() {
-    //  Recibir platos desde el controlador
+  
     const { platos: platosIniciales = [] } = usePage<{ platos: Plato[] | { data?: Plato[] } | Record<string, Plato> }>().props;
-    //  Estado - usar datos del controlador
     const [platos, setPlatos] = useState<Plato[]>(() => toArray<Plato>(platosIniciales));
-    //  Estado del modal
     const [modalAbierto, setModalAbierto] = useState(false);
     const [modalVerAbierto, setModalVerAbierto] = useState(false);
     const [platoSeleccionado, setPlatoSeleccionado] = useState<Plato | null>(null);
@@ -61,9 +59,7 @@ export default function Platos() {
     const [modalEtiquetaAbierto, setModalEtiquetaAbierto] = useState(false);
     const [etiquetaActual, setEtiquetaActual] = useState<Plato | null>(null);
     const [previewImagen, setPreviewImagen] = useState<string>('');
-    //  Archivo real de la imagen a subir (se envía como multipart, nunca como base64)
     const [imagenFile, setImagenFile] = useState<File | null>(null);
-    //  Filtros
     const [filtroCategoria, setFiltroCategoria] = useState('');
     const [filtroEstado, setFiltroEstado] = useState('');
     const [ordenPor, setOrdenPor] = useState('');
@@ -89,11 +85,10 @@ export default function Platos() {
         stockTotal: platos.reduce((sum, p) => sum + p.stock, 0),
     };
 
-    // Top productos
+
     const topProductos = [...platos].sort((a, b) => b.vendidos - a.vendidos).slice(0, 4);
     const maxVendidos = topProductos.length ? topProductos[0].vendidos : 1;
 
-    //  Top categorías
     const categoriasTotales: Record<string, number> = {};
     platos.forEach(p => {
         categoriasTotales[p.categoria] = (categoriasTotales[p.categoria] || 0) + p.vendidos;
@@ -101,7 +96,7 @@ export default function Platos() {
     const topCategorias = Object.entries(categoriasTotales).sort((a, b) => b[1] - a[1]);
     const maxCategoriaVentas = topCategorias.length ? topCategorias[0][1] : 1;
 
-    //  Funciones CRUD
+
     const abrirNuevo = () => {
         setEsEdicion(false);
         setFormulario({
@@ -135,8 +130,6 @@ export default function Platos() {
         }
 
         const url = esEdicion ? `/platos/${formulario.id}` : '/platos';
-        // Nunca mandamos 'imagen' como string: o va el archivo real (multipart),
-        // o no se manda y el backend conserva la imagen existente.
         const { imagen: _imagen, ...datosSinImagen } = formulario;
         void _imagen;
         const datos = {
@@ -157,8 +150,7 @@ export default function Platos() {
         } as Parameters<typeof router.post>[2];
 
         if (esEdicion) {
-            // Las requests con archivos no soportan PUT nativo: se manda por POST
-            // con spoofing de método (recomendación oficial de Inertia).
+  
             router.post(url, { ...datos, _method: 'put' }, opciones);
         } else {
             router.post(url, datos, opciones);
@@ -170,7 +162,6 @@ export default function Platos() {
         if (!confirm('¿Seguro que deseas eliminar este plato?')) return;
 
         const platosAnteriores = platos;
-        // Actualización optimista: desaparece de inmediato de la grilla
         setPlatos(prev => prev.filter(p => p.id !== id));
 
         router.delete(`/platos/${id}`, {
@@ -189,7 +180,6 @@ export default function Platos() {
         const plato = platos.find(p => p.id === id);
         if (!plato) return;
 
-        // Actualización optimista
         setPlatos(prev => prev.map(p =>
             p.id === id ? { ...p, disponible: !p.disponible } : p
         ));
@@ -202,7 +192,7 @@ export default function Platos() {
                 router.reload({ only: ['platos'], preserveScroll: true } as Parameters<typeof router.reload>[0]);
             },
             onError: (errors) => {
-                // Revertir si falla
+
                 setPlatos(prev => prev.map(p =>
                     p.id === id ? { ...p, disponible: plato.disponible } : p
                 ));
@@ -216,7 +206,7 @@ export default function Platos() {
         setModalVerAbierto(true);
     };
 
-    // Formatear moneda
+  
     const formatCurrency = (amount: number | string): string => {
         const num = typeof amount === 'string' ? parseFloat(amount) : amount;
         if (isNaN(num)) return 'S/ 0.00';
