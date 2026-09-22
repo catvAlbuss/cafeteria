@@ -743,19 +743,14 @@ if (!empty($validated['mesa_id'])) {
         $facturaController = new \App\Http\Controllers\FacturaController();
 
         // 5. Determinar serie según tipo de documento
+// 5. Determinar serie según tipo de documento
 $serie = $validated['tipo_documento'] === '01' ? 'F001' : 'B001';
 
-// 6. Obtener el correlativo actual (según la serie)
-$correlativoResponse = $facturaController->nuevoCorrelativo(
-    new \Illuminate\Http\Request(['serie' => $serie])
-);
-$correlativoData = json_decode($correlativoResponse->getContent(), true);
-$correlativo = $correlativoData['correlativo'] ?? 1;
+// 6. El correlativo se calcula DENTRO del FacturaController (con lockForUpdate)
 
         // 7. Construir el payload para el FacturaController
         $payload = [
             'serie' => $serie,
-            'correlativo' => $correlativo,
             'tipo_documento' => $validated['tipo_documento'],
             'incluidoigv' => true,
             'client' => [
@@ -781,7 +776,7 @@ $correlativo = $correlativoData['correlativo'] ?? 1;
         $response = $facturaController->generateInvoice($invoiceRequest);
         $resultado = json_decode($response->getContent(), true);
 
-        // 9. Guardar la respuesta en los pedidos
+          // 9. Guardar la respuesta en los pedidos
         if ($resultado['success'] ?? false) {
             foreach ($pedidos as $pedido) {
                 $pedido->factura_estado = 'aceptado';
@@ -790,8 +785,21 @@ $correlativo = $correlativoData['correlativo'] ?? 1;
                 $pedido->factura_xml_url = $resultado['xml_url'] ?? null;
                 $pedido->factura_cdr_url = $resultado['cdr_url'] ?? null;
                 $pedido->factura_respuesta = $resultado['message'] ?? 'Aceptado';
+                $pedido->error_sunat = null;
                 $pedido->save();
             }
+        } else {
+            // SUNAT rechazó el comprobante
+            $errorMessage = $resultado['error'] ?? 'Error desconocido';
+
+            foreach ($pedidos as $pedido) {
+                $pedido->factura_estado = 'rechazado';
+                $pedido->factura_respuesta = $errorMessage;
+                $pedido->error_sunat = $errorMessage;
+                $pedido->save();
+            }
+
+            \Log::error('SUNAT rechazó el comprobante: ' . $errorMessage);
         }
 
         DB::commit();

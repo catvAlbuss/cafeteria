@@ -9,20 +9,24 @@ class Factura extends Model
     protected $primaryKey = 'idfactura';
     protected $table = 'facturas';
     public $timestamps = false;
-    protected $fillable = [
-        'serie',
-        'correlativo',
-        'vendedor',
-        'montototal',
-        'fecha_emitido',
-        'Cliente',
-        'documento'
-    ];
+protected $fillable = [
+    'serie',
+    'correlativo',
+    'vendedor',
+    'montototal',
+    'fecha_emitido',
+    'Cliente',
+    'documento',
+    'estado_sunat',
+    'error_sunat',
+    'codigo_sunat',
+];
 
-    protected $casts = [
-        'fecha_emitido' => 'datetime',
-        'montototal' => 'decimal:2'
-    ];
+protected $casts = [
+    'fecha_emitido' => 'datetime',
+    'montototal' => 'decimal:2',
+    'correlativo' => 'integer',
+];
 
     // Accessors para las URLs (adaptados a las rutas de la cafetería)
     public function getPdfUrlAttribute()
