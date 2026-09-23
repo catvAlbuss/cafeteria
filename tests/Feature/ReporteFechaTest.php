@@ -49,13 +49,15 @@ test('la fecha de las ventas del día se muestra en hora local de Lima (UTC-5)',
         'caja_id' => Caja::query()->where('estado', 'Abierta')->first()->id,
     ]);
 
-    $pedido->created_at = Carbon::parse('2026-09-22 11:05:48', 'America/Lima');
-    $pedido->updated_at = Carbon::parse('2026-09-22 11:05:48', 'America/Lima');
+    $fechaLocal = Carbon::today('America/Lima');
+
+    $pedido->created_at = Carbon::parse($fechaLocal->toDateString().' 11:05:48', 'America/Lima');
+    $pedido->updated_at = Carbon::parse($fechaLocal->toDateString().' 11:05:48', 'America/Lima');
     $pedido->save();
 
     test()->actingAs($user)
         ->get(route('reportes.index'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('ventasDelDiaDetalle', fn ($detalle) => collect($detalle)->contains('fecha', '22/09/2026 11:05')));
+            ->where('ventasDelDiaDetalle', fn ($detalle) => collect($detalle)->contains('fecha', $fechaLocal->format('d/m/Y').' 11:05')));
 });

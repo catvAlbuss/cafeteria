@@ -157,6 +157,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pedidos/{pedido}/agregar-productos', [PedidoController::class, 'agregarProductos']);
     Route::get('/pedidos/pendientes', [PedidoController::class, 'pendientes'])->name('pedidos.pendientes');
     Route::get('/pedidos/listos', [PedidoController::class, 'listosParaCobrar'])->name('pedidos.listos');
+    Route::get('/pedidos/{pedido}/datos-envio', [PedidoController::class, 'datosEnvio'])
+        ->name('pedidos.datos-envio');
+
     Route::patch('/pedidos/{pedido}/cobrar', [PedidoController::class, 'cobrar'])->middleware('cash.session')->name('pedidos.cobrar');
     Route::patch('/pedidos/{pedido}/cancelar', [PedidoController::class, 'cancelar'])->middleware('cash.session')->name('pedidos.cancelar');
     Route::resource('pedidos', PedidoController::class)

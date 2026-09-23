@@ -16,6 +16,12 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
 // ============================================================
+// CONFIGURACIÓN DE LA EMPRESA
+// ============================================================
+const EMPRESA_NOMBRE = 'DOLCE CAFFE';
+const EMPRESA_WHATSAPP = '+51 949 265 128';
+
+// ============================================================
 // INTERFACES
 // ============================================================
 
@@ -69,6 +75,17 @@ export default function ModalBoleta({
     const [buscando, setBuscando] = useState(false);
     const [emitiendo, setEmitiendo] = useState(false);
 
+    // Estados para la pantalla post-emisión (enviar por WhatsApp)
+    const [comprobanteEmitido, setComprobanteEmitido] = useState<{
+        pdfUrl: string;
+        facturaNumero: string | null;
+        clienteNombre: string;
+        total: number;
+        tipoTexto: string;
+    } | null>(null);
+    const [telefonoWhatsapp, setTelefonoWhatsapp] = useState('');
+    const [enviandoWhatsapp, setEnviandoWhatsapp] = useState(false);
+
     // Confirmación al cerrar el modal
     const [confirmandoSalida, setConfirmandoSalida] = useState(false);
     const [cancelandoVenta, setCancelandoVenta] = useState(false);
@@ -86,6 +103,9 @@ export default function ModalBoleta({
             setEmitiendo(false);
             setConfirmandoSalida(false);
             setCancelandoVenta(false);
+            setComprobanteEmitido(null);
+            setTelefonoWhatsapp('');
+            setEnviandoWhatsapp(false);
         }
     }, [isOpen, data?.metodoPago]);
 
@@ -109,8 +129,8 @@ export default function ModalBoleta({
         tipo === 'salon'
             ? '🪑 Salón'
             : tipo === 'llevar'
-              ? '📦 Llevar'
-              : '🚚 Delivery';
+                ? '📦 Llevar'
+                : '🚚 Delivery';
 
     // ============================================================
     // BUSCAR RUC (solo para factura)
@@ -198,8 +218,8 @@ export default function ModalBoleta({
                 documento: esFactura
                     ? documento
                     : esBoletaConDni
-                      ? documento
-                      : '00000000',
+                        ? documento
+                        : '00000000',
                 nombre:
                     esFactura || esBoletaConDni
                         ? nombreEscrito
@@ -226,14 +246,18 @@ export default function ModalBoleta({
                         : 'Boleta emitida correctamente',
                 );
 
-                if (response.pdf_url) {
-                    window.open(response.pdf_url, '_blank');
-                }
-
-                setTimeout(() => {
-                    onClose();
-                    onSuccess();
-                }, 1500);
+                // En vez de cerrar, mostramos la pantalla de envío
+                setComprobanteEmitido({
+                    pdfUrl: response.pdf_url ?? '',
+                    facturaNumero: response.file ?? null,
+                    clienteNombre:
+                        esFactura || esBoletaConDni
+                            ? nombreEscrito || 'Cliente'
+                            : 'Cliente',
+                    total: total,
+                    tipoTexto:
+                        tipoComprobante === 'factura' ? 'Factura' : 'Boleta',
+                });
             } else {
                 // Mostrar el error de SUNAT con más detalle
                 toast.error('SUNAT rechazó el comprobante', {
@@ -279,7 +303,7 @@ export default function ModalBoleta({
             if (response.success) {
                 toast.success(
                     response.message ||
-                        'Venta cancelada; el stock fue restaurado',
+                    'Venta cancelada; el stock fue restaurado',
                 );
                 setConfirmandoSalida(false);
                 onClose();
@@ -296,6 +320,63 @@ export default function ModalBoleta({
         } finally {
             setCancelandoVenta(false);
         }
+    };
+
+    // ============================================================
+    // ENVIAR POR WHATSAPP
+    // ============================================================
+    const enviarPorWhatsApp = () => {
+        if (!comprobanteEmitido) {
+            return;
+        }
+
+        if (!comprobanteEmitido.pdfUrl) {
+            toast.error('No hay PDF disponible para enviar');
+
+            return;
+        }
+
+        const soloDigitos = telefonoWhatsapp.replace(/\D/g, '');
+
+        if (soloDigitos.length < 9) {
+            toast.error('Ingresa un número de WhatsApp válido');
+
+            return;
+        }
+
+        const numeroConPais = soloDigitos.startsWith('51')
+            ? soloDigitos
+            : `51${soloDigitos}`;
+
+        const mensaje = [
+            `Hola ${comprobanteEmitido.clienteNombre},`,
+            '',
+            `Aquí tienes tu ${comprobanteEmitido.tipoTexto} electrónica:`,
+            comprobanteEmitido.pdfUrl,
+            '',
+            `Total: S/ ${comprobanteEmitido.total.toFixed(2)}`,
+            '',
+            '¡Gracias por tu preferencia!',
+            '',
+            EMPRESA_NOMBRE,
+            `WhatsApp: ${EMPRESA_WHATSAPP}`,
+        ].join('\n');
+
+        const url = `https://wa.me/${numeroConPais}?text=${encodeURIComponent(mensaje)}`;
+
+        setEnviandoWhatsapp(true);
+        window.open(url, '_blank');
+
+        setTimeout(() => setEnviandoWhatsapp(false), 1000);
+    };
+
+    // ============================================================
+    // CERRAR PANTALLA DE ENVÍO (finaliza el flujo)
+    // ============================================================
+    const finalizarEnvio = () => {
+        setComprobanteEmitido(null);
+        onClose();
+        onSuccess();
     };
 
     // ============================================================
@@ -316,14 +397,14 @@ export default function ModalBoleta({
                         </div>
                         <div>
                             <p className="text-sm font-bold text-[#2D1B1A]">
-                                DOLCE CAFFE
+                                {EMPRESA_NOMBRE}
                             </p>
                             <p className="text-[10px] text-gray-400">
                                 {tipoComprobante === 'factura'
                                     ? 'Factura'
                                     : tipoComprobante === 'boleta'
-                                      ? 'Boleta'
-                                      : 'Cobrar'}{' '}
+                                        ? 'Boleta'
+                                        : 'Cobrar'}{' '}
                                 · Mesa #{mesa}
                             </p>
                         </div>
@@ -340,8 +421,93 @@ export default function ModalBoleta({
 
                 {/* ===== CONTENIDO ===== */}
                 <div className="flex-1 space-y-4 overflow-y-auto p-5">
+                    {/* ===== PASO 3: COMPROBANTE EMITIDO → ENVIAR ===== */}
+                    {comprobanteEmitido && (
+                        <div className="space-y-4">
+                            {/* Éxito */}
+                            <div className="flex flex-col items-center rounded-xl bg-green-50 p-4 text-center">
+                                <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
+                                    <CheckCircle className="h-6 w-6 text-green-600" />
+                                </div>
+                                <p className="text-sm font-bold text-green-800">
+                                    ¡{comprobanteEmitido.tipoTexto} emitida!
+                                </p>
+                                <p className="mt-1 text-xs text-green-700">
+                                    {comprobanteEmitido.facturaNumero}
+                                </p>
+                                <p className="mt-2 text-lg font-bold text-[#C9A96E]">
+                                    S/ {comprobanteEmitido.total.toFixed(2)}
+                                </p>
+                            </div>
+
+                            {/* Input WhatsApp */}
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-gray-600">
+                                    Número de WhatsApp del cliente{' '}
+                                    <span className="text-gray-400">(con código de país)</span>
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <span className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700">
+                                        🇵🇪 +51
+                                    </span>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        placeholder="987654321"
+                                        value={telefonoWhatsapp}
+                                        onChange={(e) =>
+                                            setTelefonoWhatsapp(
+                                                e.target.value.replace(/\D/g, '').slice(0, 9),
+                                            )
+                                        }
+                                        className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                    />
+                                </div>
+                                <p className="mt-1 text-[10px] text-gray-400">
+                                    Se abrirá WhatsApp Web con el PDF adjunto como link.
+                                </p>
+                            </div>
+
+                            {/* Botón enviar */}
+                            <button
+                                type="button"
+                                onClick={enviarPorWhatsApp}
+                                disabled={
+                                    enviandoWhatsapp ||
+                                    telefonoWhatsapp.replace(/\D/g, '').length < 9
+                                }
+                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <Smartphone className="h-4 w-4" />
+                                {enviandoWhatsapp
+                                    ? 'Abriendo WhatsApp...'
+                                    : 'Enviar por WhatsApp'}
+                            </button>
+
+                            {/* Botones secundarios */}
+                            <div className="flex gap-2">
+                                <a
+                                    href={comprobanteEmitido.pdfUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-100 py-2.5 text-xs font-medium text-gray-700 transition hover:bg-gray-200"
+                                >
+                                    <FileText className="h-3.5 w-3.5" />
+                                    Ver PDF
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={finalizarEnvio}
+                                    className="flex-1 rounded-xl bg-[#2D1B1A] py-2.5 text-xs font-medium text-white transition hover:bg-[#1A0F0E]"
+                                >
+                                    Finalizar
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* ===== PASO 1: SELECCIÓN DE TIPO ===== */}
-                    {!tipoComprobante && (
+                    {!comprobanteEmitido && !tipoComprobante && (
                         <div className="space-y-3">
                             <p className="mb-4 text-center text-sm font-medium text-gray-600">
                                 ¿Qué comprobante desea emitir?
@@ -386,7 +552,7 @@ export default function ModalBoleta({
                     )}
 
                     {/* ===== PASO 2: FORMULARIO ===== */}
-                    {tipoComprobante && (
+                    {!comprobanteEmitido && tipoComprobante && (
                         <>
                             {/* RESUMEN DEL PEDIDO */}
                             <div className="rounded-xl bg-gray-50 p-4">
@@ -433,6 +599,7 @@ export default function ModalBoleta({
                                     </span>
                                 </div>
                             </div>
+
                             {/* DNI OPCIONAL (solo boleta) */}
                             {tipoComprobante === 'boleta' && (
                                 <div>
