@@ -138,6 +138,36 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
         }
     }, [isOpen, cover]);
 
+    // Captura global de Ctrl+V mientras el modal está abierto.
+    // Esto permite pegar imágenes desde cualquier lugar del modal.
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handlePaste = (e: ClipboardEvent) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            const base64 = reader.result as string;
+                            setPreviewImagen(base64);
+                            setForm(f => ({ ...f, imagen: base64 }));
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                    break;
+                }
+            }
+        };
+
+        document.addEventListener('paste', handlePaste);
+        return () => document.removeEventListener('paste', handlePaste);
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     const tipos = [
@@ -147,18 +177,35 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
         { value: 'temporada', label: '🌿 Temporada' },
     ];
     const guardar = () => {
-        if (!form.titulo.trim()) return setError('Ingresa el título del cover');
-        if (!form.fechaInicio || !form.fechaFin) return setError('Ingresa las fechas de inicio y fin');
-        if (form.fechaInicio > form.fechaFin) return setError('La fecha de inicio no puede ser mayor a la fecha fin');
+        // Validaciones locales
+        if (!form.titulo.trim()) {
+            return setError('Ingresa el título del cover');
+        }
+        if (!form.fechaInicio || !form.fechaFin) {
+            return setError('Ingresa las fechas de inicio y fin');
+        }
+        if (form.fechaInicio > form.fechaFin) {
+            return setError('La fecha de inicio no puede ser mayor a la fecha fin');
+        }
         setError('');
 
-        // ✅ Conserva la imagen existente si estás editando y no subiste una nueva
-        const payload = {
-            ...form,
+        // Construir payload
+        const payload: any = {
+            titulo: form.titulo,
+            descripcion: form.descripcion || '',
+            tipo: form.tipo,
             fechaInicio: form.fechaInicio,
             fechaFin: form.fechaFin,
-            imagen: form.imagen ? form.imagen : (esEdicion ? cover!.imagen : '/images/default-cover.jpg')
         };
+
+        // Solo agregar imagen si hay una nueva (base64) o si estamos creando
+        if (form.imagen && form.imagen.startsWith('data:')) {
+            payload.imagen = form.imagen;
+        } else if (!esEdicion) {
+            payload.imagen = '/images/default-cover.jpg';
+        }
+        // Si estamos editando y no hay imagen nueva → NO enviamos el campo
+        // (el backend conserva la imagen anterior)
 
         setGuardando(true);
 
@@ -167,10 +214,7 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
             onSuccess: () => {
                 setGuardando(false);
                 onClose();
-
-                
                 router.reload({ only: ['covers'] });
-
                 swalSuccess(
                     esEdicion ? '✅ Cover actualizado' : '✅ Cover creado',
                     'Los cambios se guardaron correctamente.'
@@ -178,14 +222,19 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
             },
             onError: (errors: Record<string, string>) => {
                 setGuardando(false);
-                setError(Object.values(errors).join(' '));
+                const mensaje = Object.values(errors).join(' ');
+                setError(mensaje);
+                swalError('Error al guardar', mensaje);
+            },
+            onFinish: () => {
+                setGuardando(false);
             },
         };
 
         if (esEdicion) {
             router.post(`/covers/${cover!.id}`, {
                 ...payload,
-                _method: 'patch'
+                _method: 'patch',
             }, opciones);
         } else {
             router.post('/covers', payload, opciones);
@@ -193,10 +242,10 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
     };
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
 
                 {/* HEADER */}
-                <div className="bg-gradient-to-r from-[#2D1B1A] to-[#4A2C2A] px-6 py-5 flex items-center justify-between">
+                <div className="bg-gradient-to-r from-[#2D1B1A] to-[#4A2C2A] px-6 py-5 flex items-center justify-between flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-[#C9A96E] rounded-xl flex items-center justify-center shadow-lg">
                             {esEdicion ? <Edit className="w-5 h-5 text-white" /> : <Plus className="w-5 h-5 text-white" />}
@@ -219,7 +268,7 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
                 </div>
 
                 {/* BODY */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                <div className="p-6 overflow-y-auto flex-1">
                     {error && (
                         <div className="mb-4 bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-2.5 rounded-xl">
                             ⚠️ {error}
@@ -292,7 +341,8 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
                             <div>
                                 <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Imagen</label>
                                 <div
-                                    className={`w-full border-2 border-dashed rounded-xl p-6 text-center transition cursor-pointer ${previewImagen ? 'border-[#C9A96E] bg-[#FBF7F0]' : 'border-gray-300 bg-gray-50 hover:border-[#C9A96E] hover:bg-[#FBF7F0]'
+                                    tabIndex={0}
+                                    className={`w-full border-2 border-dashed rounded-xl p-6 text-center transition cursor-pointer outline-none focus:ring-2 focus:ring-[#C9A96E] ${previewImagen ? 'border-[#C9A96E] bg-[#FBF7F0]' : 'border-gray-300 bg-gray-50 hover:border-[#C9A96E] hover:bg-[#FBF7F0]'
                                         }`}
                                     onPaste={(e) => {
                                         const items = e.clipboardData?.items;
@@ -380,7 +430,7 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
                 </div>
 
                 {/* FOOTER */}
-                <div className="border-t border-gray-200 px-6 py-4 bg-gray-50/50 flex justify-end gap-3">
+                <div className="border-t border-gray-200 px-6 py-4 bg-gray-50/50 flex justify-end gap-3 flex-shrink-0">
                     <button
                         onClick={onClose}
                         className="px-6 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-100 font-semibold text-sm transition"

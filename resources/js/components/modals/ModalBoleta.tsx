@@ -348,10 +348,12 @@ export default function ModalBoleta({
             ? soloDigitos
             : `51${soloDigitos}`;
 
+        // URL del PDF aislada en su propia línea
         const mensaje = [
             `Hola ${comprobanteEmitido.clienteNombre},`,
             '',
-            `Aquí tienes tu ${comprobanteEmitido.tipoTexto} electrónica:`,
+            `Aquí tienes tu ${comprobanteEmitido.tipoTexto} electrónica.`,
+            'Haz clic aquí para descargarla:',
             comprobanteEmitido.pdfUrl,
             '',
             `Total: S/ ${comprobanteEmitido.total.toFixed(2)}`,
@@ -362,7 +364,13 @@ export default function ModalBoleta({
             `WhatsApp: ${EMPRESA_WHATSAPP}`,
         ].join('\n');
 
-        const url = `https://wa.me/${numeroConPais}?text=${encodeURIComponent(mensaje)}`;
+        // Forzar %0A explícito para que WhatsApp respete los saltos
+        const mensajeCodificado = encodeURIComponent(mensaje).replace(
+            /%0A/g,
+            '%0A',
+        );
+
+        const url = `https://wa.me/${numeroConPais}?text=${mensajeCodificado}`;
 
         setEnviandoWhatsapp(true);
         window.open(url, '_blank');
@@ -788,11 +796,10 @@ export default function ModalBoleta({
                                         onClick={() =>
                                             setMetodoPago('efectivo')
                                         }
-                                        className={`flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-medium transition ${
-                                            metodoPago === 'efectivo'
-                                                ? 'bg-[#C9A96E] text-white shadow-md'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
+                                        className={`flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-medium transition ${metodoPago === 'efectivo'
+                                            ? 'bg-[#C9A96E] text-white shadow-md'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
                                     >
                                         <Banknote className="h-4 w-4" />
                                         <span>Efectivo</span>
@@ -800,11 +807,10 @@ export default function ModalBoleta({
                                     <button
                                         type="button"
                                         onClick={() => setMetodoPago('tarjeta')}
-                                        className={`flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-medium transition ${
-                                            metodoPago === 'tarjeta'
-                                                ? 'bg-[#C9A96E] text-white shadow-md'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
+                                        className={`flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-medium transition ${metodoPago === 'tarjeta'
+                                            ? 'bg-[#C9A96E] text-white shadow-md'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
                                     >
                                         <CreditCard className="h-4 w-4" />
                                         <span>Tarjeta</span>
@@ -812,11 +818,10 @@ export default function ModalBoleta({
                                     <button
                                         type="button"
                                         onClick={() => setMetodoPago('yape')}
-                                        className={`flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-medium transition ${
-                                            metodoPago === 'yape'
-                                                ? 'bg-[#C9A96E] text-white shadow-md'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
+                                        className={`flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-medium transition ${metodoPago === 'yape'
+                                            ? 'bg-[#C9A96E] text-white shadow-md'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
                                     >
                                         <Smartphone className="h-4 w-4" />
                                         <span>Yape/Plin</span>
