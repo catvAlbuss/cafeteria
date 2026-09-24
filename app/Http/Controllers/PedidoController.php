@@ -284,13 +284,17 @@ class PedidoController extends Controller
                 abort(422, 'No se encontraron pedidos válidos para cobrar.');
             }
 
-            foreach ($pedidosACobrar as $pedido) {
-                $pedido->update([
-                    'estado' => 'pagado',
-                    'metodo_pago' => $validated['metodo_pago'],
-                    'caja_id' => $caja->id,
-                ]);
-            }
+         // Generar un venta_grupo único para este cobro de mesa
+        $ventaGrupo = 'mesa-' . $mesa->id . '-' . now()->format('YmdHis');
+
+        foreach ($pedidosACobrar as $pedido) {
+            $pedido->update([
+            'estado' => 'pagado',
+            'metodo_pago' => $validated['metodo_pago'],
+            'caja_id' => $caja->id,
+            'venta_grupo' => $ventaGrupo,
+        ]);
+        }
 
             $quedanPedidos = $pedidosActuales->filter(
                 function ($pedido) use ($idsEnviados) {
@@ -1027,37 +1031,25 @@ class PedidoController extends Controller
             );
 
             if ($resultado['success'] ?? false) {
-                foreach ($pedidos as $pedido) {
-                    $pedido->tipo_documento =
-                        $validated['tipo_documento'];
+             // Generar un venta_grupo único para este cobro
+$ventaGrupo = ! empty($validated['mesa_id'])
+    ? 'mesa-' . $validated['mesa_id'] . '-' . now()->format('YmdHis')
+    : 'caja-' . now()->format('YmdHis') . '-' . uniqid();
 
-                    $pedido->documento_cliente =
-                        $validated['documento'];
-
-                    $pedido->nombre_cliente = $validated['nombre'] ?? 'CLIENTES VARIOS';
-
-                    $pedido->metodo_pago =
-                        $validated['metodo_pago'];
-
-                    $pedido->factura_estado = 'aceptado';
-
-                    $pedido->factura_numero =
-                        $resultado['file'] ?? null;
-
-                    $pedido->factura_pdf_url =
-                        $resultado['pdf_url'] ?? null;
-
-                    $pedido->factura_xml_url =
-                        $resultado['xml_url'] ?? null;
-
-                    $pedido->factura_cdr_url =
-                        $resultado['cdr_url'] ?? null;
-
-                    $pedido->factura_respuesta =
-                        $resultado['message'] ?? 'Aceptado';
-
-                    $pedido->save();
-                }
+foreach ($pedidos as $pedido) {
+    $pedido->tipo_documento = $validated['tipo_documento'];
+    $pedido->documento_cliente = $validated['documento'];
+    $pedido->nombre_cliente = $validated['nombre'] ?? 'CLIENTES VARIOS';
+    $pedido->metodo_pago = $validated['metodo_pago'];
+    $pedido->factura_estado = 'aceptado';
+    $pedido->factura_numero = $resultado['file'] ?? null;
+    $pedido->factura_pdf_url = $resultado['pdf_url'] ?? null;
+    $pedido->factura_xml_url = $resultado['xml_url'] ?? null;
+    $pedido->factura_cdr_url = $resultado['cdr_url'] ?? null;
+    $pedido->factura_respuesta = $resultado['message'] ?? 'Aceptado';
+    $pedido->venta_grupo = $ventaGrupo;   // ← NUEVO
+    $pedido->save();
+}
 
                 $this->clienteService->sincronizarDesdeVenta(
                     (int) auth()->user()->current_team_id,

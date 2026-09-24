@@ -493,20 +493,22 @@ export default function ModalBoleta({
                             </button>
 
                             {/* Botones secundarios */}
-                            <div className="flex gap-2">
-                                <a
-                                    href={comprobanteEmitido.pdfUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-100 py-2.5 text-xs font-medium text-gray-700 transition hover:bg-gray-200"
+                            <div className="space-y-2">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        window.open(comprobanteEmitido.pdfUrl, '_blank')
+                                    }
+                                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2D1B1A] py-3 text-sm font-semibold text-white transition hover:bg-[#1A0F0E]"
                                 >
-                                    <FileText className="h-3.5 w-3.5" />
-                                    Ver PDF
-                                </a>
+                                    <FileText className="h-4 w-4" />
+                                    Imprimir PDF
+                                </button>
+
                                 <button
                                     type="button"
                                     onClick={finalizarEnvio}
-                                    className="flex-1 rounded-xl bg-[#2D1B1A] py-2.5 text-xs font-medium text-white transition hover:bg-[#1A0F0E]"
+                                    className="w-full rounded-xl bg-gray-100 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-200"
                                 >
                                     Finalizar
                                 </button>

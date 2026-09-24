@@ -12,7 +12,7 @@ body {
     font-size: 10px;
     margin: 0;
     padding: 3mm;
-    width: 74mm;   /* 80mm - 6mm (3mm padding de cada lado) */
+    width: 74mm;   
     color: #000;
     box-sizing: border-box;
 }
@@ -138,7 +138,7 @@ body {
             <tr>
                 <td class="text-left">{{ $item->quantity }}</td>
                 <td class="text-left producto-desc">{{ $item->description }}</td>
-                <td class="text-right">{{ number_format($item->totalValue, 2) }}</td>
+                <td class="text-right">{{ number_format($item->unitValue * $item->quantity, 2) }}</td>
             </tr>
             @endforeach
         </tbody>
