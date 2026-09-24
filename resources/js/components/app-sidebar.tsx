@@ -16,6 +16,7 @@ import {
     Users,
     Truck,
     PackageSearch,
+    MapPin,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
@@ -32,16 +33,49 @@ import {
 } from '@/components/ui/sidebar';
 import type { NavItem } from '@/types';
 
+function SidebarBranch({ canManageTeams }: { canManageTeams: boolean }) {
+    const page = usePage();
+    const currentTeam = page.props.currentTeam;
+
+    return (
+        <div className="flex w-full min-w-0 items-center justify-stretch border-y border-sidebar-border bg-sidebar-branch px-2 py-2">
+            {canManageTeams ? (
+                <TeamSwitcher label="Sede Principal" />
+            ) : (
+                <div className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm leading-tight">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary/15">
+                        <MapPin className="size-4 text-sidebar-primary" />
+                    </span>
+                    <span className="grid flex-1 leading-tight group-data-[collapsible=icon]:hidden">
+                        <span className="truncate text-[10px] font-semibold tracking-wider text-sidebar-foreground/60 uppercase">
+                            Sede Principal
+                        </span>
+                        <span className="truncate font-semibold text-sidebar-foreground">
+                            {currentTeam?.name ?? 'Sin sede'}
+                        </span>
+                    </span>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function AppSidebar() {
     const page = usePage();
     const dashboardUrl = '/dashboard';
     const permissions = page.props.auth?.permissions ?? [];
-const roles = page.props.auth?.roles ?? [];
+    const roles = page.props.auth?.roles ?? [];
 
     const currentTeam = page.props.currentTeam;
-    const canManageTeams = roles.includes('Gerente') || ['owner', 'admin'].includes(currentTeam?.role ?? '');
-    const canManageCashSession = roles.includes('Gerente') || roles.includes('Cajero') || ['owner', 'admin'].includes(currentTeam?.role ?? '');
-    const isProductionOperator = roles.includes('Cocinero') || roles.includes('Bar');
+    const canManageTeams =
+        roles.includes('Gerente') ||
+        ['owner', 'admin'].includes(currentTeam?.role ?? '');
+    const canManageCashSession =
+        roles.includes('Gerente') ||
+        roles.includes('Cajero') ||
+        ['owner', 'admin'].includes(currentTeam?.role ?? '');
+    const isProductionOperator =
+        roles.includes('Cocinero') || roles.includes('Bar');
 
     //  TODAS LAS PÁGINAS (se filtran según el permiso de "ver" de cada rol)
     const allNavItems: NavItem[] = [
@@ -141,9 +175,11 @@ const roles = page.props.auth?.roles ?? [];
         },
     ];
 
-    const mainNavItems: NavItem[] = allNavItems.filter((item) => item.href === '/contador'
-        ? canManageCashSession
-        : !item.permission || permissions.includes(item.permission));
+    const mainNavItems: NavItem[] = allNavItems.filter((item) =>
+        item.href === '/contador'
+            ? canManageCashSession
+            : !item.permission || permissions.includes(item.permission),
+    );
 
     if (isProductionOperator) {
         mainNavItems.push({
@@ -154,8 +190,9 @@ const roles = page.props.auth?.roles ?? [];
     }
 
     return (
-        <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader>
+        <Sidebar collapsible="icon">
+            {/* ZONA 1 / LOGO */}
+            <SidebarHeader className="bg-sidebar-zone p-2">
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
@@ -165,20 +202,18 @@ const roles = page.props.auth?.roles ?? [];
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
-                {canManageTeams && (
-                    <SidebarMenu>
-                        <SidebarMenuItem>
-                            <TeamSwitcher />
-                        </SidebarMenuItem>
-                    </SidebarMenu>
-                )}
             </SidebarHeader>
 
-            <SidebarContent>
+            {/* ZONA 2 / SEDE PRINCIPAL */}
+            <SidebarBranch canManageTeams={canManageTeams} />
+
+            {/* ZONA 3 / NAVEGACIÓN */}
+            <SidebarContent className="bg-sidebar">
                 <NavMain items={mainNavItems} />
             </SidebarContent>
 
-            <SidebarFooter>
+            {/* ZONA 4 / PIE */}
+            <SidebarFooter className="bg-sidebar-zone">
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

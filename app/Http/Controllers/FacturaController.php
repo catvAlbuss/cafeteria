@@ -40,9 +40,13 @@ class FacturaController extends Controller
                 ->first();
 
             if (! $control) {
+                $ultimoCorrelativo = Factura::where('serie', $serie)
+                    ->pluck('correlativo')
+                    ->max(fn ($correlativo) => (int) $correlativo) ?? 0;
+
                 DB::table('correlativos_control')->insert([
                     'serie' => $serie,
-                    'ultimo_correlativo' => 0,
+                    'ultimo_correlativo' => $ultimoCorrelativo,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);

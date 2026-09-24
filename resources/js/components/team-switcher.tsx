@@ -16,9 +16,13 @@ import type { Team } from '@/types';
 
 type TeamSwitcherProps = {
     inHeader?: boolean;
+    label?: string;
 };
 
-export function TeamSwitcher({ inHeader = false }: TeamSwitcherProps) {
+export function TeamSwitcher({
+    inHeader = false,
+    label = '',
+}: TeamSwitcherProps) {
     const page = usePage();
     const isMobile = useIsMobile();
     const currentTeam = page.props.currentTeam;
@@ -60,7 +64,7 @@ export function TeamSwitcher({ inHeader = false }: TeamSwitcherProps) {
                     className={
                         inHeader
                             ? 'h-8 gap-1 px-2'
-                            : 'w-full justify-start px-2 has-[>svg]:px-2 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
+                            : 'w-full justify-start px-2 text-sidebar-foreground hover:bg-sidebar-accent! hover:text-sidebar-accent-foreground! has-[>svg]:px-2 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
                     }
                 >
                     <Users
@@ -77,6 +81,11 @@ export function TeamSwitcher({ inHeader = false }: TeamSwitcherProps) {
                                 : 'grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden'
                         }
                     >
+                        {label && !inHeader ? (
+                            <span className="truncate text-[10px] font-semibold tracking-wider text-sidebar-foreground/60 uppercase">
+                                {label}
+                            </span>
+                        ) : null}
                         <span
                             className={
                                 inHeader
@@ -91,7 +100,7 @@ export function TeamSwitcher({ inHeader = false }: TeamSwitcherProps) {
                         className={
                             inHeader
                                 ? 'size-4 opacity-50'
-                                : 'ml-auto group-data-[collapsible=icon]:hidden'
+                                : 'ml-auto text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden'
                         }
                     />
                 </Button>

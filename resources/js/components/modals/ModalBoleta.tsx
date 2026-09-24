@@ -67,7 +67,9 @@ export default function ModalBoleta({
         useState<TipoComprobante | null>(null);
 
     // Estados del formulario
-    const [metodoPago, setMetodoPago] = useState<string>(() => data?.metodoPago || 'efectivo');
+    const [metodoPago, setMetodoPago] = useState<string>(
+        () => data?.metodoPago || 'efectivo',
+    );
     const [authorizationPin, setAuthorizationPin] = useState('');
     const [documento, setDocumento] = useState('');
     const [nombre, setNombre] = useState('');
@@ -126,11 +128,7 @@ export default function ModalBoleta({
     } = data;
 
     const tipoTexto =
-        tipo === 'salon'
-            ? '🪑 Salón'
-            : tipo === 'llevar'
-                ? '📦 Llevar'
-                : '🚚 Delivery';
+        tipo === 'salon' ? 'Salón' : tipo === 'llevar' ? 'Llevar' : 'Delivery';
 
     // ============================================================
     // BUSCAR RUC (solo para factura)
@@ -218,8 +216,8 @@ export default function ModalBoleta({
                 documento: esFactura
                     ? documento
                     : esBoletaConDni
-                        ? documento
-                        : '00000000',
+                      ? documento
+                      : '00000000',
                 nombre:
                     esFactura || esBoletaConDni
                         ? nombreEscrito
@@ -303,7 +301,7 @@ export default function ModalBoleta({
             if (response.success) {
                 toast.success(
                     response.message ||
-                    'Venta cancelada; el stock fue restaurado',
+                        'Venta cancelada; el stock fue restaurado',
                 );
                 setConfirmandoSalida(false);
                 onClose();
@@ -384,11 +382,11 @@ export default function ModalBoleta({
     // ============================================================
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-            <div className="flex max-h-[95vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex max-h-[95vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
                 {/* ===== HEADER ===== */}
-                <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 bg-[#FBF7F0] px-5 py-3">
+                <div className="flex flex-shrink-0 items-center justify-between border-b border-sand bg-cream px-5 py-3">
                     <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#C9A96E]">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gold">
                             {tipoComprobante === 'factura' ? (
                                 <FileText className="h-4 w-4 text-white" />
                             ) : (
@@ -396,15 +394,15 @@ export default function ModalBoleta({
                             )}
                         </div>
                         <div>
-                            <p className="text-sm font-bold text-[#2D1B1A]">
+                            <p className="text-sm font-bold text-chocolate">
                                 {EMPRESA_NOMBRE}
                             </p>
-                            <p className="text-[10px] text-gray-400">
+                            <p className="text-[10px] text-cocoa-soft">
                                 {tipoComprobante === 'factura'
                                     ? 'Factura'
                                     : tipoComprobante === 'boleta'
-                                        ? 'Boleta'
-                                        : 'Cobrar'}{' '}
+                                      ? 'Boleta'
+                                      : 'Cobrar'}{' '}
                                 · Mesa #{mesa}
                             </p>
                         </div>
@@ -413,7 +411,7 @@ export default function ModalBoleta({
                         onClick={() =>
                             mesaId ? onClose() : setConfirmandoSalida(true)
                         }
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600"
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-cocoa-soft transition hover:bg-sand hover:text-cocoa"
                     >
                         <X className="h-4 w-4" />
                     </button>
@@ -435,19 +433,21 @@ export default function ModalBoleta({
                                 <p className="mt-1 text-xs text-green-700">
                                     {comprobanteEmitido.facturaNumero}
                                 </p>
-                                <p className="mt-2 text-lg font-bold text-[#C9A96E]">
+                                <p className="mt-2 text-lg font-bold text-gold">
                                     S/ {comprobanteEmitido.total.toFixed(2)}
                                 </p>
                             </div>
 
                             {/* Input WhatsApp */}
                             <div>
-                                <label className="mb-1 block text-xs font-medium text-gray-600">
+                                <label className="mb-1 block text-xs font-medium text-cocoa">
                                     Número de WhatsApp del cliente{' '}
-                                    <span className="text-gray-400">(con código de país)</span>
+                                    <span className="text-cocoa-soft">
+                                        (con código de país)
+                                    </span>
                                 </label>
                                 <div className="flex items-center gap-2">
-                                    <span className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700">
+                                    <span className="rounded-lg bg-sand px-3 py-2 text-sm font-medium text-chocolate">
                                         🇵🇪 +51
                                     </span>
                                     <input
@@ -457,14 +457,17 @@ export default function ModalBoleta({
                                         value={telefonoWhatsapp}
                                         onChange={(e) =>
                                             setTelefonoWhatsapp(
-                                                e.target.value.replace(/\D/g, '').slice(0, 9),
+                                                e.target.value
+                                                    .replace(/\D/g, '')
+                                                    .slice(0, 9),
                                             )
                                         }
-                                        className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                        className="flex-1 rounded-lg border border-wheat bg-card px-3 py-2 text-sm text-chocolate outline-none placeholder:text-cocoa-soft focus:ring-2 focus:ring-gold"
                                     />
                                 </div>
-                                <p className="mt-1 text-[10px] text-gray-400">
-                                    Se abrirá WhatsApp Web con el PDF adjunto como link.
+                                <p className="mt-1 text-[10px] text-cocoa-soft">
+                                    Se abrirá WhatsApp Web con el PDF adjunto
+                                    como link.
                                 </p>
                             </div>
 
@@ -474,7 +477,8 @@ export default function ModalBoleta({
                                 onClick={enviarPorWhatsApp}
                                 disabled={
                                     enviandoWhatsapp ||
-                                    telefonoWhatsapp.replace(/\D/g, '').length < 9
+                                    telefonoWhatsapp.replace(/\D/g, '').length <
+                                        9
                                 }
                                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
@@ -490,7 +494,7 @@ export default function ModalBoleta({
                                     href={comprobanteEmitido.pdfUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-100 py-2.5 text-xs font-medium text-gray-700 transition hover:bg-gray-200"
+                                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-sand py-2.5 text-xs font-medium text-chocolate transition hover:bg-wheat"
                                 >
                                     <FileText className="h-3.5 w-3.5" />
                                     Ver PDF
@@ -498,7 +502,7 @@ export default function ModalBoleta({
                                 <button
                                     type="button"
                                     onClick={finalizarEnvio}
-                                    className="flex-1 rounded-xl bg-[#2D1B1A] py-2.5 text-xs font-medium text-white transition hover:bg-[#1A0F0E]"
+                                    className="flex-1 rounded-xl bg-roast py-2.5 text-xs font-medium text-white transition hover:bg-ink"
                                 >
                                     Finalizar
                                 </button>
@@ -509,23 +513,23 @@ export default function ModalBoleta({
                     {/* ===== PASO 1: SELECCIÓN DE TIPO ===== */}
                     {!comprobanteEmitido && !tipoComprobante && (
                         <div className="space-y-3">
-                            <p className="mb-4 text-center text-sm font-medium text-gray-600">
+                            <p className="mb-4 text-center text-sm font-medium text-cocoa">
                                 ¿Qué comprobante desea emitir?
                             </p>
 
                             {/* BOTÓN BOLETA */}
                             <button
                                 onClick={() => setTipoComprobante('boleta')}
-                                className="flex w-full items-center gap-4 rounded-xl border-2 border-gray-200 p-4 transition-all hover:border-[#C9A96E] hover:bg-[#C9A96E]/5 active:scale-[0.98]"
+                                className="flex w-full items-center gap-4 rounded-xl border-2 border-wheat p-4 transition-all hover:border-gold hover:bg-gold/5 active:scale-[0.98]"
                             >
-                                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#C9A96E]/10">
-                                    <Receipt className="h-6 w-6 text-[#C9A96E]" />
+                                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gold/10">
+                                    <Receipt className="h-6 w-6 text-gold" />
                                 </div>
                                 <div className="text-left">
-                                    <p className="font-bold text-[#2D1B1A]">
+                                    <p className="font-bold text-chocolate">
                                         BOLETA
                                     </p>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-cocoa">
                                         Para personas naturales
                                     </p>
                                 </div>
@@ -534,16 +538,16 @@ export default function ModalBoleta({
                             {/* BOTÓN FACTURA */}
                             <button
                                 onClick={() => setTipoComprobante('factura')}
-                                className="flex w-full items-center gap-4 rounded-xl border-2 border-gray-200 p-4 transition-all hover:border-[#C9A96E] hover:bg-[#C9A96E]/5 active:scale-[0.98]"
+                                className="flex w-full items-center gap-4 rounded-xl border-2 border-wheat p-4 transition-all hover:border-gold hover:bg-gold/5 active:scale-[0.98]"
                             >
-                                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#C9A96E]/10">
-                                    <FileText className="h-6 w-6 text-[#C9A96E]" />
+                                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gold/10">
+                                    <FileText className="h-6 w-6 text-gold" />
                                 </div>
                                 <div className="text-left">
-                                    <p className="font-bold text-[#2D1B1A]">
+                                    <p className="font-bold text-chocolate">
                                         FACTURA
                                     </p>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-cocoa">
                                         Para empresas con RUC
                                     </p>
                                 </div>
@@ -555,8 +559,8 @@ export default function ModalBoleta({
                     {!comprobanteEmitido && tipoComprobante && (
                         <>
                             {/* RESUMEN DEL PEDIDO */}
-                            <div className="rounded-xl bg-gray-50 p-4">
-                                <p className="mb-2 text-xs font-bold text-gray-500 uppercase">
+                            <div className="rounded-xl bg-cream-soft p-4">
+                                <p className="mb-2 text-xs font-bold text-cocoa uppercase">
                                     Resumen del pedido
                                 </p>
                                 <div className="space-y-1">
@@ -565,7 +569,7 @@ export default function ModalBoleta({
                                             key={index}
                                             className="flex justify-between text-sm"
                                         >
-                                            <span className="text-gray-700">
+                                            <span className="text-chocolate">
                                                 {item.cantidad}x {item.nombre}
                                             </span>
                                             <span className="font-medium">
@@ -574,9 +578,9 @@ export default function ModalBoleta({
                                         </div>
                                     ))}
                                 </div>
-                                <div className="mt-2 space-y-1 border-t border-gray-200 pt-2 text-sm">
+                                <div className="mt-2 space-y-1 border-t border-sand pt-2 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">
+                                        <span className="text-cocoa">
                                             Subtotal
                                         </span>
                                         <span className="font-medium">
@@ -584,7 +588,7 @@ export default function ModalBoleta({
                                         </span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">
+                                        <span className="text-cocoa">
                                             IGV (18%)
                                         </span>
                                         <span className="font-medium">
@@ -594,7 +598,7 @@ export default function ModalBoleta({
                                 </div>
                                 <div className="flex justify-between text-base font-bold">
                                     <span>TOTAL</span>
-                                    <span className="text-[#C9A96E]">
+                                    <span className="text-gold">
                                         S/ {total.toFixed(2)}
                                     </span>
                                 </div>
@@ -603,9 +607,9 @@ export default function ModalBoleta({
                             {/* DNI OPCIONAL (solo boleta) */}
                             {tipoComprobante === 'boleta' && (
                                 <div>
-                                    <label className="mb-1 block text-xs font-medium text-gray-600">
+                                    <label className="mb-1 block text-xs font-medium text-cocoa">
                                         DNI del cliente{' '}
-                                        <span className="text-gray-400">
+                                        <span className="text-cocoa-soft">
                                             (opcional)
                                         </span>
                                     </label>
@@ -626,7 +630,7 @@ export default function ModalBoleta({
                                                     buscarClientePorDni(valor);
                                                 }
                                             }}
-                                            className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                            className="flex-1 rounded-lg border border-wheat bg-card px-3 py-2 text-sm text-chocolate outline-none placeholder:text-cocoa-soft focus:ring-2 focus:ring-gold"
                                         />
                                     </div>
                                     {documento.length > 0 &&
@@ -637,7 +641,7 @@ export default function ModalBoleta({
                                             </p>
                                         )}
                                     {documento.length === 0 && (
-                                        <p className="mt-1 text-[10px] text-gray-400">
+                                        <p className="mt-1 text-[10px] text-cocoa-soft">
                                             Si no lo ingresa, se emitirá como
                                             CLIENTES VARIOS
                                         </p>
@@ -646,9 +650,9 @@ export default function ModalBoleta({
                                     {/* NOMBRE DEL CLIENTE (opcional, solo con DNI) */}
                                     {documento.length === 8 && (
                                         <div className="mt-3">
-                                            <label className="mb-1 block text-xs font-medium text-gray-600">
+                                            <label className="mb-1 block text-xs font-medium text-cocoa">
                                                 Nombre del cliente{' '}
-                                                <span className="text-gray-400">
+                                                <span className="text-cocoa-soft">
                                                     (opcional)
                                                 </span>
                                             </label>
@@ -659,9 +663,9 @@ export default function ModalBoleta({
                                                 onChange={(e) =>
                                                     setNombre(e.target.value)
                                                 }
-                                                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                                className="w-full rounded-lg border border-wheat bg-card px-3 py-2 text-sm text-chocolate outline-none placeholder:text-cocoa-soft focus:ring-2 focus:ring-gold"
                                             />
-                                            <p className="mt-1 text-[10px] text-gray-400">
+                                            <p className="mt-1 text-[10px] text-cocoa-soft">
                                                 El cliente se registra
                                                 automáticamente por su DNI; si
                                                 no pones nombre, quedará como
@@ -675,13 +679,13 @@ export default function ModalBoleta({
                             {/* DATOS DE LA FACTURA (solo factura) */}
                             {tipoComprobante === 'factura' && (
                                 <div className="space-y-3">
-                                    <p className="text-xs font-bold text-gray-500 uppercase">
+                                    <p className="text-xs font-bold text-cocoa uppercase">
                                         Datos de la factura
                                     </p>
 
                                     {/* RUC */}
                                     <div>
-                                        <label className="mb-1 block text-xs font-medium text-gray-600">
+                                        <label className="mb-1 block text-xs font-medium text-cocoa">
                                             RUC{' '}
                                             <span className="text-red-500">
                                                 *
@@ -700,7 +704,7 @@ export default function ModalBoleta({
                                                         .slice(0, 11);
                                                     setDocumento(valor);
                                                 }}
-                                                className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                                className="flex-1 rounded-lg border border-wheat bg-card px-3 py-2 text-sm text-chocolate outline-none placeholder:text-cocoa-soft focus:ring-2 focus:ring-gold"
                                             />
                                             <button
                                                 type="button"
@@ -709,7 +713,7 @@ export default function ModalBoleta({
                                                     buscando ||
                                                     documento.length !== 11
                                                 }
-                                                className="rounded-lg bg-[#C9A96E] px-3 py-2 text-xs font-medium text-white transition hover:bg-[#B8975D] disabled:cursor-not-allowed disabled:opacity-50"
+                                                className="rounded-lg bg-gold px-3 py-2 text-xs font-medium text-ink transition hover:bg-gold-deep disabled:cursor-not-allowed disabled:opacity-50"
                                             >
                                                 {buscando ? (
                                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -729,9 +733,9 @@ export default function ModalBoleta({
 
                                     {/* RAZÓN SOCIAL */}
                                     <div>
-                                        <label className="mb-1 block text-xs font-medium text-gray-600">
+                                        <label className="mb-1 block text-xs font-medium text-cocoa">
                                             Razón Social{' '}
-                                            <span className="text-gray-400">
+                                            <span className="text-cocoa-soft">
                                                 (opcional)
                                             </span>
                                         </label>
@@ -742,9 +746,9 @@ export default function ModalBoleta({
                                             onChange={(e) =>
                                                 setNombre(e.target.value)
                                             }
-                                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                            className="w-full rounded-lg border border-wheat bg-card px-3 py-2 text-sm text-chocolate outline-none placeholder:text-cocoa-soft focus:ring-2 focus:ring-gold"
                                         />
-                                        <p className="mt-1 text-[10px] text-gray-400">
+                                        <p className="mt-1 text-[10px] text-cocoa-soft">
                                             Si no la pones, quedará como
                                             «Cliente {documento}».
                                         </p>
@@ -752,7 +756,7 @@ export default function ModalBoleta({
 
                                     {/* DIRECCIÓN */}
                                     <div>
-                                        <label className="mb-1 block text-xs font-medium text-gray-600">
+                                        <label className="mb-1 block text-xs font-medium text-cocoa">
                                             Dirección{' '}
                                             <span className="text-red-500">
                                                 *
@@ -765,12 +769,12 @@ export default function ModalBoleta({
                                             onChange={(e) =>
                                                 setDireccion(e.target.value)
                                             }
-                                            className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#C9A96E]"
+                                            className="w-full rounded-lg border border-wheat bg-card px-3 py-2 text-sm text-chocolate outline-none placeholder:text-cocoa-soft focus:ring-2 focus:ring-gold"
                                         />
                                     </div>
 
                                     {/* NOTA */}
-                                    <p className="text-[10px] text-gray-500">
+                                    <p className="text-[10px] text-cocoa">
                                         <span className="text-red-500">*</span>{' '}
                                         Todos los campos son obligatorios
                                     </p>
@@ -779,7 +783,7 @@ export default function ModalBoleta({
 
                             {/* MÉTODO DE PAGO */}
                             <div>
-                                <p className="mb-2 text-xs font-bold text-gray-500 uppercase">
+                                <p className="mb-2 text-xs font-bold text-cocoa uppercase">
                                     Método de pago
                                 </p>
                                 <div className="grid grid-cols-3 gap-2">
@@ -790,8 +794,8 @@ export default function ModalBoleta({
                                         }
                                         className={`flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-medium transition ${
                                             metodoPago === 'efectivo'
-                                                ? 'bg-[#C9A96E] text-white shadow-md'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                ? 'bg-gold text-ink shadow-md'
+                                                : 'bg-sand text-cocoa hover:bg-wheat'
                                         }`}
                                     >
                                         <Banknote className="h-4 w-4" />
@@ -802,8 +806,8 @@ export default function ModalBoleta({
                                         onClick={() => setMetodoPago('tarjeta')}
                                         className={`flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-medium transition ${
                                             metodoPago === 'tarjeta'
-                                                ? 'bg-[#C9A96E] text-white shadow-md'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                ? 'bg-gold text-ink shadow-md'
+                                                : 'bg-sand text-cocoa hover:bg-wheat'
                                         }`}
                                     >
                                         <CreditCard className="h-4 w-4" />
@@ -814,8 +818,8 @@ export default function ModalBoleta({
                                         onClick={() => setMetodoPago('yape')}
                                         className={`flex flex-col items-center gap-1 rounded-xl py-3 text-xs font-medium transition ${
                                             metodoPago === 'yape'
-                                                ? 'bg-[#C9A96E] text-white shadow-md'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                ? 'bg-gold text-ink shadow-md'
+                                                : 'bg-sand text-cocoa hover:bg-wheat'
                                         }`}
                                     >
                                         <Smartphone className="h-4 w-4" />
@@ -826,18 +830,18 @@ export default function ModalBoleta({
 
                             {/* PIN */}
                             <div>
-                                <label className="mb-1 block text-xs font-medium text-gray-600">
+                                <label className="mb-1 block text-xs font-medium text-cocoa">
                                     PIN de autorización
                                 </label>
                                 <div className="relative">
-                                    <KeyRound className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                    <KeyRound className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-cocoa-soft" />
                                     <input
                                         type="password"
                                         inputMode="numeric"
                                         maxLength={4}
                                         autoComplete="off"
                                         placeholder="••••"
-                                        className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pr-4 pl-9 text-center text-sm tracking-[0.5em] text-gray-900 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        className="w-full rounded-xl border border-wheat bg-cream-soft py-2 pr-4 pl-9 text-center text-sm tracking-[0.5em] text-chocolate outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                         value={authorizationPin}
                                         onChange={(e) =>
                                             setAuthorizationPin(
@@ -862,7 +866,7 @@ export default function ModalBoleta({
                                             !nombre ||
                                             !direccion))
                                 }
-                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2D1B1A] py-3 text-sm font-semibold text-white transition hover:bg-[#1A0F0E] disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-roast py-3 text-sm font-semibold text-white transition hover:bg-ink disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {emitiendo ? (
                                     <>
@@ -883,7 +887,7 @@ export default function ModalBoleta({
                             <button
                                 type="button"
                                 onClick={() => setTipoComprobante(null)}
-                                className="w-full py-2 text-xs text-gray-500 transition hover:text-gray-700"
+                                className="w-full py-2 text-xs text-cocoa transition hover:text-chocolate"
                             >
                                 ← Volver a seleccionar
                             </button>
@@ -895,15 +899,15 @@ export default function ModalBoleta({
             {/* ===== CONFIRMACIÓN DE SALIDA ===== */}
             {confirmandoSalida && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                    <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+                    <div className="w-full max-w-sm rounded-2xl bg-card p-6 shadow-2xl">
                         <div className="flex flex-col items-center text-center">
                             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
                                 <AlertTriangle className="h-6 w-6 text-amber-600" />
                             </div>
-                            <p className="text-base font-bold text-[#2D1B1A]">
+                            <p className="text-base font-bold text-chocolate">
                                 ¿Salir de la emisión?
                             </p>
-                            <p className="mt-2 text-sm text-gray-500">
+                            <p className="mt-2 text-sm text-cocoa">
                                 La venta ya fue registrada y el stock fue
                                 descontado. Si sales sin emitir el comprobante,
                                 se cancelará la venta y se restaurará el stock.
@@ -914,7 +918,7 @@ export default function ModalBoleta({
                                     type="button"
                                     onClick={() => setConfirmandoSalida(false)}
                                     disabled={cancelandoVenta}
-                                    className="w-full rounded-xl bg-[#C9A96E] py-2.5 text-sm font-semibold text-white transition hover:bg-[#B8975D] disabled:opacity-50"
+                                    className="w-full rounded-xl bg-gold py-2.5 text-sm font-semibold text-ink transition hover:bg-gold-deep disabled:opacity-50"
                                 >
                                     Continuar con la venta
                                 </button>

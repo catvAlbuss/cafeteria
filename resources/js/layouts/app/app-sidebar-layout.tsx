@@ -12,7 +12,10 @@ export default function AppSidebarLayout({
     return (
         <AppShell variant="sidebar">
             <AppSidebar />
-            <AppContent variant="sidebar" className="overflow-x-clip pt-16 group-has-data-[collapsible=icon]/sidebar-wrapper:pt-12">
+            <AppContent
+                variant="sidebar"
+                className="overflow-x-clip pt-16 group-has-data-[collapsible=icon]/sidebar-wrapper:pt-12"
+            >
                 <AppSidebarHeader breadcrumbs={breadcrumbs} />
                 <CashSessionGuard>{children}</CashSessionGuard>
             </AppContent>

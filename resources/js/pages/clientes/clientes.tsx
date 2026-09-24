@@ -114,8 +114,8 @@ export default function Clientes() {
                 };
             default:
                 return {
-                    bg: 'bg-gray-100',
-                    text: 'text-gray-700',
+                    bg: 'bg-sand',
+                    text: 'text-cocoa',
                     label: 'Desconocido',
                     icon: XCircle,
                 };
@@ -292,22 +292,22 @@ export default function Clientes() {
     return (
         <>
             <Head title="Clientes - Dolce Cafe" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto bg-[#FBF3E7] p-6">
+            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-6">
                 {/* ===== HEADER ===== */}
                 <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
                     <div>
-                        <h1 className="text-3xl font-bold text-[#2D1B1A]">
+                        <h1 className="text-3xl font-bold text-chocolate">
                             {' '}
                             Clientes
                         </h1>
-                        <p className="mt-1 text-sm text-[#5A3D2B]">
+                        <p className="mt-1 text-sm text-cocoa">
                             Gestión y control de clientes del sistema
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setModalConfigAbierto(true)}
-                            className="inline-flex items-center gap-2 rounded-xl border border-[#E8D5C4] bg-white px-4 py-2.5 font-semibold text-[#5A3D2B] shadow-sm transition hover:bg-gray-50"
+                            className="inline-flex items-center gap-2 rounded-xl border border-wheat bg-card px-4 py-2.5 font-semibold text-cocoa shadow-sm transition hover:bg-sand"
                             title="Configurar umbral de registro automático"
                         >
                             <Settings className="h-4 w-4" />
@@ -315,7 +315,7 @@ export default function Clientes() {
                         </button>
                         <button
                             onClick={abrirNuevo}
-                            className="inline-flex items-center gap-2 rounded-xl bg-[#C9A96E] px-5 py-2.5 font-semibold text-white shadow-md transition hover:bg-[#B8975D]"
+                            className="inline-flex items-center gap-2 rounded-xl bg-gold px-5 py-2.5 font-semibold text-ink shadow-md transition hover:bg-gold-deep"
                         >
                             <Plus className="h-4 w-4" />
                             Nuevo Cliente
@@ -325,25 +325,25 @@ export default function Clientes() {
 
                 {/* ===== ESTADÍSTICAS ===== */}
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-2xl border border-[#F3E1C8] bg-white p-5 shadow-sm">
+                    <div className="rounded-2xl border border-sand bg-card p-5 shadow-sm">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-[#5A3D2B]">
+                                <p className="text-sm font-medium text-cocoa">
                                     Total clientes
                                 </p>
-                                <p className="mt-1 text-3xl font-bold text-[#2D1B1A]">
+                                <p className="mt-1 text-3xl font-bold text-chocolate">
                                     {stats.total}
                                 </p>
                             </div>
-                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F3E1C8]">
-                                <Users className="h-6 w-6 text-[#8A5A2B]" />
+                            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sand">
+                                <Users className="h-6 w-6 text-cinnamon" />
                             </div>
                         </div>
                     </div>
-                    <div className="rounded-2xl border border-[#F3E1C8] bg-white p-5 shadow-sm">
+                    <div className="rounded-2xl border border-sand bg-card p-5 shadow-sm">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-[#5A3D2B]">
+                                <p className="text-sm font-medium text-cocoa">
                                     Activos
                                 </p>
                                 <p className="mt-1 text-3xl font-bold text-green-600">
@@ -355,10 +355,10 @@ export default function Clientes() {
                             </div>
                         </div>
                     </div>
-                    <div className="rounded-2xl border border-[#F3E1C8] bg-white p-5 shadow-sm">
+                    <div className="rounded-2xl border border-sand bg-card p-5 shadow-sm">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-[#5A3D2B]">
+                                <p className="text-sm font-medium text-cocoa">
                                     VIP
                                 </p>
                                 <p className="mt-1 text-3xl font-bold text-yellow-600">
@@ -370,7 +370,7 @@ export default function Clientes() {
                             </div>
                         </div>
                     </div>
-                    <div className="rounded-2xl bg-[#2D1B1A] p-5 text-white">
+                    <div className="rounded-2xl bg-roast p-5 text-white">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-white/60">
@@ -381,28 +381,28 @@ export default function Clientes() {
                                 </p>
                             </div>
                             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10">
-                                <DollarSign className="h-6 w-6 text-[#C9A96E]" />
+                                <DollarSign className="h-6 w-6 text-gold" />
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* ===== BUSCADOR Y FILTROS ===== */}
-                <div className="rounded-2xl border border-[#F3E1C8] bg-white p-3 shadow-sm">
+                <div className="rounded-2xl border border-sand bg-card p-3 shadow-sm">
                     <div className="flex flex-col items-center gap-2 sm:flex-row">
                         <div className="relative w-full flex-1 sm:w-auto">
-                            <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-[#8D6B53]" />
+                            <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-cocoa-soft" />
                             <input
                                 type="text"
                                 placeholder="Buscar cliente, DNI o RUC..."
-                                className="w-full rounded-lg border border-[#E8D5C4] bg-white py-2 pr-3 pl-9 text-sm text-[#2D1B1A] placeholder-[#8D6B53] transition focus:border-[#C9A96E] focus:ring-2 focus:ring-[#C9A96E]/20 focus:outline-none"
+                                className="w-full rounded-lg border border-wheat bg-card py-2 pr-3 pl-9 text-sm text-chocolate placeholder-cocoa-soft transition focus:border-gold focus:ring-2 focus:ring-gold/20 focus:outline-none"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
                             />
                         </div>
                         <div className="flex w-full gap-2 sm:w-auto">
                             <select
-                                className="min-w-[130px] appearance-none rounded-lg border border-[#E8D5C4] bg-white px-3 py-2 text-sm text-[#2D1B1A] transition focus:border-[#C9A96E] focus:ring-2 focus:ring-[#C9A96E]/20 focus:outline-none"
+                                className="min-w-[130px] appearance-none rounded-lg border border-wheat bg-card px-3 py-2 text-sm text-chocolate transition focus:border-gold focus:ring-2 focus:ring-gold/20 focus:outline-none"
                                 value={filtroEstado}
                                 onChange={(e) =>
                                     setFiltroEstado(e.target.value)
@@ -418,14 +418,14 @@ export default function Clientes() {
                                     setBusqueda('');
                                     setFiltroEstado('');
                                 }}
-                                className="flex items-center gap-1.5 rounded-lg border border-[#E8D5C4] px-3 py-2 text-xs font-medium whitespace-nowrap text-[#5A3D2B] transition hover:border-[#C9A96E] hover:bg-[#FBF3E7]"
+                                className="flex items-center gap-1.5 rounded-lg border border-wheat px-3 py-2 text-xs font-medium whitespace-nowrap text-cocoa transition hover:border-gold hover:bg-cream-soft"
                             >
                                 <X className="h-3.5 w-3.5" />
                                 Limpiar
                             </button>
                         </div>
                     </div>
-                    <p className="mt-2 px-1 text-[11px] text-[#8D6B53]">
+                    <p className="mt-2 px-1 text-[11px] text-cocoa-soft">
                         Los clientes se identifican automáticamente con el
                         DNI/RUC de cada comprobante. El estado se calcula según
                         las compras de los últimos 30 días (mín.{' '}
@@ -435,48 +435,48 @@ export default function Clientes() {
                 </div>
 
                 {/* ===== TABLA DE CLIENTES ===== */}
-                <div className="overflow-hidden rounded-2xl border border-[#F3E1C8] bg-white shadow-sm">
-                    <div className="flex items-center justify-between border-b border-[#F3E1C8] p-5">
-                        <h2 className="text-xl font-bold text-[#2D1B1A]">
+                <div className="overflow-hidden rounded-2xl border border-sand bg-card shadow-sm">
+                    <div className="flex items-center justify-between border-b border-sand p-5">
+                        <h2 className="text-xl font-bold text-chocolate">
                             Listado de clientes
                         </h2>
-                        <span className="text-sm text-[#5A3D2B]">
+                        <span className="text-sm text-cocoa">
                             {clientesFiltrados.length} clientes
                         </span>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-[#FBF3E7]">
+                            <thead className="border-b-2 border-sand bg-cream-soft text-cocoa dark:border-roast/60 dark:bg-roast/70 dark:text-cocoa">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-cocoa-soft uppercase">
                                         Cliente
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-cocoa-soft uppercase">
                                         Documento
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-cocoa-soft uppercase">
                                         Contacto
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-cocoa-soft uppercase">
                                         Pedidos (30d)
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-cocoa-soft uppercase">
                                         Total gastado (30d)
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase">
+                                    <th className="px-4 py-3 text-left text-xs font-bold text-cocoa-soft uppercase">
                                         Estado
                                     </th>
-                                    <th className="px-4 py-3 text-center text-xs font-bold text-gray-400 uppercase">
+                                    <th className="px-4 py-3 text-center text-xs font-bold text-cocoa-soft uppercase">
                                         Acciones
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-sand dark:divide-roast">
                                 {clientesFiltrados.length === 0 ? (
                                     <tr>
                                         <td
                                             colSpan={7}
-                                            className="py-10 text-center text-gray-400"
+                                            className="py-10 text-center text-cocoa-soft"
                                         >
                                             No hay clientes
                                         </td>
@@ -491,15 +491,15 @@ export default function Clientes() {
                                         return (
                                             <tr
                                                 key={cliente.id}
-                                                className="transition hover:bg-[#FBF3E7]"
+                                                className="transition hover:bg-cream-soft"
                                             >
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center gap-2">
                                                         <div>
-                                                            <p className="font-medium text-[#2D1B1A]">
+                                                            <p className="font-medium text-chocolate">
                                                                 {cliente.nombre}
                                                             </p>
-                                                            <p className="text-xs text-gray-400">
+                                                            <p className="text-xs text-cocoa-soft">
                                                                 Registro:{' '}
                                                                 {
                                                                     cliente.fechaRegistro
@@ -514,8 +514,8 @@ export default function Clientes() {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <span className="flex items-center gap-1 text-sm text-[#5A3D2B]">
-                                                        <FileDigit className="h-3 w-3 text-gray-400" />
+                                                    <span className="flex items-center gap-1 text-sm text-cocoa">
+                                                        <FileDigit className="h-3 w-3 text-cocoa-soft" />
                                                         {formatoDocumento(
                                                             cliente,
                                                         )}
@@ -523,23 +523,23 @@ export default function Clientes() {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="space-y-0.5">
-                                                        <p className="flex items-center gap-1 text-sm text-[#5A3D2B]">
+                                                        <p className="flex items-center gap-1 text-sm text-cocoa">
                                                             <Phone className="h-3 w-3" />{' '}
                                                             {cliente.telefono ||
                                                                 '—'}
                                                         </p>
                                                         {cliente.email && (
-                                                            <p className="flex items-center gap-1 text-xs text-gray-400">
+                                                            <p className="flex items-center gap-1 text-xs text-cocoa-soft">
                                                                 <Mail className="h-3 w-3" />{' '}
                                                                 {cliente.email}
                                                             </p>
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-sm text-[#5A3D2B]">
+                                                <td className="px-4 py-3 text-sm text-cocoa">
                                                     {cliente.pedidos}
                                                 </td>
-                                                <td className="px-4 py-3 text-sm font-semibold text-[#2D1B1A]">
+                                                <td className="px-4 py-3 text-sm font-semibold text-chocolate">
                                                     {formatCurrency(
                                                         cliente.totalGastado,
                                                     )}
@@ -570,7 +570,7 @@ export default function Clientes() {
                                                                     cliente,
                                                                 )
                                                             }
-                                                            className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700 transition hover:bg-gray-200"
+                                                            className="rounded-lg bg-sand px-2.5 py-1 text-xs font-semibold text-chocolate transition hover:bg-wheat"
                                                         >
                                                             Editar
                                                         </button>
@@ -600,16 +600,16 @@ export default function Clientes() {
                 {/* ============================================================ */}
                 {modalAbierto && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-                        <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white shadow-xl">
-                            <div className="flex items-center justify-between border-b border-[#F3E1C8] p-6">
-                                <h2 className="text-2xl font-bold text-[#2D1B1A]">
+                        <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-card shadow-xl">
+                            <div className="flex items-center justify-between border-b border-sand p-6">
+                                <h2 className="text-2xl font-bold text-chocolate">
                                     {esEdicion
                                         ? 'Editar Cliente'
                                         : 'Nuevo Cliente'}
                                 </h2>
                                 <button
                                     onClick={() => setModalAbierto(false)}
-                                    className="text-3xl text-gray-400 transition hover:text-red-500"
+                                    className="text-3xl text-cocoa-soft transition hover:text-red-500"
                                 >
                                     ×
                                 </button>
@@ -617,12 +617,12 @@ export default function Clientes() {
 
                             <div className="space-y-4 p-6">
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500">
+                                    <label className="text-sm font-medium text-cocoa">
                                         Nombre completo *
                                     </label>
                                     <input
                                         type="text"
-                                        className="mt-1 w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        className="mt-1 w-full rounded-xl border border-wheat p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                         value={formulario.nombre}
                                         onChange={(e) =>
                                             setFormulario({
@@ -635,12 +635,12 @@ export default function Clientes() {
                                 </div>
 
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500">
+                                    <label className="text-sm font-medium text-cocoa">
                                         Documento (DNI/RUC)
                                     </label>
                                     <div className="mt-1 flex gap-2">
                                         <select
-                                            className="rounded-xl border border-gray-200 bg-white p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                            className="rounded-xl border border-wheat bg-card p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                             value={formulario.tipoDocumento}
                                             onChange={(e) =>
                                                 setFormulario({
@@ -662,7 +662,7 @@ export default function Clientes() {
                                                     ? 11
                                                     : 8
                                             }
-                                            className="flex-1 rounded-xl border border-gray-200 p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                            className="flex-1 rounded-xl border border-wheat p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                             value={formulario.documento}
                                             onChange={(e) =>
                                                 setFormulario({
@@ -686,19 +686,19 @@ export default function Clientes() {
                                             }
                                         />
                                     </div>
-                                    <p className="mt-1 text-[11px] text-gray-400">
+                                    <p className="mt-1 text-[11px] text-cocoa-soft">
                                         Opcional. Si se deja vacío, el cliente
                                         no estará vinculado a comprobantes.
                                     </p>
                                 </div>
 
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500">
+                                    <label className="text-sm font-medium text-cocoa">
                                         Teléfono
                                     </label>
                                     <input
                                         type="text"
-                                        className="mt-1 w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        className="mt-1 w-full rounded-xl border border-wheat p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                         value={formulario.telefono}
                                         onChange={(e) =>
                                             setFormulario({
@@ -711,12 +711,12 @@ export default function Clientes() {
                                 </div>
 
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500">
+                                    <label className="text-sm font-medium text-cocoa">
                                         Correo electrónico
                                     </label>
                                     <input
                                         type="email"
-                                        className="mt-1 w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        className="mt-1 w-full rounded-xl border border-wheat p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                         value={formulario.email}
                                         onChange={(e) =>
                                             setFormulario({
@@ -729,12 +729,12 @@ export default function Clientes() {
                                 </div>
 
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500">
+                                    <label className="text-sm font-medium text-cocoa">
                                         Dirección
                                     </label>
                                     <input
                                         type="text"
-                                        className="mt-1 w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        className="mt-1 w-full rounded-xl border border-wheat p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                         value={formulario.direccion}
                                         onChange={(e) =>
                                             setFormulario({
@@ -747,11 +747,11 @@ export default function Clientes() {
                                 </div>
 
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500">
+                                    <label className="text-sm font-medium text-cocoa">
                                         Estado
                                     </label>
                                     <select
-                                        className="mt-1 w-full rounded-xl border border-gray-200 bg-white p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        className="mt-1 w-full rounded-xl border border-wheat bg-card p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                         value={formulario.estado}
                                         onChange={(e) =>
                                             setFormulario({
@@ -769,7 +769,7 @@ export default function Clientes() {
                                             Inactivo
                                         </option>
                                     </select>
-                                    <p className="mt-1 text-[11px] text-gray-400">
+                                    <p className="mt-1 text-[11px] text-cocoa-soft">
                                         Para clientes con documento, el estado
                                         se recalcula automáticamente según sus
                                         compras.
@@ -777,17 +777,17 @@ export default function Clientes() {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 border-t border-[#F3E1C8] p-6">
+                            <div className="flex justify-end gap-3 border-t border-sand p-6">
                                 <button
                                     onClick={() => setModalAbierto(false)}
-                                    className="rounded-xl bg-gray-100 px-5 py-2.5 font-semibold transition hover:bg-gray-200"
+                                    className="rounded-xl bg-cream-pale px-5 py-2.5 font-semibold text-cocoa transition hover:bg-cream"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     onClick={guardarCliente}
                                     disabled={guardando}
-                                    className="rounded-xl bg-[#C9A96E] px-5 py-2.5 font-semibold text-white transition hover:bg-[#B8975D] disabled:opacity-50"
+                                    className="rounded-xl bg-gold px-5 py-2.5 font-semibold text-ink transition hover:bg-gold-deep disabled:opacity-50"
                                 >
                                     {guardando ? 'Guardando...' : 'Guardar'}
                                 </button>
@@ -801,14 +801,14 @@ export default function Clientes() {
                 {/* ============================================================ */}
                 {modalVerAbierto && clienteSeleccionado && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-                        <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-xl">
-                            <div className="flex items-center justify-between border-b border-[#F3E1C8] p-6">
-                                <h2 className="text-2xl font-bold text-[#2D1B1A]">
+                        <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-card shadow-xl">
+                            <div className="flex items-center justify-between border-b border-sand p-6">
+                                <h2 className="text-2xl font-bold text-chocolate">
                                     Detalle del Cliente
                                 </h2>
                                 <button
                                     onClick={() => setModalVerAbierto(false)}
-                                    className="text-3xl text-gray-400 transition hover:text-red-500"
+                                    className="text-3xl text-cocoa-soft transition hover:text-red-500"
                                 >
                                     ×
                                 </button>
@@ -816,11 +816,11 @@ export default function Clientes() {
 
                             <div className="space-y-4 p-6">
                                 <div className="flex items-center gap-4">
-                                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#F3E1C8] text-3xl">
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sand text-3xl">
                                         {clienteSeleccionado.nombre.charAt(0)}
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-[#2D1B1A]">
+                                        <h3 className="text-xl font-bold text-chocolate">
                                             {clienteSeleccionado.nombre}
                                         </h3>
                                         <span
@@ -847,101 +847,101 @@ export default function Clientes() {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-cocoa-soft">
                                             Documento
                                         </p>
-                                        <p className="font-semibold text-[#2D1B1A]">
+                                        <p className="font-semibold text-chocolate">
                                             {formatoDocumento(
                                                 clienteSeleccionado,
                                             )}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-cocoa-soft">
                                             Teléfono
                                         </p>
-                                        <p className="font-semibold text-[#2D1B1A]">
+                                        <p className="font-semibold text-chocolate">
                                             {clienteSeleccionado.telefono ||
                                                 '-'}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-cocoa-soft">
                                             Correo
                                         </p>
-                                        <p className="font-semibold text-[#2D1B1A]">
+                                        <p className="font-semibold text-chocolate">
                                             {clienteSeleccionado.email || '-'}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-cocoa-soft">
                                             Dirección
                                         </p>
-                                        <p className="font-semibold text-[#2D1B1A]">
+                                        <p className="font-semibold text-chocolate">
                                             {clienteSeleccionado.direccion ||
                                                 '-'}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-cocoa-soft">
                                             Total gastado (30 días)
                                         </p>
-                                        <p className="font-semibold text-[#C9A96E]">
+                                        <p className="font-semibold text-gold">
                                             {formatCurrency(
                                                 clienteSeleccionado.totalGastado,
                                             )}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-cocoa-soft">
                                             Pedidos (30 días)
                                         </p>
-                                        <p className="font-semibold text-[#2D1B1A]">
+                                        <p className="font-semibold text-chocolate">
                                             {clienteSeleccionado.pedidos}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-cocoa-soft">
                                             Total gastado histórico
                                         </p>
-                                        <p className="font-semibold text-[#C9A96E]">
+                                        <p className="font-semibold text-gold">
                                             {formatCurrency(
                                                 clienteSeleccionado.totalGastadoTotal,
                                             )}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-cocoa-soft">
                                             Pedidos históricos
                                         </p>
-                                        <p className="font-semibold text-[#2D1B1A]">
+                                        <p className="font-semibold text-chocolate">
                                             {clienteSeleccionado.pedidosTotal}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-cocoa-soft">
                                             Última visita
                                         </p>
-                                        <p className="font-semibold text-[#2D1B1A]">
+                                        <p className="font-semibold text-chocolate">
                                             {clienteSeleccionado.ultimaVisita ||
                                                 '-'}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-cocoa-soft">
                                             Fecha de registro
                                         </p>
-                                        <p className="font-semibold text-[#2D1B1A]">
+                                        <p className="font-semibold text-chocolate">
                                             {clienteSeleccionado.fechaRegistro}
                                         </p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex justify-end border-t border-[#F3E1C8] p-6">
+                            <div className="flex justify-end border-t border-sand p-6">
                                 <button
                                     onClick={() => setModalVerAbierto(false)}
-                                    className="rounded-xl bg-gray-100 px-5 py-2.5 font-semibold transition hover:bg-gray-200"
+                                    className="rounded-xl bg-cream-pale px-5 py-2.5 font-semibold text-cocoa transition hover:bg-cream"
                                 >
                                     Cerrar
                                 </button>
@@ -955,14 +955,14 @@ export default function Clientes() {
                 {/* ============================================================ */}
                 {modalConfigAbierto && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-                        <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-xl">
-                            <div className="flex items-center justify-between border-b border-[#F3E1C8] p-6">
-                                <h2 className="text-2xl font-bold text-[#2D1B1A]">
+                        <div className="w-full max-w-md overflow-hidden rounded-3xl bg-card shadow-xl">
+                            <div className="flex items-center justify-between border-b border-sand p-6">
+                                <h2 className="text-2xl font-bold text-chocolate">
                                     Configuración de Clientes
                                 </h2>
                                 <button
                                     onClick={() => setModalConfigAbierto(false)}
-                                    className="text-3xl text-gray-400 transition hover:text-red-500"
+                                    className="text-3xl text-cocoa-soft transition hover:text-red-500"
                                 >
                                     ×
                                 </button>
@@ -970,14 +970,14 @@ export default function Clientes() {
 
                             <div className="space-y-4 p-6">
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500">
+                                    <label className="text-sm font-medium text-cocoa">
                                         Compras mínimas para registro automático
                                     </label>
                                     <input
                                         type="number"
                                         min={1}
                                         max={100}
-                                        className="mt-1 w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        className="mt-1 w-full rounded-xl border border-wheat p-3 outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                         value={minCompras}
                                         onChange={(e) =>
                                             setMinCompras(
@@ -986,7 +986,7 @@ export default function Clientes() {
                                         }
                                         placeholder="Ej: 6"
                                     />
-                                    <p className="mt-1 text-[11px] text-gray-400">
+                                    <p className="mt-1 text-[11px] text-cocoa-soft">
                                         Un cliente con DNI/RUC se registra
                                         automáticamente al alcanzar este número
                                         de compras en el histórico.
@@ -994,17 +994,17 @@ export default function Clientes() {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 border-t border-[#F3E1C8] p-6">
+                            <div className="flex justify-end gap-3 border-t border-sand p-6">
                                 <button
                                     onClick={() => setModalConfigAbierto(false)}
-                                    className="rounded-xl bg-gray-100 px-5 py-2.5 font-semibold transition hover:bg-gray-200"
+                                    className="rounded-xl bg-cream-pale px-5 py-2.5 font-semibold text-cocoa transition hover:bg-cream"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     onClick={guardarConfiguracion}
                                     disabled={guardandoConfig}
-                                    className="rounded-xl bg-[#C9A96E] px-5 py-2.5 font-semibold text-white transition hover:bg-[#B8975D] disabled:opacity-50"
+                                    className="rounded-xl bg-gold px-5 py-2.5 font-semibold text-ink transition hover:bg-gold-deep disabled:opacity-50"
                                 >
                                     {guardandoConfig
                                         ? 'Guardando...'

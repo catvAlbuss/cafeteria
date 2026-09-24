@@ -1,6 +1,14 @@
 import { router } from '@inertiajs/react';
-import { X, CheckCircle, CreditCard, Banknote, Smartphone, Printer, KeyRound } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react'; 
+import {
+    X,
+    CheckCircle,
+    CreditCard,
+    Banknote,
+    Smartphone,
+    Printer,
+    KeyRound,
+} from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 
 // ============================================================
 // INTERFACES
@@ -52,7 +60,7 @@ export default function ModalCobro({
     const [authorizationPin, setAuthorizationPin] = useState('');
     const [cargando, setCargando] = useState(false);
     const [exito, setExito] = useState(false);
-    const [comprobanteEmitido, setComprobanteEmitido] = useState<any>(null); 
+    const [comprobanteEmitido, setComprobanteEmitido] = useState<any>(null);
     const ticketRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -73,11 +81,13 @@ export default function ModalCobro({
     const toNum = (v: number | string | null | undefined) =>
         typeof v === 'number' ? v : parseFloat(v as string) || 0;
     const total = pedidosArray.reduce((sum, p) => sum + toNum(p.total), 0);
-    const subtotal = pedidosArray.reduce((sum, p) => sum + toNum(p.subtotal), 0);
+    const subtotal = pedidosArray.reduce(
+        (sum, p) => sum + toNum(p.subtotal),
+        0,
+    );
     const igv = pedidosArray.reduce((sum, p) => sum + toNum(p.igv), 0);
-    const igvCalculado = total > 0 && subtotal === 0 && igv === 0
-        ? total - total / 1.18
-        : igv;
+    const igvCalculado =
+        total > 0 && subtotal === 0 && igv === 0 ? total - total / 1.18 : igv;
     const subtotalMostrado = subtotal > 0 ? subtotal : total - igvCalculado;
     const productos = pedidosArray.flatMap((p) =>
         typeof p.productos === 'string' ? JSON.parse(p.productos) : p.productos,
@@ -273,7 +283,7 @@ export default function ModalCobro({
                 setCargando(false);
                 alert(
                     'Error al registrar la venta: ' +
-                    Object.values(errors).join(' '),
+                        Object.values(errors).join(' '),
                 );
             },
         });
@@ -295,24 +305,29 @@ export default function ModalCobro({
         minute: '2-digit',
         hour12: true,
     });
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[95vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="flex max-h-[95vh] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
                 {/* ===== HEADER ===== */}
-                <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 bg-[#FBF7F0] px-5 py-3">
+                <div className="flex flex-shrink-0 items-center justify-between border-b border-sand bg-cream px-5 py-3">
                     <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#C9A96E] text-sm font-bold text-white">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gold text-sm font-bold text-ink">
                             {mesa.numero}
                         </div>
                         <div>
-                            <p className="text-sm font-bold text-[#2D1B1A]">DOLCE CAFEE</p>
-                            <p className="text-[10px] text-gray-400">Mesa #{mesa.numero}</p>
+                            <p className="text-sm font-bold text-chocolate">
+                                DOLCE CAFEE
+                            </p>
+                            <p className="text-[10px] text-cocoa-soft">
+                                Mesa #{mesa.numero}
+                            </p>
                         </div>
                     </div>
                     {!exito && (
                         <button
                             onClick={handleClose}
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600"
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-cocoa-soft transition hover:bg-sand hover:text-cocoa"
                             disabled={cargando}
                         >
                             <X className="h-4 w-4" />
@@ -321,19 +336,34 @@ export default function ModalCobro({
                 </div>
 
                 {!exito ? (
-                    <div className="p-4 space-y-3 overflow-y-auto flex-1">
-                        {/* ===== TICKET ===== */}
-                        <div
-                            ref={ticketRef}
-                            className="rounded-xl border border-gray-200 bg-white p-4"
-                            id="ticket-print"
-                        >
+                    <div className="flex-1 space-y-3 overflow-y-auto p-4">
+{/* ===== TICKET ===== */}
+                            <div
+                                ref={ticketRef}
+                                className="rounded-xl border border-black/10 bg-white p-4"
+                                id="ticket-print"
+                            >
                             {/* SHOP NAME - SIN IMAGEN */}
-                            <div className="text-center pb-1 mb-1" style={{ borderBottom: '1.5px dashed #ccc' }}>
-                                <p style={{ fontSize: '18px', fontWeight: 700, color: '#000000', letterSpacing: '2px' }}>
+                            <div
+                                className="mb-1 pb-1 text-center"
+                                style={{ borderBottom: '1.5px dashed #ccc' }}
+                            >
+                                <p
+                                    style={{
+                                        fontSize: '18px',
+                                        fontWeight: 700,
+                                        color: '#000000',
+                                        letterSpacing: '2px',
+                                    }}
+                                >
                                     DOLCE CAFE
                                 </p>
-                                <p style={{ fontSize: '11px', color: '#333333' }}>
+                                <p
+                                    style={{
+                                        fontSize: '11px',
+                                        color: '#333333',
+                                    }}
+                                >
                                     Av. Principal 123, Lima
                                 </p>
                                 <p
@@ -347,19 +377,44 @@ export default function ModalCobro({
                             </div>
 
                             {/* TITLE */}
-                            <div className="text-center pb-1 mb-1" style={{ borderBottom: '1.5px dashed #ccc' }}>
-                                <p style={{ fontSize: '13px', fontWeight: 700, color: '#000000', letterSpacing: '1.5px' }}>
+                            <div
+                                className="mb-1 pb-1 text-center"
+                                style={{ borderBottom: '1.5px dashed #ccc' }}
+                            >
+                                <p
+                                    style={{
+                                        fontSize: '13px',
+                                        fontWeight: 700,
+                                        color: '#000000',
+                                        letterSpacing: '1.5px',
+                                    }}
+                                >
                                     COMPROBANTE DE PAGO
                                 </p>
-                                <p style={{ fontSize: '11px', color: '#444444' }}>
+                                <p
+                                    style={{
+                                        fontSize: '11px',
+                                        color: '#444444',
+                                    }}
+                                >
                                     {fecha} {hora}
                                 </p>
                             </div>
 
                             {/* PRODUCTOS */}
                             <div className="mb-1">
-                                <div className="flex justify-between pb-0.5 mb-0.5" style={{ borderBottom: '1.5px solid #ddd' }}>
-                                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#000000', letterSpacing: '1px' }}>
+                                <div
+                                    className="mb-0.5 flex justify-between pb-0.5"
+                                    style={{ borderBottom: '1.5px solid #ddd' }}
+                                >
+                                    <span
+                                        style={{
+                                            fontSize: '12px',
+                                            fontWeight: 700,
+                                            color: '#000000',
+                                            letterSpacing: '1px',
+                                        }}
+                                    >
                                         DESCRIPCIÓN
                                     </span>
                                     <span
@@ -374,22 +429,44 @@ export default function ModalCobro({
                                     </span>
                                 </div>
                                 {productos.length > 0 ? (
-                                    productos.map((item: ProductoPedido, index: number) => (
-                                        <div key={index} style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            fontSize: '13px',
-                                            padding: '1px 0',
-                                            color: '#000000'
-                                        }}>
-                                            <span style={{ flex: 1, color: '#000000' }}>
-                                                {item.cantidad}x {item.nombre}
-                                            </span>
-                                            <span style={{ fontWeight: 600, minWidth: '60px', textAlign: 'right', color: '#000000' }}>
-                                                {item.subtotal.toFixed(2)}
-                                            </span>
-                                        </div>
-                                    ))
+                                    productos.map(
+                                        (
+                                            item: ProductoPedido,
+                                            index: number,
+                                        ) => (
+                                            <div
+                                                key={index}
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent:
+                                                        'space-between',
+                                                    fontSize: '13px',
+                                                    padding: '1px 0',
+                                                    color: '#000000',
+                                                }}
+                                            >
+                                                <span
+                                                    style={{
+                                                        flex: 1,
+                                                        color: '#000000',
+                                                    }}
+                                                >
+                                                    {item.cantidad}x{' '}
+                                                    {item.nombre}
+                                                </span>
+                                                <span
+                                                    style={{
+                                                        fontWeight: 600,
+                                                        minWidth: '60px',
+                                                        textAlign: 'right',
+                                                        color: '#000000',
+                                                    }}
+                                                >
+                                                    {item.subtotal.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        ),
+                                    )
                                 ) : (
                                     <p
                                         style={{
@@ -403,88 +480,177 @@ export default function ModalCobro({
                                 )}
                             </div>
                             {/* TOTAL */}
-                            <div className="pt-1 mb-1" style={{ borderTop: '2px dashed #ccc' }}>
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    fontSize: '13px',
-                                    padding: '1px 0',
-                                    color: '#000000'
-                                }}>
-                                    <span style={{ color: '#333333' }}>Subtotal</span>
-                                    <span style={{ fontWeight: 600, color: '#000000' }}>{subtotalMostrado.toFixed(2)}</span>
+                            <div
+                                className="mb-1 pt-1"
+                                style={{ borderTop: '2px dashed #ccc' }}
+                            >
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        fontSize: '13px',
+                                        padding: '1px 0',
+                                        color: '#000000',
+                                    }}
+                                >
+                                    <span style={{ color: '#333333' }}>
+                                        Subtotal
+                                    </span>
+                                    <span
+                                        style={{
+                                            fontWeight: 600,
+                                            color: '#000000',
+                                        }}
+                                    >
+                                        {subtotalMostrado.toFixed(2)}
+                                    </span>
                                 </div>
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    fontSize: '13px',
-                                    padding: '1px 0',
-                                    color: '#000000'
-                                }}>
-                                    <span style={{ color: '#333333' }}>IGV (18%)</span>
-                                    <span style={{ fontWeight: 600, color: '#000000' }}>{igvCalculado.toFixed(2)}</span>
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        fontSize: '13px',
+                                        padding: '1px 0',
+                                        color: '#000000',
+                                    }}
+                                >
+                                    <span style={{ color: '#333333' }}>
+                                        IGV (18%)
+                                    </span>
+                                    <span
+                                        style={{
+                                            fontWeight: 600,
+                                            color: '#000000',
+                                        }}
+                                    >
+                                        {igvCalculado.toFixed(2)}
+                                    </span>
                                 </div>
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    fontSize: '16px',
-                                    fontWeight: 700,
-                                    color: '#000000',
-                                    padding: '2px 0'
-                                }}>
-                                    <span style={{ color: '#000000' }}>TOTAL</span>
-                                    <span style={{ color: '#000000' }}>{total.toFixed(2)}</span>
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        fontSize: '16px',
+                                        fontWeight: 700,
+                                        color: '#000000',
+                                        padding: '2px 0',
+                                    }}
+                                >
+                                    <span style={{ color: '#000000' }}>
+                                        TOTAL
+                                    </span>
+                                    <span style={{ color: '#000000' }}>
+                                        {total.toFixed(2)}
+                                    </span>
                                 </div>
                             </div>
 
                             {/* PAGO Y CAMBIO - SOLO SI ES EFECTIVO */}
-                            {metodoPago === 'efectivo' && montoRecibidoNum > 0 && (
-                                <div className="pt-1 mb-1" style={{ borderTop: '1.5px dashed #ccc' }}>
-                                    <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        fontSize: '13px',
-                                        padding: '1px 0',
-                                        color: '#000000'
-                                    }}>
-                                        <span style={{ color: '#333333' }}>Efectivo</span>
-                                        <span style={{ fontWeight: 600, color: '#000000' }}>{montoRecibidoNum.toFixed(2)}</span>
+                            {metodoPago === 'efectivo' &&
+                                montoRecibidoNum > 0 && (
+                                    <div
+                                        className="mb-1 pt-1"
+                                        style={{
+                                            borderTop: '1.5px dashed #ccc',
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                fontSize: '13px',
+                                                padding: '1px 0',
+                                                color: '#000000',
+                                            }}
+                                        >
+                                            <span style={{ color: '#333333' }}>
+                                                Efectivo
+                                            </span>
+                                            <span
+                                                style={{
+                                                    fontWeight: 600,
+                                                    color: '#000000',
+                                                }}
+                                            >
+                                                {montoRecibidoNum.toFixed(2)}
+                                            </span>
+                                        </div>
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                fontSize: '13px',
+                                                padding: '1px 0',
+                                                color: '#000000',
+                                            }}
+                                        >
+                                            <span style={{ color: '#333333' }}>
+                                                Cambio
+                                            </span>
+                                            <span
+                                                style={{
+                                                    fontWeight: 700,
+                                                    color: '#000000',
+                                                }}
+                                            >
+                                                {cambio.toFixed(2)}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        fontSize: '13px',
-                                        padding: '1px 0',
-                                        color: '#000000'
-                                    }}>
-                                        <span style={{ color: '#333333' }}>Cambio</span>
-                                        <span style={{ fontWeight: 700, color: '#000000' }}>{cambio.toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            )}
+                                )}
 
                             {/* MÉTODO DE PAGO */}
-                            <div className="pt-1 mb-1" style={{ borderTop: '1.5px dashed #ccc' }}>
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    fontSize: '13px',
-                                    padding: '1px 0',
-                                    color: '#000000'
-                                }}>
-                                    <span style={{ color: '#333333' }}>Método de pago</span>
-                                    <span style={{ fontWeight: 700, color: '#000000', textTransform: 'uppercase' }}>
+                            <div
+                                className="mb-1 pt-1"
+                                style={{ borderTop: '1.5px dashed #ccc' }}
+                            >
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        fontSize: '13px',
+                                        padding: '1px 0',
+                                        color: '#000000',
+                                    }}
+                                >
+                                    <span style={{ color: '#333333' }}>
+                                        Método de pago
+                                    </span>
+                                    <span
+                                        style={{
+                                            fontWeight: 700,
+                                            color: '#000000',
+                                            textTransform: 'uppercase',
+                                        }}
+                                    >
                                         {metodoPago}
                                     </span>
                                 </div>
                             </div>
                             {/* FOOTER */}
-                            <div className="text-center pt-1" style={{ borderTop: '2px dashed #ccc' }}>
-                                <p style={{ fontSize: '14px', fontWeight: 700, color: '#000000', letterSpacing: '1.5px' }}>
+                            <div
+                                className="pt-1 text-center"
+                                style={{ borderTop: '2px dashed #ccc' }}
+                            >
+                                <p
+                                    style={{
+                                        fontSize: '14px',
+                                        fontWeight: 700,
+                                        color: '#000000',
+                                        letterSpacing: '1.5px',
+                                    }}
+                                >
                                     ¡GRACIAS POR SU VISITA!
                                 </p>
-                                <p style={{ fontSize: '11px', color: '#333333' }}>
-                                    {mesa.mesero ? `Atendido por: ${mesa.mesero}` : 'Esperamos verlo pronto'}
+                                <p
+                                    style={{
+                                        fontSize: '11px',
+                                        color: '#333333',
+                                    }}
+                                >
+                                    {mesa.mesero
+                                        ? `Atendido por: ${mesa.mesero}`
+                                        : 'Esperamos verlo pronto'}
                                 </p>
                             </div>
                         </div>
@@ -493,30 +659,33 @@ export default function ModalCobro({
                         <div className="grid flex-shrink-0 grid-cols-3 gap-2">
                             <button
                                 onClick={() => setMetodoPago('efectivo')}
-                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${metodoPago === 'efectivo'
-                                        ? 'bg-[#C9A96E] text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${
+                                    metodoPago === 'efectivo'
+                                        ? 'bg-gold text-ink shadow-md'
+                                        : 'bg-sand text-cocoa hover:bg-wheat'
+                                }`}
                             >
                                 <Banknote className="h-4 w-4" />
                                 <span>Efectivo</span>
                             </button>
                             <button
                                 onClick={() => setMetodoPago('tarjeta')}
-                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${metodoPago === 'tarjeta'
-                                        ? 'bg-[#C9A96E] text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${
+                                    metodoPago === 'tarjeta'
+                                        ? 'bg-gold text-ink shadow-md'
+                                        : 'bg-sand text-cocoa hover:bg-wheat'
+                                }`}
                             >
                                 <CreditCard className="h-4 w-4" />
                                 <span>Tarjeta</span>
                             </button>
                             <button
                                 onClick={() => setMetodoPago('yape')}
-                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${metodoPago === 'yape'
-                                        ? 'bg-[#C9A96E] text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
+                                className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-xs font-medium transition ${
+                                    metodoPago === 'yape'
+                                        ? 'bg-gold text-ink shadow-md'
+                                        : 'bg-sand text-cocoa hover:bg-wheat'
+                                }`}
                             >
                                 <Smartphone className="h-4 w-4" />
                                 <span>Yape/Plin</span>
@@ -526,18 +695,18 @@ export default function ModalCobro({
                         {/* ===== EFECTIVO RECIBIDO ===== */}
                         {metodoPago === 'efectivo' && (
                             <div className="flex-shrink-0">
-                                <label className="mb-1 block text-xs font-medium text-gray-600">
+                                <label className="mb-1 block text-xs font-medium text-cocoa">
                                     Efectivo recibido
                                 </label>
                                 <div className="relative">
-                                    <span className="absolute top-1/2 left-3 -translate-y-1/2 text-sm font-medium text-gray-400">
+                                    <span className="absolute top-1/2 left-3 -translate-y-1/2 text-sm font-medium text-cocoa-soft">
                                         S/
                                     </span>
                                     <input
                                         type="number"
                                         step="0.01"
                                         placeholder="0.00"
-                                        className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pr-4 pl-8 text-sm text-gray-900 placeholder-gray-500 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                        className="w-full rounded-xl border border-wheat bg-cream-soft py-2 pr-4 pl-8 text-sm text-chocolate outline-none placeholder:text-cocoa-soft focus:border-transparent focus:ring-2 focus:ring-gold"
                                         value={montoRecibido}
                                         onChange={(e) =>
                                             setMontoRecibido(e.target.value)
@@ -548,10 +717,10 @@ export default function ModalCobro({
                                     montoRecibidoNum > 0 &&
                                     cambio >= 0 && (
                                         <div className="mt-1 flex justify-between px-1 text-sm">
-                                            <span className="text-gray-500">
+                                            <span className="text-cocoa">
                                                 Cambio
                                             </span>
-                                            <span className="font-bold text-[#C9A96E]">
+                                            <span className="font-bold text-gold">
                                                 S/ {cambio.toFixed(2)}
                                             </span>
                                         </div>
@@ -566,18 +735,18 @@ export default function ModalCobro({
 
                         {/* ===== PIN ===== */}
                         <div className="flex-shrink-0">
-                            <label className="mb-1 block text-xs font-medium text-gray-600">
+                            <label className="mb-1 block text-xs font-medium text-cocoa">
                                 PIN de autorización
                             </label>
                             <div className="relative">
-                                <KeyRound className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                                <KeyRound className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-cocoa-soft" />
                                 <input
                                     type="password"
                                     inputMode="numeric"
                                     maxLength={4}
                                     autoComplete="off"
                                     placeholder="••••"
-                                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pr-4 pl-9 text-center text-sm tracking-[0.5em] text-gray-900 outline-none focus:border-transparent focus:ring-2 focus:ring-[#C9A96E]"
+                                    className="w-full rounded-xl border border-wheat bg-cream-soft py-2 pr-4 pl-9 text-center text-sm tracking-[0.5em] text-chocolate outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                     value={authorizationPin}
                                     onChange={(event) =>
                                         setAuthorizationPin(
@@ -599,12 +768,13 @@ export default function ModalCobro({
                                 (metodoPago === 'efectivo' &&
                                     montoRecibidoNum < total)
                             }
-                            className={`flex w-full flex-shrink-0 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${cargando ||
-                                    (metodoPago === 'efectivo' &&
-                                        montoRecibidoNum < total)
-                                    ? 'cursor-not-allowed bg-gray-300'
-                                    : 'bg-[#2D1B1A] text-white hover:bg-[#1A0F0E]'
-                                }`}
+                            className={`flex w-full flex-shrink-0 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
+                                cargando ||
+                                (metodoPago === 'efectivo' &&
+                                    montoRecibidoNum < total)
+                                    ? 'cursor-not-allowed bg-wheat'
+                                    : 'bg-roast text-white hover:bg-ink'
+                            }`}
                         >
                             {cargando ? (
                                 <>
@@ -624,20 +794,18 @@ export default function ModalCobro({
                         <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
                             <CheckCircle className="h-12 w-12 text-green-600" />
                         </div>
-                        <h3 className="text-2xl font-bold text-gray-900">
-                            ¡Cobro exitoso! 🎉
+                        <h3 className="text-2xl font-bold text-chocolate">
+                            ¡Cobro exitoso!
                         </h3>
-                        <p className="mt-2 text-gray-500">
+                        <p className="mt-2 text-cocoa">
                             Mesa #{mesa.numero} liberada
                         </p>
-                        <div className="mt-4 rounded-xl bg-gray-50 p-4">
-                            <p className="text-sm text-gray-500">
-                                Total cobrado
-                            </p>
-                            <p className="text-2xl font-bold text-[#C9A96E]">
+                        <div className="mt-4 rounded-xl bg-cream-soft p-4">
+                            <p className="text-sm text-cocoa">Total cobrado</p>
+                            <p className="text-2xl font-bold text-gold">
                                 S/ {total.toFixed(2)}
                             </p>
-                            <p className="mt-1 text-xs text-gray-400">
+                            <p className="mt-1 text-xs text-cocoa-soft">
                                 Comprobante impreso
                             </p>
                         </div>
@@ -646,9 +814,10 @@ export default function ModalCobro({
                                 onClose();
                                 router.reload();
                             }}
-                            className="mt-6 w-full rounded-xl bg-[#C9A96E] py-3 font-semibold text-white transition hover:bg-[#B8975D]"
+                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gold py-3 font-semibold text-ink transition hover:bg-gold-deep"
                         >
-                            ✅ Aceptar
+                            <CheckCircle className="h-5 w-5" />
+                            Aceptar
                         </button>
                     </div>
                 )}
