@@ -2,27 +2,22 @@ import { Head, usePage, router } from '@inertiajs/react';
 import axios from 'axios';
 import {
     Armchair,
-    Plus,
     User,
     X,
     Receipt,
     CircleCheck,
     Calendar,
-    Users,
-    Utensils,
-    ChefHat,
-    ClipboardList,
-    ShoppingCart,
+    Settings,
     AlertCircle,
-    Eye,
-    Search,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 import ModalCobro from '@/components/modals/ModalCobro';
+import ModalConfigurarMesas from '@/components/modals/ModalConfigurarMesas';
+import type { Reserva } from '@/components/modals/ModalReservasMesa';
+import ModalReservasMesa from '@/components/modals/ModalReservasMesa';
 import ModalVerTickets from '@/components/tickets/ModalVerTickets';
-import TarjetaTicket from '@/components/tickets/TarjetaTicket';
 import { useSedeChannel } from '@/hooks/useSedeChannel';
 import { swalError, swalSuccess, errorsToText } from '@/lib/swal';
 import {
@@ -215,7 +210,40 @@ interface Mesa {
     personas?: number | null;
     mesero?: string | null;
     pedido_listo?: boolean;
+    activa?: boolean;
 }
+
+const ROLES_ACCESO_COMPLETO = [
+    'Administración',
+    'Gerencia',
+    'Caja',
+    'Administrador',
+    'Gerente',
+    'Cajero',
+];
+
+const formatearHoyLocal = (): string => {
+    const hoy = new Date();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+
+    return `${hoy.getFullYear()}-${mm}-${dd}`;
+};
+
+const horaActualLocal = (): string => {
+    const ahora = new Date();
+    const hh = String(ahora.getHours()).padStart(2, '0');
+    const mm = String(ahora.getMinutes()).padStart(2, '0');
+
+    return `${hh}:${mm}`;
+};
+
+const sumarMinutosLocal = (hora: string, minutos: number): string => {
+    const [hh, mm] = hora.split(':').map(Number);
+    const total = hh * 60 + mm + minutos;
+
+    return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+};
 
 const toArray = <T,>(
     value: T[] | { data?: T[] } | Record<string, T> | null | undefined,
@@ -254,54 +282,54 @@ const getEstadoConfig = (estado: string) => {
         case 'libre':
             return {
                 bg: 'bg-green-50 dark:bg-green-950/40',
-                border: 'border-green-400 dark:border-green-500',
-                text: 'text-green-600 dark:text-green-300',
-                chip: 'bg-green-400 dark:bg-green-500',
+                border: 'border-green-400 dark:border-green-700/50',
+                text: 'text-green-600 dark:text-green-400',
+                chip: 'bg-green-400 dark:bg-green-500/80',
                 label: 'Libre',
             };
 
         case 'pendiente':
             return {
                 bg: 'bg-yellow-50 dark:bg-yellow-950/30',
-                border: 'border-yellow-400 dark:border-yellow-500',
-                text: 'text-yellow-600 dark:text-yellow-300',
-                chip: 'bg-yellow-400 dark:bg-yellow-500',
+                border: 'border-yellow-400 dark:border-yellow-700/50',
+                text: 'text-yellow-600 dark:text-yellow-400',
+                chip: 'bg-yellow-400 dark:bg-yellow-500/80',
                 label: 'Pendiente',
             };
 
         case 'ocupada':
             return {
                 bg: 'bg-orange-50 dark:bg-orange-950/40',
-                border: 'border-orange-400 dark:border-orange-500',
-                text: 'text-orange-600 dark:text-orange-300',
-                chip: 'bg-orange-400 dark:bg-orange-500',
+                border: 'border-orange-400 dark:border-orange-700/50',
+                text: 'text-orange-600 dark:text-orange-400',
+                chip: 'bg-orange-400 dark:bg-orange-500/80',
                 label: 'Ocupada',
             };
 
         case 'reserva':
             return {
                 bg: 'bg-blue-50 dark:bg-blue-950/40',
-                border: 'border-blue-400 dark:border-blue-500',
-                text: 'text-blue-600 dark:text-blue-300',
-                chip: 'bg-blue-400 dark:bg-blue-500',
+                border: 'border-blue-400 dark:border-blue-700/50',
+                text: 'text-blue-600 dark:text-blue-400',
+                chip: 'bg-blue-400 dark:bg-blue-500/80',
                 label: 'Reserva',
             };
 
         case 'listo_cobrar':
             return {
                 bg: 'bg-purple-50 dark:bg-purple-950/40',
-                border: 'border-purple-400 dark:border-purple-500',
-                text: 'text-purple-600 dark:text-purple-300',
-                chip: 'bg-purple-400 dark:bg-purple-500',
+                border: 'border-purple-400 dark:border-purple-700/50',
+                text: 'text-purple-600 dark:text-purple-400',
+                chip: 'bg-purple-400 dark:bg-purple-500/80',
                 label: 'Cobrar',
             };
 
         default:
             return {
-                bg: 'bg-cream-soft',
-                border: 'border-cocoa-soft/60',
-                text: 'text-cocoa',
-                chip: 'bg-cocoa-soft',
+                bg: 'bg-cream-soft dark:bg-cream-soft/10',
+                border: 'border-cocoa-soft/60 dark:border-white/10',
+                text: 'text-cocoa dark:text-cream-soft/90',
+                chip: 'bg-cocoa-soft dark:bg-cream-soft/70',
                 label: 'Estado',
             };
     }
@@ -376,7 +404,7 @@ function PlanoMesa({
     colorClass: string;
     disabled: boolean;
 }) {
-    const total = Math.min(mesa.sillas, 8);
+    const total = Math.min(mesa.sillas, 10);
     const arriba = Math.ceil(total / 2);
     const abajo = total - arriba;
 
@@ -395,16 +423,19 @@ function PlanoMesa({
             </div>
 
             <div
-                className={`flex h-12 w-16 items-center justify-center rounded-xl border-2 ${
+                className={`flex h-12 w-16 flex-col items-center justify-center rounded-xl border-2 ${
                     getEstadoConfig(mesa.estado).border
-                } ${getEstadoConfig(mesa.estado).bg} shadow-inner`}
+                } ${getEstadoConfig(mesa.estado).bg} shadow-inner dark:border`}
             >
                 <span
-                    className={`text-lg font-extrabold ${
+                    className={`text-lg leading-tight font-extrabold ${
                         getEstadoConfig(mesa.estado).text
                     }`}
                 >
-                    {mesa.capacidad}
+                    {mesa.sillas}
+                </span>
+                <span className="text-[9px] leading-none font-semibold text-cocoa-soft opacity-80">
+                    cap {mesa.capacidad}
                 </span>
             </div>
 
@@ -435,6 +466,9 @@ function MesaCard({
     onVerTickets,
     pedidos,
     userRole,
+    reservaActiva,
+    reservaProxima,
+    onAbrirReservas,
 }: {
     mesa: Mesa;
     onCambiarEstado: (id: number, estado: string) => void;
@@ -442,8 +476,11 @@ function MesaCard({
     onAbrirModalCobro: (mesa: Mesa) => void;
     onVerPedido?: (mesa: Mesa) => void;
     onVerTickets?: (mesa: Mesa) => void;
+    onAbrirReservas?: (mesa: Mesa) => void;
     pedidos: any[];
     userRole?: string;
+    reservaActiva?: Reserva | null;
+    reservaProxima?: Reserva | null;
 }) {
     const config = getEstadoConfig(mesa.estado);
 
@@ -467,22 +504,13 @@ function MesaCard({
 
     const isMesero = userRole === 'Mesero';
 
-    const rolesAccesoCompleto = [
-        'Administración',
-        'Gerencia',
-        'Caja',
-        'Administrador',
-        'Gerente',
-        'Cajero',
-    ];
-
     const tieneAccesoCompleto =
-        userRole && rolesAccesoCompleto.includes(userRole);
+        userRole && ROLES_ACCESO_COMPLETO.includes(userRole);
 
     const renderButtonsRow = () => {
         if (isMesero) {
             return (
-                <div className="mt-3 flex gap-2">
+                <div className="flex gap-2">
                     {mesa.estado === 'listo_cobrar' ? (
                         <button
                             onClick={() => onAbrirModalCobro(mesa)}
@@ -509,6 +537,16 @@ function MesaCard({
                                 </button>
                             )}
 
+                            {mesa.estado === 'reserva' && (
+                                <button
+                                    onClick={() => onAbrirReservas?.(mesa)}
+                                    className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-white transition hover:bg-blue-700 active:scale-95"
+                                    title="Ver reserva"
+                                >
+                                    <Calendar className="h-5 w-5" />
+                                </button>
+                            )}
+
                             <button
                                 onClick={() => onAbrirModalCobro(mesa)}
                                 className="rounded-lg bg-purple-600 px-3 py-1.5 text-white transition hover:bg-purple-700 active:scale-95"
@@ -522,12 +560,12 @@ function MesaCard({
             );
         }
 
-        return <div className="mt-3">{renderPrimaryAction()}</div>;
+        return <div>{renderPrimaryAction()}</div>;
     };
 
     const renderPrimaryAction = () => {
         const baseClass =
-            'mt-2 w-full py-1.5 rounded-lg text-sm font-semibold transition active:scale-95';
+            'w-full py-1.5 rounded-lg text-sm font-semibold transition active:scale-95';
 
         if (mesa.estado === 'listo_cobrar') {
             return (
@@ -547,6 +585,17 @@ function MesaCard({
                     className={`${baseClass} bg-gold text-ink hover:bg-gold-deep`}
                 >
                     Ver pedidos
+                </button>
+            );
+        }
+
+        if (mesa.estado === 'reserva') {
+            return (
+                <button
+                    onClick={() => onAbrirReservas?.(mesa)}
+                    className={`${baseClass} bg-blue-600 text-white hover:bg-blue-700`}
+                >
+                    Ver reserva
                 </button>
             );
         }
@@ -584,7 +633,7 @@ function MesaCard({
                 activeClass:
                     'bg-green-500 text-white border-green-500 dark:bg-green-600 dark:border-green-600',
                 idleClass:
-                    'bg-white/90 text-green-600 border-green-200 hover:bg-green-50 dark:bg-white/5 dark:text-green-400 dark:border-green-500/40 dark:hover:bg-green-500/10',
+                    'bg-white/90 text-green-600 border-green-200 hover:bg-green-50 dark:bg-white/5 dark:text-green-400 dark:border-white/10 dark:hover:bg-green-500/10',
                 disabled:
                     esCobrar ||
                     (tienePedidosPendientes && mesa.estado !== 'libre'),
@@ -596,7 +645,7 @@ function MesaCard({
                 activeClass:
                     'bg-blue-500 text-white border-blue-500 dark:bg-blue-600 dark:border-blue-600',
                 idleClass:
-                    'bg-white/90 text-blue-600 border-blue-200 hover:bg-blue-50 dark:bg-white/5 dark:text-blue-400 dark:border-blue-500/40 dark:hover:bg-blue-500/10',
+                    'bg-white/90 text-blue-600 border-blue-200 hover:bg-blue-50 dark:bg-white/5 dark:text-blue-400 dark:border-white/10 dark:hover:bg-blue-500/10',
                 disabled:
                     esCobrar ||
                     (tienePedidosPendientes && mesa.estado !== 'reserva'),
@@ -608,7 +657,7 @@ function MesaCard({
                 activeClass:
                     'bg-purple-500 text-white border-purple-500 dark:bg-purple-600 dark:border-purple-600',
                 idleClass:
-                    'bg-white/90 text-purple-600 border-purple-200 hover:bg-purple-50 dark:bg-white/5 dark:text-purple-400 dark:border-purple-500/40 dark:hover:bg-purple-500/10',
+                    'bg-white/90 text-purple-600 border-purple-200 hover:bg-purple-50 dark:bg-white/5 dark:text-purple-400 dark:border-white/10 dark:hover:bg-purple-500/10',
 
                 // ====================================================
                 // ÚNICA MODIFICACIÓN:
@@ -620,7 +669,7 @@ function MesaCard({
         ];
 
         return (
-            <div className="mt-3 grid grid-cols-3 gap-1">
+            <div className="grid grid-cols-3 gap-1">
                 {estadoActions.map(
                     ({
                         value,
@@ -634,20 +683,32 @@ function MesaCard({
 
                         const isDisabled = disabled && !isActive;
 
+                        const abrirDesdeTile =
+                            value === 'reserva' ||
+                            (value === 'libre' && mesa.estado === 'reserva');
+
                         return (
                             <button
                                 key={value}
-                                onClick={() =>
-                                    !isActive &&
-                                    !isDisabled &&
-                                    onCambiarEstado(mesa.id, value)
-                                }
+                                onClick={() => {
+                                    if (isActive || isDisabled) {
+                                        return;
+                                    }
+
+                                    if (abrirDesdeTile) {
+                                        onAbrirReservas?.(mesa);
+
+                                        return;
+                                    }
+
+                                    onCambiarEstado(mesa.id, value);
+                                }}
                                 disabled={isDisabled}
                                 className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${
                                     isActive
                                         ? activeClass
                                         : isDisabled
-                                          ? 'cursor-not-allowed border-wheat bg-sand text-cocoa-soft opacity-50'
+                                          ? 'cursor-not-allowed border-wheat bg-sand text-cocoa-soft opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-cream-soft/60'
                                           : idleClass
                                 }`}
                                 title={
@@ -672,7 +733,7 @@ function MesaCard({
     return (
         <div
             ref={setNodeRef}
-            className={`group relative rounded-xl border-2 ${config.border} ${config.bg} p-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+            className={`group relative flex h-full flex-col rounded-xl border-2 ${config.border} ${config.bg} p-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:border ${
                 isOver ? 'scale-[1.02] ring-4 ring-gold' : ''
             }`}
         >
@@ -725,10 +786,48 @@ function MesaCard({
                         {mesa.mesero}
                     </p>
                 )}
+
+                {mesa.estado === 'reserva' && reservaActiva && (
+                    <>
+                        <p className="mt-0.5 truncate text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                            {reservaActiva.hora_inicio} ·{' '}
+                            {reservaActiva.cliente} · {reservaActiva.personas}
+                            {reservaActiva.personas === 1
+                                ? ' persona'
+                                : ' personas'}
+                        </p>
+
+                        <p className="text-[10px] text-cocoa-soft">
+                            {(() => {
+                                const ahora = horaActualLocal();
+                                const aMin = (h: string) =>
+                                    Number(h.slice(0, 2)) * 60 +
+                                    Number(h.slice(3, 5));
+
+                                const faltan =
+                                    aMin(reservaActiva.hora_inicio) -
+                                    aMin(ahora);
+
+                                return faltan > 0
+                                    ? `comienza en ${faltan} min`
+                                    : 'en curso';
+                            })()}
+                        </p>
+                    </>
+                )}
+
+                {mesa.estado !== 'reserva' && reservaProxima && (
+                    <p className="mt-0.5 truncate text-[10px] font-semibold text-blue-500/80 dark:text-blue-400/80">
+                        Reserva {reservaProxima.hora_inicio} ·{' '}
+                        {reservaProxima.cliente}
+                    </p>
+                )}
             </div>
 
-            {renderEstadoActions()}
-            {renderButtonsRow()}
+            <div className="mt-auto flex flex-col gap-3 pt-3">
+                {renderEstadoActions()}
+                {renderButtonsRow()}
+            </div>
         </div>
     );
 }
@@ -741,16 +840,24 @@ export default function MesasDistribucion() {
     const {
         mesas: mesasIniciales,
         pedidos: pedidosIniciales,
+        reservas: reservasIniciales,
         flash,
         auth,
+        mesaHistorialIds,
+        reservaHistorialIds,
+        margenInicioMinutos = 10,
     } = usePage<{
         mesas?: Mesa[] | { data?: Mesa[] } | Record<string, Mesa>;
         pedidos?: any[] | { data?: any[] } | Record<string, any>;
+        reservas?: Reserva[] | { data?: Reserva[] } | Record<string, Reserva>;
         flash?: FlashProps;
         auth?: {
             roles?: string[];
             permissions?: string[];
         };
+        mesaHistorialIds?: number[];
+        reservaHistorialIds?: number[];
+        margenInicioMinutos?: number;
     }>().props;
 
     const userRole = auth?.roles?.[0];
@@ -761,7 +868,19 @@ export default function MesasDistribucion() {
         toArray<Mesa>(mesasIniciales),
     );
 
+    const mesasActivas = mesas.filter((m) => m.activa !== false);
+
+    const [reservasLista, setReservasLista] = useState<Reserva[]>(() =>
+        toArray<Reserva>(reservasIniciales),
+    );
+
+    const [modalReservasAbierto, setModalReservasAbierto] = useState(false);
+
+    const [mesaReservas, setMesaReservas] = useState<Mesa | null>(null);
+
     const [modalCobroAbierto, setModalCobroAbierto] = useState(false);
+
+    const [modalConfigurarAbierto, setModalConfigurarAbierto] = useState(false);
 
     const [mesaCobro, setMesaCobro] = useState<Mesa | null>(null);
 
@@ -909,7 +1028,8 @@ export default function MesasDistribucion() {
 
         setMesas(mesasArray);
         setPedidosLista(toArray<any>(pedidosIniciales));
-    }, [mesasIniciales, pedidosIniciales]);
+        setReservasLista(toArray<Reserva>(reservasIniciales));
+    }, [mesasIniciales, pedidosIniciales, reservasIniciales]);
 
     useEffect(() => {
         setIsClient(true);
@@ -928,6 +1048,15 @@ export default function MesasDistribucion() {
                     prev.filter((p) => p.mesa_id !== payload.id),
                 );
             }
+        },
+    });
+
+    useSedeChannel('reservas', {
+        'reserva.actualizada': () => {
+            router.reload({
+                only: ['reservas', 'mesas'],
+                preserveUrl: true,
+            });
         },
     });
 
@@ -1109,10 +1238,20 @@ export default function MesasDistribucion() {
                 return;
             }
 
-            swalError(
-                'Sin pedidos',
-                `La mesa #${mesa.numero} no tiene pedidos.`,
-            );
+            Swal.fire({
+                icon: 'info',
+                title: 'Sin pedidos',
+                text: `La mesa #${mesa.numero} no tiene pedidos.`,
+                showCancelButton: true,
+                confirmButtonText: 'Agregar pedido',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: 'var(--gold)',
+                cancelButtonColor: 'var(--cream)',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = `/ventas?mesa=${mesa.numero}`;
+                }
+            });
 
             return;
         }
@@ -1326,104 +1465,48 @@ export default function MesasDistribucion() {
         });
     };
 
-    const crearMesa = async () => {
-        const result = await Swal.fire({
-            title: 'Nueva mesa',
+    const abrirConfiguracion = () => {
+        setModalConfigurarAbierto(true);
+    };
 
-            html: `
-                <div class="text-left space-y-3">
-                    <label class="block text-sm font-semibold text-chocolate">
-                        Numero de mesa
-                        <input
-                            id="swal-mesa-numero"
-                            class="swal2-input !mx-0 !mt-1 !w-full"
-                            placeholder="Ej: 12"
-                        />
-                    </label>
+    const reservasHoyPorMesa = (mesaId: number): Reserva[] =>
+        reservasLista
+            .filter(
+                (r) => r.mesa_id === mesaId && r.fecha === formatearHoyLocal(),
+            )
+            .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
 
-                    <label class="block text-sm font-semibold text-chocolate">
-                        Capacidad
-                        <input
-                            id="swal-mesa-capacidad"
-                            type="number"
-                            min="1"
-                            class="swal2-input !mx-0 !mt-1 !w-full"
-                            placeholder="Personas"
-                        />
-                    </label>
-                </div>
-            `,
+    // Reserva que actualmente bloquea la mesa: dentro de la ventana de
+    // anticipación (margen antes de iniciar) y aún no terminó.
+    const reservaActivaDe = (mesaId: number): Reserva | null => {
+        const ahora = horaActualLocal();
+        const limiteInicio = sumarMinutosLocal(ahora, margenInicioMinutos);
 
-            focusConfirm: false,
-            showCancelButton: true,
-            confirmButtonText: 'Crear mesa',
-            cancelButtonText: 'Cancelar',
-            confirmButtonColor: 'var(--gold)',
-            cancelButtonColor: '#6B7280',
-
-            preConfirm: () => {
-                const numero = (
-                    document.getElementById(
-                        'swal-mesa-numero',
-                    ) as HTMLInputElement | null
-                )?.value.trim();
-
-                const capacidadValue = (
-                    document.getElementById(
-                        'swal-mesa-capacidad',
-                    ) as HTMLInputElement | null
-                )?.value;
-
-                const capacidad = Number.parseInt(capacidadValue || '', 10);
-
-                if (!numero) {
-                    Swal.showValidationMessage('Ingresa el numero de mesa');
-
-                    return false;
-                }
-
-                if (!Number.isInteger(capacidad) || capacidad < 1) {
-                    Swal.showValidationMessage('Ingresa una capacidad valida');
-
-                    return false;
-                }
-
-                return {
-                    numero,
-                    capacidad,
-                };
-            },
-        });
-
-        if (!result.isConfirmed || !result.value) {
-            return;
-        }
-
-        const { numero, capacidad } = result.value;
-
-        router.post(
-            '/mesas',
-            {
-                numero,
-                capacidad,
-                sillas: capacidad,
-            },
-            {
-                onSuccess: () => {
-                    swalSuccess(
-                        'Mesa creada',
-                        `Mesa #${numero} registrada correctamente.`,
-                    );
-
-                    router.reload({
-                        only: ['mesas'],
-                    });
-                },
-
-                onError: (errors) =>
-                    swalError('Error al crear mesa', errorsToText(errors)),
-            },
+        return (
+            reservasHoyPorMesa(mesaId).find(
+                (r) =>
+                    r.estado === 'confirmada' &&
+                    r.hora_fin > ahora &&
+                    r.hora_inicio <= limiteInicio,
+            ) ?? null
         );
+    };
+
+    // Próxima reserva del día (aún no iniciada): se muestra como aviso.
+    const reservaProximaDe = (mesaId: number): Reserva | null =>
+        reservasHoyPorMesa(mesaId).find(
+            (r) =>
+                r.estado === 'confirmada' && r.hora_inicio > horaActualLocal(),
+        ) ?? null;
+
+    const abrirReservas = (mesa: Mesa) => {
+        setMesaReservas(mesa);
+        setModalReservasAbierto(true);
+    };
+
+    const cerrarReservas = () => {
+        setModalReservasAbierto(false);
+        setMesaReservas(null);
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
@@ -1468,6 +1551,15 @@ export default function MesasDistribucion() {
             return;
         }
 
+        if (destino.sillas >= 10) {
+            swalError(
+                'Movimiento no permitido',
+                'La mesa destino ya tiene 10 sillas, el máximo permitido.',
+            );
+
+            return;
+        }
+
         setMesas((prev) =>
             prev.map((m) => {
                 if (m.id === mesaOrigenId) {
@@ -1490,7 +1582,7 @@ export default function MesasDistribucion() {
 
         router.patch(
             `/mesas/${mesaOrigenId}/transferir-silla/${mesaDestinoId}`,
-            {},
+            { forzar: true },
             {
                 preserveScroll: true,
                 only: ['mesas'],
@@ -1526,79 +1618,89 @@ export default function MesasDistribucion() {
         <>
             <Head title="Distribución de Mesas" />
 
-            <div className="min-h-screen space-y-4 bg-cream p-4 md:p-6">
-                <div className="flex justify-end gap-3">
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+            <div className="min-h-screen space-y-5 bg-cream p-4 md:p-6">
+                {/* Encabezado */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <h1 className="text-base font-semibold text-cocoa sm:text-lg">
+                            Distribución de mesas
+                        </h1>
+
                         {canManageTables && (
                             <button
-                                onClick={crearMesa}
-                                className="inline-flex items-center gap-2 rounded-xl bg-gold px-4 py-2.5 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-deep active:scale-95 sm:px-5"
+                                onClick={abrirConfiguracion}
+                                className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-gold px-4 py-2.5 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-deep active:scale-95 sm:px-5"
                             >
-                                <Plus className="h-4 w-4" />
-                                Nueva Mesa
+                                <Settings className="h-4 w-4" />
+                                <span>Configurar Mesas</span>
                             </button>
                         )}
+                    </div>
 
-                        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-cocoa-soft/20 bg-white/80 p-2 text-xs dark:border-white/10 dark:bg-white/5 sm:gap-3">
-                            <span className="flex items-center gap-1 text-chocolate">
-                                <span className="h-3 w-3 rounded-full bg-green-400 dark:bg-green-500" />
+                    {/* Resumen + estados */}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="text-xs font-medium text-cocoa-soft sm:text-sm">
+                            Ocupadas:{' '}
+                            {
+                                mesasActivas.filter(
+                                    (m) => m.estado === 'ocupada',
+                                ).length
+                            }{' '}
+                            / {mesasActivas.length}
+                        </span>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-chocolate">
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="h-2.5 w-2.5 rounded-full bg-green-400 dark:bg-green-500" />
                                 Libre
                             </span>
 
-                            <span className="flex items-center gap-1 text-chocolate">
-                                <span className="h-3 w-3 rounded-full bg-yellow-400 dark:bg-yellow-500" />
-                                Pendiente
-                            </span>
-
-                            <span className="flex items-center gap-1 text-chocolate">
-                                <span className="h-3 w-3 rounded-full bg-orange-400 dark:bg-orange-500" />
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="h-2.5 w-2.5 rounded-full bg-orange-400 dark:bg-orange-500" />
                                 Ocupada
                             </span>
 
-                            <span className="flex items-center gap-1 text-chocolate">
-                                <span className="h-3 w-3 rounded-full bg-blue-400 dark:bg-blue-500" />
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="h-2.5 w-2.5 rounded-full bg-blue-400 dark:bg-blue-500" />
                                 Reserva
                             </span>
 
-                            <span className="flex items-center gap-1 text-chocolate">
-                                <span className="h-3 w-3 rounded-full bg-purple-400 dark:bg-purple-500" />
-                                Cobrar
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="h-2.5 w-2.5 rounded-full bg-purple-400 dark:bg-purple-500" />
+                                Por cobrar
                             </span>
                         </div>
                     </div>
                 </div>
 
-                <div className="w-full">
-                    <div className="mb-3 flex items-center justify-between">
-                        <h2 className="text-sm font-semibold text-cocoa">
-                            Distribucion de mesas - tiempo real
-                        </h2>
-
-                        <span className="text-xs text-cocoa-soft">
-                            {mesas.filter((m) => m.estado === 'ocupada').length}{' '}
-                            ocupadas / {mesas.length} total
-                        </span>
-                    </div>
-
-                    {isClient && (
-                        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-                            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-                                {mesas.map((mesa) => (
+                {/* Distribución */}
+                {isClient && (
+                    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+                        <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                            {mesasActivas.map((mesa) => (
+                                <div
+                                    key={mesa.id}
+                                    className="flex min-w-0 flex-col"
+                                >
                                     <MesaCard
-                                        key={mesa.id}
                                         mesa={mesa}
                                         onCambiarEstado={cambiarEstado}
                                         onTomarPedido={tomarPedido}
                                         onAbrirModalCobro={abrirModalCobro}
                                         onVerTickets={verTickets}
+                                        onAbrirReservas={abrirReservas}
                                         pedidos={pedidosLista}
                                         userRole={userRole}
+                                        reservaActiva={reservaActivaDe(mesa.id)}
+                                        reservaProxima={reservaProximaDe(
+                                            mesa.id,
+                                        )}
                                     />
-                                ))}
-                            </div>
-                        </DndContext>
-                    )}
-                </div>
+                                </div>
+                            ))}
+                        </div>
+                    </DndContext>
+                )}
 
                 <ModalPin
                     isOpen={modalPinAbierto}
@@ -1639,11 +1741,41 @@ export default function MesasDistribucion() {
                     onCobrarMesa={() => {
                         if (mesaSeleccionada) {
                             setModalTicketsAbierto(false);
-
                             abrirModalCobro(mesaSeleccionada);
                         }
                     }}
                 />
+
+                {modalConfigurarAbierto && (
+                    <ModalConfigurarMesas
+                        isOpen
+                        mesas={mesas}
+                        pedidos={pedidosLista}
+                        mesaHistorialIds={toArray<number>(mesaHistorialIds)}
+                        reservaHistorialIds={toArray<number>(
+                            reservaHistorialIds,
+                        )}
+                        onClose={() => setModalConfigurarAbierto(false)}
+                    />
+                )}
+
+                {modalReservasAbierto && mesaReservas && (
+                    <ModalReservasMesa
+                        isOpen
+                        mesa={mesaReservas}
+                        reservas={reservasHoyPorMesa(mesaReservas.id)}
+                        puedeGestionar={
+                            ROLES_ACCESO_COMPLETO.includes(userRole ?? '') ||
+                            canManageTables
+                        }
+                        margenInicioMinutos={margenInicioMinutos}
+                        onClose={cerrarReservas}
+                        onTomarPedido={() => {
+                            cerrarReservas();
+                            tomarPedido(mesaReservas);
+                        }}
+                    />
+                )}
             </div>
         </>
     );

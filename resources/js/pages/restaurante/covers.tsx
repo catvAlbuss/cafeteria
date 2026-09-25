@@ -223,9 +223,47 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
         }
     }, [isOpen, cover]);
 
+    // Captura global de Ctrl+V mientras el modal está abierto.
+    // Esto permite pegar imágenes desde cualquier lugar del modal.
+    useEffect(() => {
+        if (!isOpen) {
+return;
+}
+
+        const handlePaste = (e: ClipboardEvent) => {
+            const items = e.clipboardData?.items;
+
+            if (!items) {
+return;
+}
+
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            const base64 = reader.result as string;
+                            setPreviewImagen(base64);
+                            setForm((f) => ({ ...f, imagen: base64 }));
+                        };
+                        reader.readAsDataURL(file);
+                    }
+
+                    break;
+                }
+            }
+        };
+
+        document.addEventListener('paste', handlePaste);
+
+        return () => document.removeEventListener('paste', handlePaste);
+    }, [isOpen]);
+
     if (!isOpen) {
-        return null;
-    }
+return null;
+}
 
     const tipos = [
         { value: 'promocion', label: 'Promoción' },
@@ -250,17 +288,23 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
 
         setError('');
 
-        // ✅ Conserva la imagen existente si estás editando y no subiste una nueva
-        const payload = {
-            ...form,
+        // Construir payload
+        const payload: any = {
+            titulo: form.titulo,
+            descripcion: form.descripcion || '',
+            tipo: form.tipo,
             fechaInicio: form.fechaInicio,
             fechaFin: form.fechaFin,
-            imagen: form.imagen
-                ? form.imagen
-                : esEdicion
-                  ? cover!.imagen
-                  : '/images/default-cover.jpg',
         };
+
+        // Solo agregar imagen si hay una nueva (base64) o si estamos creando
+        if (form.imagen && form.imagen.startsWith('data:')) {
+            payload.imagen = form.imagen;
+        } else if (!esEdicion) {
+            payload.imagen = '/images/default-cover.jpg';
+        }
+        // Si estamos editando y no hay imagen nueva → NO enviamos el campo
+        // (el backend conserva la imagen anterior)
 
         setGuardando(true);
 
@@ -271,7 +315,6 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
                 onClose();
 
                 router.reload({ only: ['covers'] });
-
                 swalSuccess(
                     esEdicion ? 'Cover actualizado' : 'Cover creado',
                     'Los cambios se guardaron correctamente.',
@@ -279,7 +322,12 @@ function CoverFormModal({ isOpen, cover, onClose }: CoverFormModalProps) {
             },
             onError: (errors: Record<string, string>) => {
                 setGuardando(false);
-                setError(Object.values(errors).join(' '));
+                const mensaje = Object.values(errors).join(' ');
+                setError(mensaje);
+                swalError('Error al guardar', mensaje);
+            },
+            onFinish: () => {
+                setGuardando(false);
             },
         };
 

@@ -6,6 +6,8 @@ use App\Events\MesaActualizada;
 use App\Events\PedidoActualizado;
 use App\Models\Mesa;
 use App\Models\Pedido;
+use App\Models\Reserva;
+use App\Services\ReservaService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -15,6 +17,14 @@ class MesaController extends Controller
     public function index()
     {
         $teamId = auth()->user()->current_team_id;
+
+        // Expiración lazy: reservas vencidas y mesas huérfanas en "reserva".
+        Reserva::expirarVencidas();
+        $mesasLiberadas = Reserva::sincronizarMesasEnReserva();
+
+        foreach ($mesasLiberadas as $mesa) {
+            MesaActualizada::dispatch($mesa);
+        }
 
         $mesas = Mesa::where('team_id', $teamId)
             ->with('meseroUser')
@@ -27,9 +37,23 @@ class MesaController extends Controller
             ->get()
             ->values();
 
+        // IDs de mesas con cualquier historial de pedidos (para bloquear su eliminación)
+        $mesaHistorialIds = Mesa::where('team_id', $teamId)
+            ->whereHas('pedidos')
+            ->pluck('id');
+
+        // IDs de mesas con historial de reservas (bloquean la eliminación)
+        $reservaHistorialIds = Mesa::where('team_id', $teamId)
+            ->whereHas('reservas')
+            ->pluck('id');
+
         return Inertia::render('restaurante/mesas', [
             'mesas' => $mesas->values()->all(),
             'pedidos' => $pedidos->values()->all(),
+            'mesaHistorialIds' => $mesaHistorialIds,
+            'reservaHistorialIds' => $reservaHistorialIds,
+            'reservas' => Reserva::delDia($teamId)->all(),
+            'margenInicioMinutos' => (int) config('reservas.margen_inicio_minutos', 10),
         ]);
     }
 
@@ -38,8 +62,8 @@ class MesaController extends Controller
     {
         $validated = $request->validate([
             'numero' => 'required|string|unique:mesas',
-            'capacidad' => 'required|integer|min:1',
-            'sillas' => 'required|integer|min:0',
+            'capacidad' => 'required|integer|min:1|max:8',
+            'sillas' => 'required|integer|min:0|max:10',
         ]);
 
         $mesa = Mesa::create($validated);
@@ -50,14 +74,71 @@ class MesaController extends Controller
     public function update(Request $request, Mesa $mesa)
     {
         $validated = $request->validate([
-            'estado' => 'required|in:libre,pendiente,ocupada,reserva,listo_cobrar',
+            'estado' => 'sometimes|in:libre,pendiente,ocupada,reserva,listo_cobrar',
             'cliente' => 'nullable|string',
             'personas' => 'nullable|integer|min:1',
             'user_id' => 'nullable|integer|exists:users,id',
+            'sillas' => 'sometimes|integer|min:1|max:10',
+            'activa' => 'sometimes|boolean',
         ]);
+
+        $puedeGestionar = auth()->user()->can('gestionar mesas');
 
         if (! empty($validated['user_id']) && ! auth()->user()->currentTeam->members()->where('users.id', $validated['user_id'])->exists()) {
             return redirect()->back()->with('error', 'El empleado no pertenece a esta sede.');
+        }
+
+        // Configuración: editar sillas (solo gestión)
+        if (array_key_exists('sillas', $validated)) {
+            if (! $puedeGestionar) {
+                return redirect()->back()->withErrors([
+                    'sillas' => 'No tienes permisos para configurar mesas.',
+                ]);
+            }
+
+            $mesa->update(['sillas' => $validated['sillas']]);
+            broadcast(new MesaActualizada($mesa->fresh()));
+
+            return redirect()->back()->with('success', 'Sillas de la mesa actualizadas');
+        }
+
+        // Configuración: activar / desactivar (solo gestión)
+        if (array_key_exists('activa', $validated)) {
+            if (! $puedeGestionar) {
+                return redirect()->back()->withErrors([
+                    'activa' => 'No tienes permisos para configurar mesas.',
+                ]);
+            }
+
+            $activar = (bool) $validated['activa'];
+
+            if (! $activar) {
+                $tienePedidosActivos = $mesa->pedidos()
+                    ->whereNotIn('estado', ['pagado', 'cancelado'])
+                    ->exists();
+
+                if ($mesa->estado !== 'libre' || $tienePedidosActivos) {
+                    return redirect()->back()->withErrors([
+                        'activa' => 'Solo puedes desactivar una mesa libre y sin pedidos activos.',
+                    ]);
+                }
+            }
+
+            $mesa->update(['activa' => $activar]);
+            broadcast(new MesaActualizada($mesa->fresh()));
+
+            return redirect()->back()->with(
+                'success',
+                $activar ? 'Mesa activada correctamente' : 'Mesa desactivada correctamente'
+            );
+        }
+
+        if (! array_key_exists('estado', $validated)) {
+            return redirect()->back()->with('error', 'No se recibió ninguna acción válida.');
+        }
+
+        if (! $mesa->activa) {
+            return redirect()->back()->with('error', 'La mesa está desactivada. Actívala para seguir operando con ella.');
         }
 
         if ($validated['estado'] === 'listo_cobrar') {
@@ -113,6 +194,11 @@ class MesaController extends Controller
         $mesa->update($validated);
         broadcast(new MesaActualizada($mesa));
 
+        // Al ocupar una mesa en reserva, la reserva activa pasa a atendida.
+        if ($validated['estado'] === 'ocupada') {
+            ReservaService::atenderActiva($mesa);
+        }
+
         return redirect()->back()->with('success', 'Estado de mesa actualizado');
     }
 
@@ -124,9 +210,27 @@ class MesaController extends Controller
         ]);
     }
 
-    //  Eliminar una mesa
+    //  Eliminar una mesa (solo si está libre y sin historial de pedidos)
     public function destroy(Mesa $mesa)
     {
+        if ($mesa->estado !== 'libre') {
+            return redirect()->back()->withErrors([
+                'mesa' => 'Solo puedes eliminar una mesa que esté libre.',
+            ]);
+        }
+
+        if ($mesa->pedidos()->count() > 0) {
+            return redirect()->back()->withErrors([
+                'mesa' => 'No se puede eliminar porque tiene historial de pedidos. Puedes desactivarla si ya no la vas a usar.',
+            ]);
+        }
+
+        if ($mesa->reservas()->count() > 0) {
+            return redirect()->back()->withErrors([
+                'mesa' => 'No se puede eliminar porque tiene historial de reservas. Puedes desactivarla si ya no la vas a usar.',
+            ]);
+        }
+
         $mesa->delete();
 
         return redirect()->back()->with('success', 'Mesa eliminada correctamente');
@@ -177,6 +281,9 @@ class MesaController extends Controller
         ]);
         broadcast(new MesaActualizada($mesa));
 
+        // Si la mesa estaba en reserva, su reserva activa pasa a atendida.
+        ReservaService::atenderActiva($mesa);
+
         return redirect()->back()->with('success', 'Mesa asignada a '.auth()->user()->name);
     }
 
@@ -199,6 +306,10 @@ class MesaController extends Controller
             return redirect()->back()->with('error', 'La mesa debe tener al menos 1 silla');
         }
 
+        if ($destino->sillas >= 10) {
+            return redirect()->back()->with('error', 'La mesa destino ya tiene 10 sillas, el máximo permitido');
+        }
+
         if (! ($validated['forzar'] ?? false) && ($destino->sillas + 1) > $destino->capacidad) {
             return redirect()->back()->with('aviso_capacidad', [
                 'mesero_origen_id' => $origen->id,
@@ -219,7 +330,7 @@ class MesaController extends Controller
     {
         $mesa = Mesa::where('numero', $numero)->first();
 
-        if (! $mesa) {
+        if (! $mesa || ! $mesa->activa) {
             return response()->json(['error' => 'Mesa no encontrada'], 404);
         }
 

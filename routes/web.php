@@ -17,6 +17,7 @@ use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\PinController;
 use App\Http\Controllers\PlatoController;
 use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\ReservaController;
 use App\Http\Controllers\ResumenController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Middleware\EnsureTeamMembership;
@@ -152,6 +153,10 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/mesas/{origen}/transferir-silla/{destino}', [MesaController::class, 'transferirSilla'])
         ->middleware('cash.session')->name('mesas.transferir-silla');
     Route::patch('/mesas/{mesa}/cobrar', [PedidoController::class, 'cobrarMesa'])->middleware('cash.session')->name('mesas.cobrar');
+
+    // RESERVAS
+    Route::post('/mesas/{mesa}/reservas', [ReservaController::class, 'store'])->middleware('cash.session')->name('mesas.reservas.store');
+    Route::patch('/mesas/{mesa}/reservas/cancelar', [ReservaController::class, 'cancelar'])->middleware('cash.session')->name('mesas.reservas.cancelar');
 
     // PEDIDOS
     Route::post('/pedidos/{pedido}/agregar-productos', [PedidoController::class, 'agregarProductos']);

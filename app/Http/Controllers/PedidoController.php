@@ -15,6 +15,7 @@ use App\Models\Plato;
 use App\Models\User;
 use App\Services\ClienteService;
 use App\Services\ProductionAreaClassifier;
+use App\Services\ReservaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,10 +30,10 @@ class PedidoController extends Controller
         $mesaNumero = $request->query('mesa');
 
         if ($mesaNumero) {
-            // Llegó con mesa explícita en la URL: guardarla como la mesa activa
+
             session(['mesa_activa' => $mesaNumero]);
         } else {
-            // No vino en la URL (ej. volviste por el sidebar): recuperar la última mesa activa
+
             $mesaNumero = session('mesa_activa');
         }
 
@@ -42,14 +43,12 @@ class PedidoController extends Controller
                 ->first()
             : null;
 
-        // Si la mesa ya está libre (fue cobrada), olvidar el contexto
         if ($mesaInfo && $mesaInfo->estado === 'libre') {
             session()->forget('mesa_activa');
             $mesaInfo = null;
         }
 
         $platos = Plato::all();
-
         $pedidosActivos = $mesaInfo
             ? Pedido::where('mesa_id', $mesaInfo->id)
                 ->whereNotIn('estado', ['pagado', 'cancelado'])
@@ -85,9 +84,7 @@ class PedidoController extends Controller
         ])->filter()->keys();
 
         abort_if($areasDisponibles->isEmpty(), 403);
-
         $areaSolicitada = $request->string('area')->toString();
-
         $areaActiva = $areasDisponibles->contains($areaSolicitada)
             ? $areaSolicitada
             : $areasDisponibles->first();
@@ -144,7 +141,6 @@ class PedidoController extends Controller
         }
 
         $productosMasPedidos = [];
-
         $pedidosRecientes = Pedido::query()
             ->where('team_id', $teamId)
             ->whereIn('area', $areas)
@@ -270,7 +266,6 @@ class PedidoController extends Controller
             }
 
             $idsEnviados = collect($validated['pedido_ids']);
-
             $pedidosACobrar = $pedidosActuales->filter(
                 function ($pedido) use ($idsEnviados) {
                     return $idsEnviados->contains($pedido->id);
@@ -339,7 +334,6 @@ class PedidoController extends Controller
             'mesa_id' => 'nullable|exists:mesas,id',
             'mesa' => 'nullable|string',
             'cliente' => 'nullable|string|max:255',
-
             'productos' => 'required|array|min:1',
             'productos.*.id' => 'nullable|integer',
             'productos.*.nombre' => 'required|string|max:255',
@@ -347,11 +341,9 @@ class PedidoController extends Controller
             'productos.*.precio' => 'required|numeric|min:0',
             'productos.*.subtotal' => 'required|numeric|min:0',
             'productos.*.categoria' => 'nullable|string|max:100',
-
             'subtotal' => 'nullable|numeric|min:0',
             'igv' => 'nullable|numeric|min:0',
             'total' => 'required|numeric|min:0',
-
             'metodo_pago' => 'nullable|string',
             'tipo' => 'nullable|string',
             'estado' => 'nullable|string|in:pendiente,preparando,listo,entregado,pagado,cancelado',
@@ -371,6 +363,21 @@ class PedidoController extends Controller
             return redirect()
                 ->back()
                 ->with('error', 'El empleado no pertenece a esta sede.');
+        }
+
+        if (! empty($validated['mesa_id'])) {
+            $mesaDePedido = Mesa::query()->find($validated['mesa_id']);
+
+            if ($mesaDePedido && ! $mesaDePedido->activa) {
+                return redirect()->back()->withErrors([
+                    'mesa_id' => 'Esta mesa está desactivada y no puede recibir pedidos.',
+                ]);
+            }
+
+            // Si la mesa estaba en reserva, su reserva activa pasa a atendida.
+            if ($mesaDePedido && $mesaDePedido->estado === 'reserva') {
+                ReservaService::atenderActiva($mesaDePedido);
+            }
         }
 
         $estado = $validated['estado'] ?? 'pendiente';
@@ -551,7 +558,7 @@ class PedidoController extends Controller
 
     public function update(Request $request, Pedido $pedido)
     {
-        // Si viene de la edición de productos (desde Ventas)
+
         if ($request->has('productos')) {
             $request->validate([
                 'productos' => 'required|array|min:1',
@@ -597,7 +604,6 @@ class PedidoController extends Controller
                 ->with('success', 'Pedido actualizado correctamente');
         }
 
-        // Si viene con estado
         if ($request->has('estado')) {
             $validated = $request->validate([
                 'estado' => 'required|in:pendiente,preparando,listo,entregado,pagado,cancelado',
@@ -610,7 +616,6 @@ class PedidoController extends Controller
             }
 
             $pedido->save();
-
             broadcast(new PedidoActualizado($pedido));
 
             if ($validated['estado'] === 'listo') {
@@ -674,7 +679,6 @@ class PedidoController extends Controller
         }
 
         $pedido->save();
-
         broadcast(new PedidoActualizado($pedido));
         broadcast(new PedidoListo($pedido));
 
@@ -683,7 +687,6 @@ class PedidoController extends Controller
             ->with('success', 'Pedido marcado como listo');
     }
 
-    // Enviar delivery a cocina
     public function enviarACocina($id)
     {
         $pedido = Pedido::findOrFail($id);
@@ -741,7 +744,6 @@ class PedidoController extends Controller
         $caja = Caja::query()
             ->where('estado', 'Abierta')
             ->firstOrFail();
-
         $pedido->estado = 'pagado';
         $pedido->metodo_pago = $validated['metodo_pago'];
         $pedido->caja_id = $caja->id;
@@ -780,7 +782,6 @@ class PedidoController extends Controller
     public function entregarTicket($id)
     {
         $pedido = Pedido::findOrFail($id);
-
         if ($pedido->estado !== 'listo') {
             return redirect()
                 ->back()
@@ -794,11 +795,10 @@ class PedidoController extends Controller
         DB::beginTransaction();
 
         try {
-            // Marcar pedido como entregado
+
             $pedido->estado = 'entregado';
             $pedido->hora_entrega = now();
             $pedido->save();
-
             $ticketsPendientes = Pedido::where(
                 'mesa_id',
                 $pedido->mesa_id
@@ -814,17 +814,16 @@ class PedidoController extends Controller
 
                 if ($mesa) {
                     if ($ticketsPendientes === 0) {
-                        // Todos los tickets entregados → cambiar a "Cobrar"
+
                         $mesa->estado = 'listo_cobrar';
                         $mesa->pedido_listo = false;
                         $mesa->save();
 
                         broadcast(new MesaActualizada($mesa));
                     } else {
-                        // Aún hay tickets pendientes
+
                         $mesa->pedido_listo = false;
                         $mesa->save();
-
                         DB::afterCommit(
                             fn () => broadcast(new MesaActualizada($mesa))
                         );
@@ -833,7 +832,6 @@ class PedidoController extends Controller
             }
 
             DB::commit();
-
             broadcast(new PedidoActualizado($pedido));
 
             return redirect()
@@ -869,8 +867,6 @@ class PedidoController extends Controller
             'documento' => 'required|string|max:11',
             'nombre' => 'required|string|max:255',
             'direccion' => 'nullable|string|max:255',
-
-            // Datos opcionales para cobrar la mesa
             'mesa_id' => 'nullable|exists:mesas,id',
             'metodo_pago' => 'nullable|in:efectivo,tarjeta,yape',
             'authorization_pin' => 'nullable|string|size:4',
@@ -878,8 +874,6 @@ class PedidoController extends Controller
 
         try {
             DB::beginTransaction();
-
-            // 1. Obtener todos los pedidos
             $pedidos = Pedido::whereIn(
                 'id',
                 $validated['pedido_ids']
@@ -894,7 +888,6 @@ class PedidoController extends Controller
                 ], 404);
             }
 
-            // 2. Validar PIN y método de pago (siempre)
             if (
                 empty($validated['authorization_pin'])
                 || empty($validated['metodo_pago'])
@@ -950,9 +943,7 @@ class PedidoController extends Controller
                 broadcast(new MesaActualizada($mesa));
             }
 
-            // 4. Agrupar todos los productos de todos los pedidos
             $items = [];
-
             foreach ($pedidos as $pedido) {
                 $productos = is_string($pedido->productos)
                     ? json_decode($pedido->productos, true)
@@ -975,12 +966,10 @@ class PedidoController extends Controller
             // 5. Determinar serie según tipo de documento
             $serie = $validated['tipo_documento'] === '01' ? 'F001' : 'B001';
 
-            // 8. Construir el payload para FacturaController
             $payload = [
                 'serie' => $serie,
                 'tipo_documento' => $validated['tipo_documento'],
                 'incluidoigv' => true,
-
                 'client' => [
                     'ruc' => $validated['tipo_documento'] === '01'
                                             ? $validated['documento']
@@ -1002,13 +991,11 @@ class PedidoController extends Controller
                 ],
 
                 'items' => $items,
-
                 'vendedor' => [
                     'nombre' => auth()->user()->name ?? 'Cajero',
                 ],
             ];
 
-            // 9. Llamar al método generateInvoice
             $invoiceRequest = Request::create(
                 '/facturacion/generar',
                 'POST',
@@ -1029,7 +1016,6 @@ class PedidoController extends Controller
                 true
             );
 
-            // 10. Guardar la respuesta en los pedidos
             if ($resultado['success'] ?? false) {
                 foreach ($pedidos as $pedido) {
                     $pedido->tipo_documento = $validated['tipo_documento'];
@@ -1073,7 +1059,6 @@ class PedidoController extends Controller
             return response()->json($resultado);
         } catch (\Exception $e) {
             DB::rollBack();
-
             \Log::error(
                 'Error al emitir comprobante: '.$e->getMessage()
             );

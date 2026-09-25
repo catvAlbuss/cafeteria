@@ -346,10 +346,12 @@ export default function ModalBoleta({
             ? soloDigitos
             : `51${soloDigitos}`;
 
+        // URL del PDF aislada en su propia línea
         const mensaje = [
             `Hola ${comprobanteEmitido.clienteNombre},`,
             '',
-            `Aquí tienes tu ${comprobanteEmitido.tipoTexto} electrónica:`,
+            `Aquí tienes tu ${comprobanteEmitido.tipoTexto} electrónica.`,
+            'Haz clic aquí para descargarla:',
             comprobanteEmitido.pdfUrl,
             '',
             `Total: S/ ${comprobanteEmitido.total.toFixed(2)}`,
@@ -360,7 +362,13 @@ export default function ModalBoleta({
             `WhatsApp: ${EMPRESA_WHATSAPP}`,
         ].join('\n');
 
-        const url = `https://wa.me/${numeroConPais}?text=${encodeURIComponent(mensaje)}`;
+        // Forzar %0A explícito para que WhatsApp respete los saltos
+        const mensajeCodificado = encodeURIComponent(mensaje).replace(
+            /%0A/g,
+            '%0A',
+        );
+
+        const url = `https://wa.me/${numeroConPais}?text=${mensajeCodificado}`;
 
         setEnviandoWhatsapp(true);
         window.open(url, '_blank');

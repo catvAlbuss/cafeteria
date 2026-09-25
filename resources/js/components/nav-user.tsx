@@ -20,6 +20,12 @@ export function NavUser() {
     const { state } = useSidebar();
     const isMobile = useIsMobile();
 
+    // ✅ Si no hay usuario autenticado, no renderizamos nada.
+    //    Esto evita el error de SSR cuando se renderiza la página de error.
+    if (!auth?.user) {
+        return null;
+    }
+
     return (
         <SidebarMenu>
             <SidebarMenuItem>
