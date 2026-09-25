@@ -138,7 +138,7 @@ body {
             <tr>
                 <td class="text-left">{{ $item->quantity }}</td>
                 <td class="text-left producto-desc">{{ $item->description }}</td>
-                <td class="text-right">{{ number_format($item->unitValue * $item->quantity, 2) }}</td>
+                <td class="text-right">{{ number_format($item->unitValue * 1.18 * $item->quantity, 2) }}</td>
             </tr>
             @endforeach
         </tbody>

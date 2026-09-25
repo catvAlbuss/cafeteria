@@ -998,10 +998,10 @@ class PedidoController extends Controller
                         : null,
 
                     'direccion' => $validated['direccion'] ?? '-',
-                    'ubigeo' => '150101',
-                    'departamento' => 'LIMA',
-                    'provincia' => 'LIMA',
-                    'distrito' => 'LIMA',
+                    'ubigeo' => '100101',
+'departamento' => 'HUANUCO',
+'provincia' => 'HUANUCO',
+'distrito' => 'HUANUCO',
                 ],
 
                 'items' => $items,

@@ -101,16 +101,16 @@ class FacturaController extends Controller
 
             // Configurar empresa emisora
             $company = new Company();
-            $company->setRuc('20000000001')
-                ->setRazonSocial('DOLCE CAFFE SAC')
-                ->setNombreComercial('DOLCE CAFFE')
+            $company->setRuc('20607955990')
+                ->setRazonSocial('SEVEN HEART SOCIEDAD ANONIMA CERRADA')
+                ->setNombreComercial('SEVEN HEART')
                 ->setAddress((new Address())
                     ->setUbigueo('100101')
                     ->setDepartamento('HUANUCO')
                     ->setProvincia('HUANUCO')
                     ->setDistrito('HUANUCO')
                     ->setUrbanizacion('-')
-                    ->setDireccion('AV. PRINCIPAL 123')
+                    ->setDireccion('JR. SIMON BOLIVAR NRO. 487 (A UNA CUADRA DE TIENDAS YOLU) HUANUCO - HUANUCO - HUANUCO')
                     ->setCodLocal('0000'));
 
             // Configurar cliente
@@ -376,8 +376,8 @@ class FacturaController extends Controller
                 'company' => [
                     'name' => $xpath->evaluate('string(//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName)'),
                     'address' => $xpath->evaluate('string(//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cac:RegistrationAddress/cac:AddressLine/cbc:Line)'),
-                    'phone' => '(+51) 953-992-277',
-                    'email' => 'example@gmail.com',
+                    'phone' => '(+51) 962-XXX-XXX',
+                    'email' => 'facturacion@sevenheart.pe',
                     'ruc' => $xpath->evaluate('string(//cac:AccountingSupplierParty/cac:Party/cac:PartyIdentification/cbc:ID)'),
                     'logo' => public_path('img/logoTiket.png'),
                 ],
