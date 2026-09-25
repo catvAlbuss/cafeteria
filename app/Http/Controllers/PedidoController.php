@@ -276,11 +276,15 @@ class PedidoController extends Controller
                 abort(422, 'No se encontraron pedidos válidos para cobrar.');
             }
 
+            // Generar un venta_grupo único para este cobro de mesa
+            $ventaGrupo = 'mesa-'.$mesa->id.'-'.now()->format('YmdHis');
+
             foreach ($pedidosACobrar as $pedido) {
                 $pedido->update([
                     'estado' => 'pagado',
                     'metodo_pago' => $validated['metodo_pago'],
                     'caja_id' => $caja->id,
+                    'venta_grupo' => $ventaGrupo,
                 ]);
             }
 
@@ -1017,6 +1021,11 @@ class PedidoController extends Controller
             );
 
             if ($resultado['success'] ?? false) {
+                // Generar un venta_grupo único para este cobro
+                $ventaGrupo = ! empty($validated['mesa_id'])
+                    ? 'mesa-'.$validated['mesa_id'].'-'.now()->format('YmdHis')
+                    : 'caja-'.now()->format('YmdHis').'-'.uniqid();
+
                 foreach ($pedidos as $pedido) {
                     $pedido->tipo_documento = $validated['tipo_documento'];
                     $pedido->documento_cliente = $validated['documento'];
@@ -1029,6 +1038,7 @@ class PedidoController extends Controller
                     $pedido->factura_xml_url = $resultado['xml_url'] ?? null;
                     $pedido->factura_cdr_url = $resultado['cdr_url'] ?? null;
                     $pedido->factura_respuesta = $resultado['message'] ?? 'Aceptado';
+                    $pedido->venta_grupo = $ventaGrupo;
                     $pedido->error_sunat = null;
                     $pedido->save();
                 }

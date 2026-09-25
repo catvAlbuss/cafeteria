@@ -199,7 +199,7 @@
                 <td>{{ $item->description }}</td>
                 <td class="text-right">S/ {{ number_format($item->unitValue, 2) }}</td>
                 <td class="text-right">S/ {{ number_format($item->unitValue * 1.18, 2) }}</td>
-                <td class="text-right">S/ {{ number_format($item->totalValue, 2) }}</td>
+                <td class="text-right">S/ {{ number_format($item->unitValue * 1.18 * $item->quantity, 2) }}</td>
             </tr>
             @endforeach
         </tbody>
