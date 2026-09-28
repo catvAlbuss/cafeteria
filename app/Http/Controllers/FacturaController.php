@@ -24,12 +24,17 @@ class FacturaController extends Controller
 {
     private $see;
 
-    public function __construct()
-    {
-        $this->see = new See;
-        $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
-        $this->see->setService(env('SUNAT_URL'));
-    }
+   public function __construct()
+{
+    $this->see = new See;
+    $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
+    $this->see->setService(config('sunat.url'));
+    $this->see->setClaveSOL(
+        config('sunat.ruc'),
+        config('sunat.usuario_sol'),
+        config('sunat.clave_sol')
+    );
+}
 
     private function reservarCorrelativoYCrearFactura(string $serie, Request $request): Factura
     {
@@ -101,7 +106,7 @@ class FacturaController extends Controller
 
             // Configurar empresa emisora
             $company = new Company();
-            $company->setRuc('20607955990')
+            $company->setRuc(config('sunat.ruc'))
                 ->setRazonSocial('SEVEN HEART SOCIEDAD ANONIMA CERRADA')
                 ->setNombreComercial('SEVEN HEART')
                 ->setAddress((new Address())
@@ -244,27 +249,32 @@ class FacturaController extends Controller
                     'xml_url' => url("facturacion/xml/{$filename}"),
                     'cdr_url' => url("facturacion/cdr/{$filename}"),
                 ];
-            } else {
-                $errorMessage = $result->getError()->getMessage();
-                $factura->montototal = $totalVenta;
-                $factura->documento = 'rechazado.pdf';
-                $factura->estado_sunat = 'rechazado';
-                $factura->error_sunat = $errorMessage;
-                $factura->codigo_sunat = 'ERROR';
-                $factura->save();
+    } else {
 
-                \Log::error('SUNAT rechazó el comprobante: ' . $errorMessage, [
-                    'serie' => $serie,
-                    'correlativo' => $correlativo,
-                    'tipo_documento' => $request->input('tipo_documento'),
-                ]);
+    $errorCode = $result->getError()->getCode();
+    $errorMessage = $result->getError()->getMessage();
+    $factura->montototal = $totalVenta;
+    $factura->documento = 'rechazado.pdf';
+    $factura->estado_sunat = 'rechazado';
+    $factura->error_sunat = $errorMessage;
+    $factura->codigo_sunat = $errorCode ?: 'ERROR';
+    $factura->save();
 
-                $response = [
-                    'success' => false,
-                    'error' => $errorMessage,
-                    'factura_id' => $factura->idfactura,
-                ];
-            }
+    \Log::error('SUNAT rechazó el comprobante', [
+        'codigo' => $errorCode,
+        'mensaje' => $errorMessage,
+        'serie' => $serie,
+        'correlativo' => $correlativo,
+        'tipo_documento' => $request->input('tipo_documento'),
+    ]);
+
+    $response = [
+        'success' => false,
+        'error' => $errorMessage,
+        'codigo' => $errorCode,
+        'factura_id' => $factura->idfactura,
+    ];
+}
 
             return response()->json($response);
         } catch (ValidationException $e) {
@@ -320,7 +330,6 @@ class FacturaController extends Controller
             $xpath->registerNamespace('cac', 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2');
             $xpath->registerNamespace('ds', 'http://www.w3.org/2000/09/xmldsig#');
             $xpath->registerNamespace('ext', 'urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2');
-
             $details = [];
             $invoiceLines = $xpath->query('//cac:InvoiceLine');
             foreach ($invoiceLines as $line) {
