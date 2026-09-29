@@ -213,16 +213,17 @@ class FacturaController extends Controller
                         ->setValue($this->numberToWords($totalVenta)),
                 ]);
 
+                       $filename = $invoice->getName();
+
+            if (Storage::exists("invoices/{$filename}.xml")) {
+                \Log::critical("Intento de sobrescribir un comprobante ya emitido: {$filename}");
+                throw new \Exception("Ya existe un comprobante emitido con el nombre {$filename}.");
+            }
+
             $result = $this->see->send($invoice);
 
             if ($result->isSuccess()) {
                 $cdr = $result->getCdrResponse();
-                $filename = $invoice->getName();
-
-                if (Storage::exists("invoices/{$filename}.xml")) {
-                    \Log::critical("Intento de sobrescribir un comprobante ya emitido: {$filename}");
-                    throw new \Exception("Ya existe un comprobante emitido con el nombre {$filename}.");
-                }
 
                 Storage::makeDirectory('invoices');
                 Storage::makeDirectory('invoices/cdr');
@@ -236,7 +237,11 @@ class FacturaController extends Controller
                 $factura->codigo_sunat = $cdr->getCode();
                 $factura->save();
 
-                $this->generatePdfFromXml($filename, $vendedor);
+                try {
+                    $this->generatePdfFromXml($filename, $vendedor);
+                } catch (\Throwable $e) {
+                    \Log::error("Comprobante {$filename} aceptado por SUNAT pero falló el PDF: " . $e->getMessage());
+                }
 
                 $response = [
                     'success' => true,

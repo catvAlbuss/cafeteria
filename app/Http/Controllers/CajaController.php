@@ -95,7 +95,7 @@ class CajaController extends Controller
                 'caja_id' => $caja->id,
                 'user_id' => $request->user()->id,
                 'team_id' => $request->user()->current_team_id,
-                'estado' => 'pagado',
+                'estado' => 'pendiente_emision',
                 'created_at' => now(),
             ]);
 
