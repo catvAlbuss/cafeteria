@@ -730,7 +730,7 @@ export default function Caja() {
                         </div>
 
                         {/* Grid de productos */}
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
                             {productosFiltrados.length === 0 ? (
                                 <div className="col-span-full py-8 text-center text-cocoa-soft">
                                     {busqueda

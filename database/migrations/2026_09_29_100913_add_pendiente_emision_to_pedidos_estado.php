@@ -1,37 +1,46 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE pedidos MODIFY estado ENUM(
-            'pendiente',
-            'preparando',
-            'listo',
-            'entregado',
-            'pagado',
-            'cancelado',
-            'pendiente_emision'
-        ) NOT NULL DEFAULT 'pendiente'");
-    }
-
-    public function down(): void
-    {
-        // Antes de revertir, actualizar cualquier registro con el nuevo estado
         DB::table('pedidos')
             ->where('estado', 'pendiente_emision')
             ->update(['estado' => 'pendiente']);
 
-        DB::statement("ALTER TABLE pedidos MODIFY estado ENUM(
-            'pendiente',
-            'preparando',
-            'listo',
-            'entregado',
-            'pagado',
-            'cancelado'
-        ) NOT NULL DEFAULT 'pendiente'");
+        Schema::table('pedidos', function (Blueprint $table) {
+            $table->enum('estado', [
+                'pendiente',
+                'preparando',
+                'listo',
+                'entregado',
+                'pagado',
+                'cancelado',
+                'pendiente_emision',
+            ])->default('pendiente')->change();
+        });
+    }
+
+    public function down(): void
+    {
+        DB::table('pedidos')
+            ->where('estado', 'pendiente_emision')
+            ->update(['estado' => 'pendiente']);
+
+        Schema::table('pedidos', function (Blueprint $table) {
+            $table->enum('estado', [
+                'pendiente',
+                'preparando',
+                'listo',
+                'entregado',
+                'pagado',
+                'cancelado',
+            ])->default('pendiente')->change();
+        });
     }
 };

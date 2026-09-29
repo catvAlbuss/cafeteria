@@ -5,6 +5,15 @@ use App\Models\Factura;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
+beforeEach(function () {
+    config([
+        'sunat.url' => 'https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService',
+        'sunat.ruc' => '20000000001',
+        'sunat.usuario_sol' => 'dummy',
+        'sunat.clave_sol' => 'dummy',
+    ]);
+});
+
 function reservarCorrelativo(FacturaController $controller, string $serie): Factura
 {
     $method = new ReflectionMethod(FacturaController::class, 'reservarCorrelativoYCrearFactura');

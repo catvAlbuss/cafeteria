@@ -46,7 +46,7 @@ function emitirComprobantePedido(User $user, string $cliente = 'Venta Directa'):
         'subtotal' => 7.50,
         'igv' => 1.35,
         'total' => 8.85,
-        'estado' => 'pagado',
+        'estado' => 'pendiente_emision',
         'caja_id' => Caja::query()->where('estado', 'Abierta')->first()->id,
     ]);
 }
