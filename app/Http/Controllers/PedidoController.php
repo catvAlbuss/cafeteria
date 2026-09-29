@@ -60,6 +60,7 @@ class PedidoController extends Controller
             : collect();
 
         $pedidos = Pedido::with('mesa')
+            ->whereNull('delivery_id')
             ->limit(50)
             ->get()
             ->sortByDesc('created_at')
@@ -96,6 +97,7 @@ class PedidoController extends Controller
 
         $pedidos = Pedido::with('mesa')
             ->where('team_id', $teamId)
+            ->whereNull('delivery_id')
             ->whereIn('area', $areasDePedidos)
             ->whereIn('estado', ['pendiente', 'preparando'])
             ->limit(100)
@@ -121,6 +123,7 @@ class PedidoController extends Controller
     {
         $pedidosTerminadosHoy = Pedido::query()
             ->where('team_id', $teamId)
+            ->whereNull('delivery_id')
             ->whereIn('area', $areas)
             ->whereIn('estado', ['listo', 'entregado', 'pagado'])
             ->whereDate('created_at', today())
@@ -144,6 +147,7 @@ class PedidoController extends Controller
         $productosMasPedidos = [];
         $pedidosRecientes = Pedido::query()
             ->where('team_id', $teamId)
+            ->whereNull('delivery_id')
             ->whereIn('area', $areas)
             ->whereIn('estado', ['listo', 'entregado', 'pagado'])
             ->where('created_at', '>=', now()->subDays(30))
@@ -324,6 +328,7 @@ class PedidoController extends Controller
     public function caja()
     {
         $pedidos = Pedido::with('mesa')
+            ->whereNull('delivery_id')
             ->where('estado', 'listo')
             ->orderBy('created_at', 'asc')
             ->get();
@@ -722,6 +727,7 @@ class PedidoController extends Controller
     public function pendientes()
     {
         $pedidos = Pedido::with('mesa')
+            ->whereNull('delivery_id')
             ->whereIn('estado', ['pendiente', 'preparando'])
             ->orderBy('created_at', 'asc')
             ->get();
@@ -732,6 +738,7 @@ class PedidoController extends Controller
     public function listosParaCobrar()
     {
         $pedidos = Pedido::with('mesa')
+            ->whereNull('delivery_id')
             ->where('estado', 'listo')
             ->orderBy('created_at', 'asc')
             ->get();

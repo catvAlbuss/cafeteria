@@ -16,6 +16,7 @@ class ProductionSummary
         $inventoryArea = in_array('bar', $areas, true) ? 'bar' : 'cocina';
         $pedidosTerminadosHoy = Pedido::query()
             ->where('team_id', $teamId)
+            ->whereNull('delivery_id')
             ->whereIn('area', $areas)
             ->whereIn('estado', ['listo', 'entregado', 'pagado'])
             ->whereDate('created_at', today())
@@ -32,6 +33,7 @@ class ProductionSummary
         $productosMasPedidos = [];
         $pedidosRecientes = Pedido::query()
             ->where('team_id', $teamId)
+            ->whereNull('delivery_id')
             ->whereIn('area', $areas)
             ->whereIn('estado', ['listo', 'entregado', 'pagado'])
             ->where('created_at', '>=', now()->subDays(30))
