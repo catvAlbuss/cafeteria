@@ -20,4 +20,7 @@ return new class extends Migration
     {
         Schema::dropIfExists('correlativos_control');
     }
+
 };  
+
+

@@ -1,7 +1,7 @@
 import { createInertiaApp } from '@inertiajs/react';
-import { createRoot } from 'react-dom/client';
-import type { ComponentType } from 'react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import type { ComponentType } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
@@ -14,15 +14,16 @@ const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 // Solo ejecutar en el cliente (navegador)
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    
+    const csrfToken = document
+        .querySelector('meta[name="csrf-token"]')
+        ?.getAttribute('content');
+
     if (csrfToken) {
         axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
         axios.defaults.withCredentials = true;
     }
 
     initializeTheme();
-
 }
 
 // Cada página se carga bajo demanda (code-splitting): la primera visita a una
@@ -32,7 +33,10 @@ const pages = import.meta.glob<{ default: ComponentType }>('./pages/**/*.tsx');
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
-    resolve: (name) => resolvePageComponent(`./pages/${name}.tsx`, pages).then((module) => module.default),
+    resolve: (name) =>
+        resolvePageComponent(`./pages/${name}.tsx`, pages).then(
+            (module) => module.default,
+        ),
     layout: (name) => {
         switch (true) {
             case name === 'welcome':
@@ -56,6 +60,6 @@ createInertiaApp({
         );
     },
     progress: {
-        color: '#4B5563',
+        color: 'var(--gold)',
     },
 });

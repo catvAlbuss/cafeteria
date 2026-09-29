@@ -17,11 +17,11 @@ use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\PinController;
 use App\Http\Controllers\PlatoController;
 use App\Http\Controllers\ReporteController;
+use App\Http\Controllers\ReservaController;
 use App\Http\Controllers\ResumenController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 // ============================================================
 //  RUTAS PÚBLICAS (Sin autenticación)
@@ -59,21 +59,19 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/contador/cerrar/{id}', [ContadorController::class, 'cerrar'])->middleware('can:manage-cash-session')->name('contador.cerrar');
     Route::post('/contador/movimientos', [MovimientoCajaController::class, 'store'])->middleware('cash.session')->name('contador.movimientos.store');
     Route::delete('/contador/{id}', [ContadorController::class, 'destroy'])->name('contador.destroy');
-// Reportes
+    // Reportes
 
-Route::get('/reportes', [ReporteController::class, 'index'])
-    ->middleware('can:ver reportes')
-    ->name('reportes.index');
+    Route::get('/reportes', [ReporteController::class, 'index'])
+        ->middleware('can:ver reportes')
+        ->name('reportes.index');
 
-Route::get('/reportes/export', [ReporteController::class, 'export'])
-    ->middleware('can:ver reportes')
-    ->name('reportes.export');
-
+    Route::get('/reportes/export', [ReporteController::class, 'export'])
+        ->middleware('can:ver reportes')
+        ->name('reportes.export');
 
     // ----------------------------
     //  RESTAURANTE
     // ----------------------------
-    Route::get('/mesas/distribucion', fn () => Inertia::render('restaurante/mesas-distribucion'))->middleware('can:ver mesas')->name('mesas.distribucion');
     Route::controller(CoverController::class)->group(function () {
         Route::get('/covers', 'index')->middleware('can:ver covers')->name('covers.index');
         Route::post('/covers', 'store')->middleware('cash.session')->name('covers.store');
@@ -129,20 +127,14 @@ Route::get('/reportes/export', [ReporteController::class, 'export'])
     // ----------------------------
 
     // PLATOS
-    Route::get('/configuracion', fn () => Inertia::render('configuracion/configuracion'))->middleware('can:configuracion sistema')->name('configuracion');
-    Route::get('/perfil', fn () => Inertia::render('configuracion/perfil'))->name('perfil');
-
-    // ----------------------------
-    //  API/RECURSOS (Controladores)
-    // ----------------------------
-
-    // PLATOS
     Route::resource('platos', PlatoController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
         ->middlewareFor('index', 'can:ver platos')
         ->middlewareFor(['store', 'update', 'destroy'], 'cash.session');
 
     // MESAS
     Route::resource('mesas', MesaController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
         ->middlewareFor('index', 'can:ver mesas')
         ->middlewareFor(['store', 'update', 'destroy'], 'cash.session')
         ->middlewareFor(['store', 'destroy'], 'can:gestionar mesas');
@@ -154,17 +146,21 @@ Route::get('/reportes/export', [ReporteController::class, 'export'])
         ->middleware('cash.session')->name('mesas.transferir-silla');
     Route::patch('/mesas/{mesa}/cobrar', [PedidoController::class, 'cobrarMesa'])->middleware('cash.session')->name('mesas.cobrar');
 
+    // RESERVAS
+    Route::post('/mesas/{mesa}/reservas', [ReservaController::class, 'store'])->middleware('cash.session')->name('mesas.reservas.store');
+    Route::patch('/mesas/{mesa}/reservas/cancelar', [ReservaController::class, 'cancelar'])->middleware('cash.session')->name('mesas.reservas.cancelar');
+
     // PEDIDOS
     Route::post('/pedidos/{pedido}/agregar-productos', [PedidoController::class, 'agregarProductos']);
     Route::get('/pedidos/pendientes', [PedidoController::class, 'pendientes'])->name('pedidos.pendientes');
     Route::get('/pedidos/listos', [PedidoController::class, 'listosParaCobrar'])->name('pedidos.listos');
     Route::get('/pedidos/{pedido}/datos-envio', [PedidoController::class, 'datosEnvio'])
-    ->name('pedidos.datos-envio');
-    
+        ->name('pedidos.datos-envio');
+
     Route::patch('/pedidos/{pedido}/cobrar', [PedidoController::class, 'cobrar'])->middleware('cash.session')->name('pedidos.cobrar');
     Route::patch('/pedidos/{pedido}/cancelar', [PedidoController::class, 'cancelar'])->middleware('cash.session')->name('pedidos.cancelar');
     Route::resource('pedidos', PedidoController::class)
-        ->except(['store'])
+        ->only(['index', 'show', 'update', 'destroy'])
         ->middlewareFor(['update', 'destroy'], 'cash.session');
     Route::post('/pedidos', [PedidoController::class, 'store'])->middleware(['operating.hours', 'cash.session'])->name('pedidos.store');
     // EMITIR COMPROBANTE ELECTRÓNICO (SUNAT)   ← AGREGAR ESTO
@@ -189,13 +185,13 @@ Route::get('/reportes/export', [ReporteController::class, 'export'])
         Route::get('xml/{filename}', [FacturaController::class, 'downloadXml'])->name('factura.xml');
         Route::get('cdr/{filename}', [FacturaController::class, 'downloadCdr'])->name('factura.cdr');
     });
-        Route::prefix('sunat/resumen')->group(function () {
+    Route::prefix('sunat/resumen')->group(function () {
         Route::post('enviar', [ResumenController::class, 'enviar'])->name('sunat.resumen.enviar');
         Route::get('xml/{filename}', [ResumenController::class, 'downloadXml'])->name('sunat.resumen.xml');
         Route::get('cdr/{filename}', [ResumenController::class, 'downloadCdr'])->name('sunat.resumen.cdr');
         Route::post('consultar-cdr', [ResumenController::class, 'consultarCdr'])->name('sunat.resumen.consultar');
     });
-        // ============================================================
+    // ============================================================
     // NOTAS DE CRÉDITO (SUNAT)
     // ============================================================
     Route::prefix('sunat/nota-credito')->group(function () {
@@ -204,7 +200,6 @@ Route::get('/reportes/export', [ReporteController::class, 'export'])
         Route::get('cdr/{filename}', [NotaCreditoController::class, 'downloadCdr'])->name('sunat.nota-credito.cdr');
         Route::get('pdf/{filename}', [NotaCreditoController::class, 'downloadPdf'])->name('sunat.nota-credito.pdf');
     });
-    
 
 });
 

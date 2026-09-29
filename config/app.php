@@ -66,7 +66,7 @@ return [
     */
 
     // DESPUÉS
-'timezone' => 'America/Lima',
+    'timezone' => 'America/Lima',
 
     /*
     |--------------------------------------------------------------------------

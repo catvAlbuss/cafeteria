@@ -62,49 +62,49 @@ class CoverController extends Controller
         return redirect()->back()->with('success', 'Cover creado correctamente');
     }
 
-public function update(Request $request, $id)
-{
-    // 1. Validar (si falla, Laravel redirige automáticamente con errores)
-    $validated = $request->validate([
-        'titulo' => 'required|string|max:255',
-        'descripcion' => 'nullable|string',
-        'tipo' => 'required|in:promocion,evento,festividad,temporada',
-        'fechaInicio' => 'required|date',
-        'fechaFin' => 'required|date|after_or_equal:fechaInicio',
-        'imagen' => 'nullable|string',
-    ]);
+    public function update(Request $request, $id)
+    {
+        // 1. Validar (si falla, Laravel redirige automáticamente con errores)
+        $validated = $request->validate([
+            'titulo' => 'required|string|max:255',
+            'descripcion' => 'nullable|string',
+            'tipo' => 'required|in:promocion,evento,festividad,temporada',
+            'fechaInicio' => 'required|date',
+            'fechaFin' => 'required|date|after_or_equal:fechaInicio',
+            'imagen' => 'nullable|string',
+        ]);
 
-    // 2. Buscar cover o fallar
-    $cover = Cover::findOrFail($id);
+        // 2. Buscar cover o fallar
+        $cover = Cover::findOrFail($id);
 
-    // 3. Manejar imagen
-    $imagenGuardar = $cover->imagen;
-    if (! empty($validated['imagen'])) {
-        if (str_contains($validated['imagen'], ';base64,')) {
-            $nueva = $this->guardarImagenBase64($validated['imagen']);
-            if ($nueva) {
-                $imagenGuardar = $nueva;
+        // 3. Manejar imagen
+        $imagenGuardar = $cover->imagen;
+        if (! empty($validated['imagen'])) {
+            if (str_contains($validated['imagen'], ';base64,')) {
+                $nueva = $this->guardarImagenBase64($validated['imagen']);
+                if ($nueva) {
+                    $imagenGuardar = $nueva;
+                }
+            } else {
+                $imagenGuardar = $validated['imagen'];
             }
-        } else {
-            $imagenGuardar = $validated['imagen'];
         }
+
+        // 4. Actualizar
+        $cover->update([
+            'titulo' => $validated['titulo'],
+            'descripcion' => $validated['descripcion'] ?? null,
+            'tipo' => $validated['tipo'],
+            'imagen' => $imagenGuardar,
+            'fecha_inicio' => $validated['fechaInicio'],
+            'fecha_fin' => $validated['fechaFin'],
+        ]);
+
+        // 5. Redirigir con éxito
+        return redirect()
+            ->route('covers.index')
+            ->with('success', 'Cover actualizado correctamente');
     }
-
-    // 4. Actualizar
-    $cover->update([
-        'titulo' => $validated['titulo'],
-        'descripcion' => $validated['descripcion'] ?? null,
-        'tipo' => $validated['tipo'],
-        'imagen' => $imagenGuardar,
-        'fecha_inicio' => $validated['fechaInicio'],
-        'fecha_fin' => $validated['fechaFin'],
-    ]);
-
-    // 5. Redirigir con éxito
-    return redirect()
-        ->route('covers.index')
-        ->with('success', 'Cover actualizado correctamente');
-}
 
     public function destroy($id)
     {

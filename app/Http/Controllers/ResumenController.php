@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Factura;
-use Greenter\See;
+use Greenter\Model\Company\Address;
+use Greenter\Model\Company\Company;
 use Greenter\Model\Summary\Summary;
 use Greenter\Model\Summary\SummaryDetail;
-use Greenter\Model\Company\Company;
-use Greenter\Model\Company\Address;
+use Greenter\See;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -17,7 +17,7 @@ class ResumenController extends Controller
 
     public function __construct()
     {
-        $this->see = new See();
+        $this->see = new See;
         $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
         $this->see->setService(env('SUNAT_URL'));
     }
@@ -49,11 +49,11 @@ class ResumenController extends Controller
             }
 
             // 3. Configurar empresa emisora
-            $company = new Company();
+            $company = new Company;
             $company->setRuc(env('GREENTER_RUC'))
                 ->setRazonSocial('SEVEN HEART SOCIEDAD ANONIMA CERRADA')
                 ->setNombreComercial('DOLCE CAFFE')
-                ->setAddress((new Address())
+                ->setAddress((new Address)
                     ->setUbigueo('100101')
                     ->setDepartamento('HUANUCO')
                     ->setProvincia('HUANUCO')
@@ -63,7 +63,7 @@ class ResumenController extends Controller
                     ->setCodLocal('0000'));
 
             // 4. Crear el Resumen
-            $resumen = (new Summary())
+            $resumen = (new Summary)
                 ->setCorrelativo($this->nuevoCorrelativoResumen())
                 ->setFecGeneracion(new \DateTime($fecha))
                 ->setFecResumen(new \DateTime($fecha))
@@ -73,9 +73,9 @@ class ResumenController extends Controller
             // 5. Agregar cada boleta al resumen
             $details = [];
             foreach ($boletas as $boleta) {
-                $detail = (new SummaryDetail())
+                $detail = (new SummaryDetail)
                     ->setTipoDoc('03')
-                    ->setSerieNro($boleta->serie . '-' . $boleta->correlativo)
+                    ->setSerieNro($boleta->serie.'-'.$boleta->correlativo)
                     ->setEstado('1')
                     ->setClienteTipo('1')
                     ->setClienteNro('00000000')
@@ -91,7 +91,7 @@ class ResumenController extends Controller
             // 6. Enviar a SUNAT (Paso 1: obtener ticket)
             $result = $this->see->send($resumen);
 
-            if (!$result->isSuccess()) {
+            if (! $result->isSuccess()) {
                 return response()->json([
                     'success' => false,
                     'error' => $result->getError()->getMessage(),
@@ -117,10 +117,10 @@ class ResumenController extends Controller
             // 9. Consultar el CDR con el ticket (Paso 2)
             $cdrResult = $this->see->getStatus($ticket);
 
-            if (!$cdrResult->isSuccess()) {
+            if (! $cdrResult->isSuccess()) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Error al consultar el CDR: ' . $cdrResult->getError()->getMessage(),
+                    'error' => 'Error al consultar el CDR: '.$cdrResult->getError()->getMessage(),
                     'ticket' => $ticket,
                     'file' => $filename,
                 ], 500);
@@ -152,7 +152,7 @@ class ResumenController extends Controller
                 'cdr_url' => url("sunat/resumen/cdr/{$filename}"),
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error al enviar resumen diario: ' . $e->getMessage());
+            \Log::error('Error al enviar resumen diario: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -178,7 +178,7 @@ class ResumenController extends Controller
         try {
             $cdrResult = $this->see->getStatus($ticket);
 
-            if (!$cdrResult->isSuccess()) {
+            if (! $cdrResult->isSuccess()) {
                 return response()->json([
                     'success' => false,
                     'error' => $cdrResult->getError()->getMessage(),
@@ -208,7 +208,7 @@ class ResumenController extends Controller
                 'cdr_url' => url("sunat/resumen/cdr/{$filename}"),
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error al consultar CDR: ' . $e->getMessage());
+            \Log::error('Error al consultar CDR: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -227,7 +227,7 @@ class ResumenController extends Controller
             ->orderBy('idfactura', 'desc')
             ->first();
 
-        if (!$ultimoResumen) {
+        if (! $ultimoResumen) {
             return '1';
         }
 
@@ -243,9 +243,10 @@ class ResumenController extends Controller
     public function downloadXml($filename)
     {
         $path = "resumenes/{$filename}.xml";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'XML no encontrado'], 404);
         }
+
         return Storage::download($path);
     }
 
@@ -255,9 +256,10 @@ class ResumenController extends Controller
     public function downloadCdr($filename)
     {
         $path = "resumenes/cdr/{$filename}.zip";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'CDR no encontrado'], 404);
         }
+
         return Storage::download($path);
     }
 }

@@ -7,7 +7,7 @@ export const swalError = (title: string, text?: string) => {
         title,
         text,
         confirmButtonText: 'Entendido',
-        confirmButtonColor: '#C9A96E',
+        confirmButtonColor: 'var(--gold)',
     });
 };
 
@@ -21,4 +21,5 @@ export const swalSuccess = (title: string, text?: string) => {
     });
 };
 
-export const errorsToText = (errors: Record<string, unknown>) => Object.values(errors).join(' ');
+export const errorsToText = (errors: Record<string, unknown>) =>
+    Object.values(errors).join(' ');

@@ -4,12 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Factura;
 use App\Models\NotaCredito;
-use Greenter\See;
-use Greenter\Model\Company\Company;
-use Greenter\Model\Company\Address;
 use Greenter\Model\Client\Client;
+use Greenter\Model\Company\Address;
+use Greenter\Model\Company\Company;
 use Greenter\Model\Sale\Note;
 use Greenter\Model\Sale\SaleDetail;
+use Greenter\See;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -19,7 +19,7 @@ class NotaCreditoController extends Controller
 
     public function __construct()
     {
-        $this->see = new See();
+        $this->see = new See;
         $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
         $this->see->setService(env('SUNAT_URL'));
     }
@@ -52,11 +52,11 @@ class NotaCreditoController extends Controller
             }
 
             // 3. Configurar empresa emisora
-            $company = new Company();
+            $company = new Company;
             $company->setRuc(env('GREENTER_RUC'))
                 ->setRazonSocial('SEVEN HEART SOCIEDAD ANONIMA CERRADA')
                 ->setNombreComercial('DOLCE CAFFE')
-                ->setAddress((new Address())
+                ->setAddress((new Address)
                     ->setUbigueo('100101')
                     ->setDepartamento('HUANUCO')
                     ->setProvincia('HUANUCO')
@@ -66,7 +66,7 @@ class NotaCreditoController extends Controller
                     ->setCodLocal('0000'));
 
             // 4. Configurar cliente
-            $client = new Client();
+            $client = new Client;
             if (substr($factura->serie, 0, 1) === 'F') {
                 $client->setTipoDoc('6')
                     ->setNumDoc($factura->Cliente)
@@ -82,14 +82,14 @@ class NotaCreditoController extends Controller
             $correlativo = (NotaCredito::where('serie', $tipoNota)->max('correlativo') ?? 0) + 1;
 
             // 6. Crear la Nota de Crédito
-            $note = (new Note())
+            $note = (new Note)
                 ->setUblVersion('2.1')
                 ->setTipoDoc('07')
                 ->setSerie($tipoNota)
                 ->setCorrelativo($correlativo)
-                ->setFechaEmision(new \DateTime())
+                ->setFechaEmision(new \DateTime)
                 ->setTipDocAfectado(substr($factura->serie, 0, 1) === 'F' ? '01' : '03')
-                ->setNumDocfectado($factura->serie . '-' . $factura->correlativo)
+                ->setNumDocfectado($factura->serie.'-'.$factura->correlativo)
                 ->setCodMotivo($request->input('motivo_codigo'))
                 ->setDesMotivo($request->input('motivo_descripcion'))
                 ->setTipoMoneda('PEN')
@@ -101,7 +101,7 @@ class NotaCreditoController extends Controller
                 ->setMtoImpVenta($factura->montototal);
 
             // 7. Detalle genérico
-            $detail = (new SaleDetail())
+            $detail = (new SaleDetail)
                 ->setCodProducto('ANULACION')
                 ->setUnidad('NIU')
                 ->setDescripcion('ANULACIÓN TOTAL DE LA OPERACIÓN')
@@ -121,7 +121,7 @@ class NotaCreditoController extends Controller
             $result = $this->see->send($note);
 
             // 9. Guardar la Nota de Crédito
-            $notaCredito = new NotaCredito();
+            $notaCredito = new NotaCredito;
             $notaCredito->factura_id = $factura->idfactura;
             $notaCredito->serie = $tipoNota;
             $notaCredito->correlativo = $correlativo;
@@ -150,7 +150,7 @@ class NotaCreditoController extends Controller
 
                 $notaCredito->estado_sunat = 'aceptado';
                 $notaCredito->codigo_sunat = $cdr->getCode();
-                $notaCredito->documento = $filename . '.pdf';
+                $notaCredito->documento = $filename.'.pdf';
                 $notaCredito->save();
 
                 $this->generatePdfFromXml($filename);
@@ -172,7 +172,7 @@ class NotaCreditoController extends Controller
                 $notaCredito->error_sunat = $errorMessage;
                 $notaCredito->save();
 
-                \Log::error('SUNAT rechazó la Nota de Crédito: ' . $errorMessage);
+                \Log::error('SUNAT rechazó la Nota de Crédito: '.$errorMessage);
 
                 $response = [
                     'success' => false,
@@ -182,7 +182,7 @@ class NotaCreditoController extends Controller
 
             return response()->json($response);
         } catch (\Exception $e) {
-            \Log::error('Error al emitir Nota de Crédito: ' . $e->getMessage());
+            \Log::error('Error al emitir Nota de Crédito: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -198,12 +198,12 @@ class NotaCreditoController extends Controller
     {
         try {
             $xmlPath = "notas_credito/{$filename}.xml";
-            if (!Storage::exists($xmlPath)) {
+            if (! Storage::exists($xmlPath)) {
                 throw new \Exception("XML no encontrado: {$xmlPath}");
             }
 
             $xmlContent = Storage::get($xmlPath);
-            $dom = new \DOMDocument();
+            $dom = new \DOMDocument;
             $dom->loadXML($xmlContent, LIBXML_NOCDATA);
             $xpath = new \DOMXPath($dom);
 
@@ -250,7 +250,7 @@ class NotaCreditoController extends Controller
 
             return "notas_credito/{$filename}.pdf";
         } catch (\Exception $e) {
-            \Log::error('Error generando PDF de Nota de Crédito: ' . $e->getMessage());
+            \Log::error('Error generando PDF de Nota de Crédito: '.$e->getMessage());
             throw $e;
         }
     }
@@ -261,9 +261,10 @@ class NotaCreditoController extends Controller
     public function downloadXml($filename)
     {
         $path = "notas_credito/{$filename}.xml";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'XML no encontrado'], 404);
         }
+
         return Storage::download($path);
     }
 
@@ -273,9 +274,10 @@ class NotaCreditoController extends Controller
     public function downloadCdr($filename)
     {
         $path = "notas_credito/cdr/{$filename}.zip";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'CDR no encontrado'], 404);
         }
+
         return Storage::download($path);
     }
 
@@ -285,9 +287,10 @@ class NotaCreditoController extends Controller
     public function downloadPdf($filename)
     {
         $path = "notas_credito/{$filename}.pdf";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'PDF no encontrado'], 404);
         }
+
         return Storage::download($path);
     }
 }

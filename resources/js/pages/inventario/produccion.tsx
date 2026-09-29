@@ -1,8 +1,6 @@
 // resources/js/Pages/inventario/produccion.tsx
 
 import { Head, usePage, router } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
-import { useSedeChannel } from '@/hooks/useSedeChannel';
 import {
     Search,
     Clock,
@@ -16,6 +14,8 @@ import {
     Trophy,
     Utensils,
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useSedeChannel } from '@/hooks/useSedeChannel';
 import {
     agruparPedidosPorArea,
     getEstadisticasPorArea,
@@ -123,8 +123,8 @@ export default function Produccion() {
                 };
             default:
                 return {
-                    bg: 'bg-gray-100',
-                    text: 'text-gray-700',
+                    bg: 'bg-sand',
+                    text: 'text-chocolate',
                     label: 'Desconocido',
                     icon: XCircle,
                 };
@@ -137,7 +137,11 @@ export default function Produccion() {
             p.cliente.toLowerCase().includes(busqueda.toLowerCase()) ||
             p.numero.toLowerCase().includes(busqueda.toLowerCase()) ||
             (p.mesa && p.mesa.numero.includes(busqueda));
-        if (filtroEstado === 'todas') return coincideBusqueda;
+
+        if (filtroEstado === 'todas') {
+            return coincideBusqueda;
+        }
+
         return coincideBusqueda && p.estado === filtroEstado;
     });
 
@@ -145,13 +149,14 @@ export default function Produccion() {
     const pedidosAgrupados = agruparPedidosPorArea(pedidosFiltrados);
     const estadisticas = getEstadisticasPorArea(pedidosFiltrados);
 
-// ============================================================
-    // CAMBIAR ESTADO 
+    // ============================================================
+    // CAMBIAR ESTADO
     // ============================================================
     const cambiarEstado = (pedido: any, nuevoEstado: Pedido['estado']) => {
         if (!pedido || !pedido.id) {
             console.error('❌ Pedido sin ID:', pedido);
             alert('Error: Pedido sin identificar');
+
             return;
         }
 
@@ -173,7 +178,6 @@ export default function Produccion() {
                             ),
                         );
                     }
-
                 },
                 onError: (errors) => {
                     alert(
@@ -220,6 +224,7 @@ export default function Produccion() {
                 ) {
                     return prev.filter((p) => p.id !== payload.id);
                 }
+
                 return prev.map((p) =>
                     p.id === payload.id ? { ...p, estado: payload.estado } : p,
                 );
@@ -235,15 +240,15 @@ export default function Produccion() {
     return (
         <>
             <Head title={areaActiva === 'bar' ? 'Bar' : 'Cocina'} />
-<div className="min-h-screen bg-[#FBF7F0] p-4 md:p-6 space-y-4">
-                <section className="rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm">
+            <div className="min-h-screen space-y-4 bg-cream p-4 md:p-6">
+                <section className="rounded-2xl border border-wheat bg-card p-3 shadow-sm">
                     <div className="flex flex-col items-stretch gap-3 lg:flex-row lg:items-center">
                         <div className="relative flex-1">
-                            <Search className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-neutral-400" />
+                            <Search className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-cocoa-soft" />
                             <input
                                 type="search"
                                 placeholder="Buscar pedido, cliente o mesa"
-                                className="min-h-12 w-full rounded-xl border border-neutral-200 bg-neutral-50 py-3 pr-4 pl-12 text-sm font-semibold text-neutral-900 outline-none transition placeholder:font-medium placeholder:text-neutral-400 focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
+                                className="min-h-12 w-full rounded-xl border border-wheat bg-cream py-3 pr-4 pl-12 text-sm font-semibold text-chocolate transition outline-none placeholder:font-medium placeholder:text-cocoa-soft focus:border-orange-400 focus:bg-card focus:ring-2 focus:ring-orange-100"
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
                             />
@@ -252,7 +257,7 @@ export default function Produccion() {
                             <button
                                 type="button"
                                 onClick={() => setFiltroEstado('todas')}
-                                className={`min-h-12 rounded-xl border px-4 text-sm font-bold transition active:scale-[0.98] ${filtroEstado === 'todas' ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50'}`}
+                                className={`min-h-12 rounded-xl border px-4 text-sm font-bold transition active:scale-[0.98] ${filtroEstado === 'todas' ? 'border-ink bg-ink text-white shadow-sm' : 'border-wheat bg-card text-cocoa hover:bg-cream'}`}
                             >
                                 Todas ({pedidos.length})
                             </button>
@@ -276,11 +281,15 @@ export default function Produccion() {
                     </div>
                 </section>
 
-                <section className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
-                    <header className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
+                <section className="overflow-hidden rounded-2xl border border-wheat bg-card shadow-sm">
+                    <header className="flex items-center justify-between border-b border-wheat px-5 py-4">
                         <div>
-                            <h1 className="text-base font-black text-neutral-950">Cola de pedidos</h1>
-                            <p className="mt-0.5 text-sm font-medium text-neutral-500">Ordenados por hora de llegada</p>
+                            <h1 className="text-base font-black text-chocolate">
+                                Cola de pedidos
+                            </h1>
+                            <p className="mt-0.5 text-sm font-medium text-cocoa">
+                                Ordenados por hora de llegada
+                            </p>
                         </div>
                         <div className="flex items-center gap-3">
                             <span className="flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-700">
@@ -290,17 +299,28 @@ export default function Produccion() {
                                 </span>
                                 En vivo
                             </span>
-                            <span className="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-black text-neutral-700">{pedidosFiltrados.length}</span>
+                            <span className="rounded-lg bg-sand px-3 py-1.5 text-sm font-black text-chocolate">
+                                {pedidosFiltrados.length}
+                            </span>
                         </div>
                     </header>
 
-                    <div className={`grid grid-cols-1 gap-4 p-4 ${areasVisibles.length > 1 ? 'xl:grid-cols-3' : ''}`}>
+                    <div
+                        className={`grid grid-cols-1 gap-4 p-4 ${areasVisibles.length > 1 ? 'xl:grid-cols-3' : ''}`}
+                    >
                         {areasVisibles.map((area) => (
                             <AreaCard
                                 key={area}
                                 area={area}
                                 pedidos={pedidosAgrupados[area] || []}
-                                estadisticas={estadisticas[area] || { total: 0, pendientes: 0, preparando: 0, listos: 0 }}
+                                estadisticas={
+                                    estadisticas[area] || {
+                                        total: 0,
+                                        pendientes: 0,
+                                        preparando: 0,
+                                        listos: 0,
+                                    }
+                                }
                                 cambiarEstado={cambiarEstado}
                                 expandido={areasVisibles.length === 1}
                             />
@@ -335,23 +355,26 @@ function ResumenOperativo({
     pedidosUrgentes: number;
     resumen: ResumenProduccion;
 }) {
-    const areas = area === 'bar'
-        ? [{ key: 'bar', label: 'Bar' }]
-        : [
-              { key: 'cocina', label: 'Cocina' },
-              { key: 'horno', label: 'Horno' },
-              { key: 'postres', label: 'Postres' },
-          ];
+    const areas =
+        area === 'bar'
+            ? [{ key: 'bar', label: 'Bar' }]
+            : [
+                  { key: 'cocina', label: 'Cocina' },
+                  { key: 'horno', label: 'Horno' },
+                  { key: 'postres', label: 'Postres' },
+              ];
 
     return (
         <section className="space-y-3" aria-label="Resumen operativo">
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-6">
-                <div className="col-span-2 flex min-h-20 items-center justify-between rounded-xl bg-neutral-950 px-4 py-3 text-white">
+                <div className="col-span-2 flex min-h-20 items-center justify-between rounded-xl bg-roast px-4 py-3 text-white">
                     <div>
                         <p className="flex items-center gap-2 text-xs font-bold text-emerald-300">
                             <Radio className="h-4 w-4" /> En vivo
                         </p>
-                        <p className="mt-1 text-sm font-black">Pedidos por Reverb</p>
+                        <p className="mt-1 text-sm font-black">
+                            Pedidos por Reverb
+                        </p>
                     </div>
                     <div className="text-right">
                         <p className="text-2xl font-black">{pedidosUrgentes}</p>
@@ -362,68 +385,123 @@ function ResumenOperativo({
                 <div className="flex min-h-20 items-center gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
                     <Utensils className="h-6 w-6 text-orange-600" />
                     <div>
-                        <p className="text-2xl font-black text-orange-700">{resumen.platosHoy}</p>
-                        <p className="text-[11px] font-bold text-orange-700/70">platos hoy</p>
+                        <p className="text-2xl font-black text-orange-700">
+                            {resumen.platosHoy}
+                        </p>
+                        <p className="text-[11px] font-bold text-orange-700/70">
+                            platos hoy
+                        </p>
                     </div>
                 </div>
 
                 {areas.map(({ key, label }) => (
-                    <div key={key} className="min-h-20 rounded-xl border border-blue-100 bg-white px-4 py-3">
-                        <p className="text-2xl font-black text-blue-700">{resumen.porArea[key as keyof ResumenProduccion['porArea']] ?? 0}</p>
-                        <p className="text-xs font-bold text-neutral-600">{label}</p>
+                    <div
+                        key={key}
+                        className="min-h-20 rounded-xl border border-blue-100 bg-card px-4 py-3"
+                    >
+                        <p className="text-2xl font-black text-blue-700">
+                            {resumen.porArea[
+                                key as keyof ResumenProduccion['porArea']
+                            ] ?? 0}
+                        </p>
+                        <p className="text-xs font-bold text-cocoa">{label}</p>
                     </div>
                 ))}
             </div>
 
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                <article className="rounded-xl border border-red-200 bg-white p-3 shadow-sm">
+                <article className="rounded-xl border border-red-200 bg-card p-3 shadow-sm">
                     <h2 className="flex items-center gap-2 text-sm font-black text-red-700">
                         <AlertTriangle className="h-4 w-4" /> Stock escaso
-                        <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs">{resumen.stockEscaso.length}</span>
+                        <span className="ml-auto rounded-full bg-red-100 px-2 py-0.5 text-xs">
+                            {resumen.stockEscaso.length}
+                        </span>
                     </h2>
                     <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
                         {resumen.stockEscaso.length === 0 ? (
-                            <p className="rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">Stock dentro de los mínimos.</p>
-                        ) : resumen.stockEscaso.map((insumo) => (
-                            <div key={insumo.id} className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-2 text-xs">
-                                <span className="font-bold text-neutral-900">{insumo.nombre}</span>
-                                <span className="font-black text-red-700">{insumo.stock} {insumo.unidad}</span>
-                            </div>
-                        ))}
+                            <p className="rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">
+                                Stock dentro de los mínimos.
+                            </p>
+                        ) : (
+                            resumen.stockEscaso.map((insumo) => (
+                                <div
+                                    key={insumo.id}
+                                    className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-2 text-xs"
+                                >
+                                    <span className="font-bold text-chocolate">
+                                        {insumo.nombre}
+                                    </span>
+                                    <span className="font-black text-red-700">
+                                        {insumo.stock} {insumo.unidad}
+                                    </span>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </article>
 
-                <article className="rounded-xl border border-amber-200 bg-white p-3 shadow-sm">
+                <article className="rounded-xl border border-amber-200 bg-card p-3 shadow-sm">
                     <h2 className="flex items-center gap-2 text-sm font-black text-amber-700">
-                        <CalendarDays className="h-4 w-4" /> Por vencer en 3 días
-                        <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs">{resumen.porVencer.length}</span>
+                        <CalendarDays className="h-4 w-4" /> Por vencer en 3
+                        días
+                        <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 text-xs">
+                            {resumen.porVencer.length}
+                        </span>
                     </h2>
                     <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
                         {resumen.porVencer.length === 0 ? (
-                            <p className="rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">Sin vencimientos próximos registrados.</p>
-                        ) : resumen.porVencer.map((insumo) => (
-                            <div key={insumo.id} className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-xs">
-                                <span className="font-bold text-neutral-900">{insumo.nombre}</span>
-                                <span className="font-black text-amber-700">{insumo.dias === 0 ? 'vence hoy' : `${insumo.dias} días`}</span>
-                            </div>
-                        ))}
+                            <p className="rounded-lg bg-emerald-50 p-2 text-xs font-semibold text-emerald-700">
+                                Sin vencimientos próximos registrados.
+                            </p>
+                        ) : (
+                            resumen.porVencer.map((insumo) => (
+                                <div
+                                    key={insumo.id}
+                                    className="flex items-center justify-between rounded-lg bg-amber-50 px-3 py-2 text-xs"
+                                >
+                                    <span className="font-bold text-chocolate">
+                                        {insumo.nombre}
+                                    </span>
+                                    <span className="font-black text-amber-700">
+                                        {insumo.dias === 0
+                                            ? 'vence hoy'
+                                            : `${insumo.dias} días`}
+                                    </span>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </article>
 
-                <article className="rounded-xl border border-violet-200 bg-white p-3 shadow-sm">
+                <article className="rounded-xl border border-violet-200 bg-card p-3 shadow-sm">
                     <h2 className="flex items-center gap-2 text-sm font-black text-violet-700">
                         <Trophy className="h-4 w-4" /> Más pedidos · 30 días
                     </h2>
                     <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
                         {resumen.productosMasPedidos.length === 0 ? (
-                            <p className="rounded-lg bg-neutral-50 p-2 text-xs font-semibold text-neutral-600">Aún no hay ventas terminadas.</p>
-                        ) : resumen.productosMasPedidos.map((producto, index) => (
-                            <div key={producto.nombre} className="flex items-center gap-2 rounded-lg bg-violet-50 px-3 py-2 text-xs">
-                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-200 font-black text-violet-800">{index + 1}</span>
-                                <span className="min-w-0 flex-1 truncate font-bold text-neutral-900">{producto.nombre}</span>
-                                <span className="font-black text-violet-700">{producto.cantidad}</span>
-                            </div>
-                        ))}
+                            <p className="rounded-lg bg-cream p-2 text-xs font-semibold text-cocoa">
+                                Aún no hay ventas terminadas.
+                            </p>
+                        ) : (
+                            resumen.productosMasPedidos.map(
+                                (producto, index) => (
+                                    <div
+                                        key={producto.nombre}
+                                        className="flex items-center gap-2 rounded-lg bg-violet-50 px-3 py-2 text-xs"
+                                    >
+                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-200 font-black text-violet-800">
+                                            {index + 1}
+                                        </span>
+                                        <span className="min-w-0 flex-1 truncate font-bold text-chocolate">
+                                            {producto.nombre}
+                                        </span>
+                                        <span className="font-black text-violet-700">
+                                            {producto.cantidad}
+                                        </span>
+                                    </div>
+                                ),
+                            )
+                        )}
                     </div>
                 </article>
             </div>
@@ -469,20 +547,24 @@ function AreaCard({
                 };
             default:
                 return {
-                    bg: 'bg-gray-100',
-                    text: 'text-gray-700',
+                    bg: 'bg-sand',
+                    text: 'text-chocolate',
                     label: estado,
                 };
         }
     };
 
     return (
-        <div className={`overflow-hidden rounded-xl ${expandido ? '' : 'border border-neutral-200 bg-neutral-50'}`}>
+        <div
+            className={`overflow-hidden rounded-xl ${expandido ? '' : 'border border-wheat bg-cream'}`}
+        >
             {!expandido && (
-                <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
+                <div className="flex items-center justify-between border-b border-wheat bg-card px-4 py-3">
                     <div>
-                        <h2 className="text-base font-black text-neutral-950">{config.icono} {config.nombre}</h2>
-                        <p className="text-sm font-medium text-neutral-500">
+                        <h2 className="text-base font-black text-chocolate">
+                            {config.icono} {config.nombre}
+                        </h2>
+                        <p className="text-sm font-medium text-cocoa">
                             {area === 'cocina'
                                 ? 'Preparación de alimentos'
                                 : area === 'horno'
@@ -491,8 +573,12 @@ function AreaCard({
                         </p>
                     </div>
                     <div className="flex gap-2 text-sm font-bold">
-                        <span className="rounded-lg bg-orange-50 px-2.5 py-1 text-orange-700">{estadisticas?.pendientes || 0} pendientes</span>
-                        <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-blue-700">{estadisticas?.preparando || 0} preparando</span>
+                        <span className="rounded-lg bg-orange-50 px-2.5 py-1 text-orange-700">
+                            {estadisticas?.pendientes || 0} pendientes
+                        </span>
+                        <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-blue-700">
+                            {estadisticas?.preparando || 0} preparando
+                        </span>
                     </div>
                 </div>
             )}
@@ -502,12 +588,19 @@ function AreaCard({
                 className={`max-h-[70vh] overflow-y-auto ${expandido ? 'grid min-h-64 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3' : 'min-h-56 space-y-3 p-3'}`}
             >
                 {pedidos.length === 0 ? (
-                    <div className={`flex min-h-56 flex-col items-center justify-center rounded-xl border border-dashed border-neutral-200 bg-neutral-50 px-6 text-center ${expandido ? 'md:col-span-2 xl:col-span-3' : ''}`}>
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-neutral-200">
+                    <div
+                        className={`flex min-h-56 flex-col items-center justify-center rounded-xl border border-dashed border-wheat bg-cream px-6 text-center ${expandido ? 'md:col-span-2 xl:col-span-3' : ''}`}
+                    >
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-card shadow-sm ring-1 ring-wheat">
                             <Radio className="h-5 w-5 text-emerald-500" />
                         </div>
-                        <p className="mt-4 text-base font-black text-neutral-800">Esperando nuevos pedidos</p>
-                        <p className="mt-1 max-w-sm text-sm font-medium text-neutral-500">Las comandas aparecerán aquí automáticamente cuando el mozo las envíe.</p>
+                        <p className="mt-4 text-base font-black text-chocolate">
+                            Esperando nuevos pedidos
+                        </p>
+                        <p className="mt-1 max-w-sm text-sm font-medium text-cocoa">
+                            Las comandas aparecerán aquí automáticamente cuando
+                            el mozo las envíe.
+                        </p>
                     </div>
                 ) : (
                     pedidos.map((pedido) => {
@@ -519,25 +612,26 @@ function AreaCard({
                             0,
                             Math.floor((Date.now() - creado) / 60_000),
                         );
+
                         return (
                             <div
                                 key={pedido.id}
-                                className={`flex flex-col rounded-xl border bg-white p-4 shadow-sm transition hover:shadow-md ${
+                                className={`flex flex-col rounded-xl border bg-card p-4 shadow-sm transition hover:shadow-md ${
                                     pedido.estado === 'preparando'
                                         ? 'border-blue-300 ring-2 ring-blue-100'
                                         : pedido.estado === 'listo'
                                           ? 'border-emerald-300 ring-2 ring-emerald-100'
                                           : pedido.estado === 'pendiente'
                                             ? 'border-orange-300 ring-2 ring-orange-100'
-                                            : 'border-neutral-200'
+                                            : 'border-wheat'
                                 }`}
                             >
                                 <div className="flex items-start justify-between gap-3 border-b border-black/5 pb-3">
                                     <div>
-                                        <h4 className="text-base font-black text-neutral-950">
+                                        <h4 className="text-base font-black text-chocolate">
                                             #{pedido.numero}
                                         </h4>
-                                        <p className="mt-1 text-sm font-semibold text-neutral-600">
+                                        <p className="mt-1 text-sm font-semibold text-cocoa">
                                             {pedido.tipo_origen === 'delivery'
                                                 ? 'Delivery'
                                                 : `Mesa ${pedido.mesa?.numero || '-'}`}{' '}
@@ -551,7 +645,7 @@ function AreaCard({
                                             {estado.label}
                                         </span>
                                         <p
-                                            className={`mt-2 text-sm font-bold ${minutos >= 10 ? 'text-red-600' : 'text-neutral-500'}`}
+                                            className={`mt-2 text-sm font-bold ${minutos >= 10 ? 'text-red-600' : 'text-cocoa'}`}
                                         >
                                             {minutos} min
                                         </p>
@@ -561,9 +655,9 @@ function AreaCard({
                                     {pedido.productos.map((producto, index) => (
                                         <li
                                             key={`${pedido.id}-${index}`}
-                                            className="flex items-center gap-3 text-sm text-neutral-800"
+                                            className="flex items-center gap-3 text-sm text-chocolate"
                                         >
-                                            <span className="min-w-10 rounded-lg bg-neutral-100 px-2 py-1.5 text-center font-black text-neutral-900">
+                                            <span className="min-w-10 rounded-lg bg-sand px-2 py-1.5 text-center font-black text-chocolate">
                                                 {producto.cantidad}x
                                             </span>
                                             <span className="font-bold">
@@ -588,7 +682,7 @@ function AreaCard({
                                                     'preparando',
                                                 )
                                             }
-                                            className="min-h-14 touch-manipulation rounded-xl bg-blue-600 px-5 py-3 text-base font-black text-white transition active:scale-[0.98] hover:bg-blue-700"
+                                            className="min-h-14 touch-manipulation rounded-xl bg-blue-600 px-5 py-3 text-base font-black text-white transition hover:bg-blue-700 active:scale-[0.98]"
                                         >
                                             Empezar preparación
                                         </button>
@@ -598,7 +692,7 @@ function AreaCard({
                                             onClick={() =>
                                                 cambiarEstado(pedido, 'listo')
                                             }
-                                            className="min-h-14 touch-manipulation rounded-xl bg-emerald-600 px-5 py-3 text-base font-black text-white transition active:scale-[0.98] hover:bg-emerald-700"
+                                            className="min-h-14 touch-manipulation rounded-xl bg-emerald-600 px-5 py-3 text-base font-black text-white transition hover:bg-emerald-700 active:scale-[0.98]"
                                         >
                                             Marcar como listo
                                         </button>

@@ -26,6 +26,11 @@ class Mesa extends Model
         'cliente',
         'personas',
         'user_id',
+        'activa',
+    ];
+
+    protected $casts = [
+        'activa' => 'boolean',
     ];
 
     public function cambiarEstado(string $nuevoEstado): void
@@ -40,6 +45,11 @@ class Mesa extends Model
     public function pedidos(): HasMany
     {
         return $this->hasMany(Pedido::class);
+    }
+
+    public function reservas(): HasMany
+    {
+        return $this->hasMany(Reserva::class);
     }
 
     /**

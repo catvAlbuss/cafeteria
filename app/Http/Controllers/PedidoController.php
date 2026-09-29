@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Events\MesaActualizada;
 use App\Events\PedidoActualizado;
 use App\Events\PedidoCreado;
@@ -16,10 +15,13 @@ use App\Models\Plato;
 use App\Models\User;
 use App\Services\ClienteService;
 use App\Services\ProductionAreaClassifier;
+use App\Services\ReservaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
+
 class PedidoController extends Controller
 {
     public function __construct(
@@ -32,10 +34,8 @@ class PedidoController extends Controller
         $mesaNumero = $request->query('mesa');
 
         if ($mesaNumero) {
-          
             session(['mesa_activa' => $mesaNumero]);
         } else {
-    
             $mesaNumero = session('mesa_activa');
         }
 
@@ -45,13 +45,13 @@ class PedidoController extends Controller
                 ->first()
             : null;
 
-  
         if ($mesaInfo && $mesaInfo->estado === 'libre') {
             session()->forget('mesa_activa');
             $mesaInfo = null;
         }
 
         $platos = Plato::all();
+
         $pedidosActivos = $mesaInfo
             ? Pedido::where('mesa_id', $mesaInfo->id)
                 ->whereNotIn('estado', ['pagado', 'cancelado'])
@@ -62,6 +62,7 @@ class PedidoController extends Controller
             : collect();
 
         $pedidos = Pedido::with('mesa')
+            ->whereNull('delivery_id')
             ->limit(50)
             ->get()
             ->sortByDesc('created_at')
@@ -87,7 +88,9 @@ class PedidoController extends Controller
         ])->filter()->keys();
 
         abort_if($areasDisponibles->isEmpty(), 403);
+
         $areaSolicitada = $request->string('area')->toString();
+
         $areaActiva = $areasDisponibles->contains($areaSolicitada)
             ? $areaSolicitada
             : $areasDisponibles->first();
@@ -98,6 +101,7 @@ class PedidoController extends Controller
 
         $pedidos = Pedido::with('mesa')
             ->where('team_id', $teamId)
+            ->whereNull('delivery_id')
             ->whereIn('area', $areasDePedidos)
             ->whereIn('estado', ['pendiente', 'preparando'])
             ->limit(100)
@@ -123,6 +127,7 @@ class PedidoController extends Controller
     {
         $pedidosTerminadosHoy = Pedido::query()
             ->where('team_id', $teamId)
+            ->whereNull('delivery_id')
             ->whereIn('area', $areas)
             ->whereIn('estado', ['listo', 'entregado', 'pagado'])
             ->whereDate('created_at', today())
@@ -144,8 +149,10 @@ class PedidoController extends Controller
         }
 
         $productosMasPedidos = [];
+
         $pedidosRecientes = Pedido::query()
             ->where('team_id', $teamId)
+            ->whereNull('delivery_id')
             ->whereIn('area', $areas)
             ->whereIn('estado', ['listo', 'entregado', 'pagado'])
             ->where('created_at', '>=', now()->subDays(30))
@@ -274,6 +281,7 @@ class PedidoController extends Controller
             }
 
             $idsEnviados = collect($validated['pedido_ids']);
+
             $pedidosACobrar = $pedidosActuales->filter(
                 function ($pedido) use ($idsEnviados) {
                     return $idsEnviados->contains($pedido->id);
@@ -284,17 +292,16 @@ class PedidoController extends Controller
                 abort(422, 'No se encontraron pedidos válidos para cobrar.');
             }
 
-         // Generar un venta_grupo único para este cobro de mesa
-        $ventaGrupo = 'mesa-' . $mesa->id . '-' . now()->format('YmdHis');
+            $ventaGrupo = 'mesa-' . $mesa->id . '-' . now()->format('YmdHis');
 
-        foreach ($pedidosACobrar as $pedido) {
-            $pedido->update([
-            'estado' => 'pagado',
-            'metodo_pago' => $validated['metodo_pago'],
-            'caja_id' => $caja->id,
-            'venta_grupo' => $ventaGrupo,
-        ]);
-        }
+            foreach ($pedidosACobrar as $pedido) {
+                $pedido->update([
+                    'estado' => 'pagado',
+                    'metodo_pago' => $validated['metodo_pago'],
+                    'caja_id' => $caja->id,
+                    'venta_grupo' => $ventaGrupo,
+                ]);
+            }
 
             $quedanPedidos = $pedidosActuales->filter(
                 function ($pedido) use ($idsEnviados) {
@@ -323,6 +330,7 @@ class PedidoController extends Controller
         );
 
         broadcast(new MesaActualizada($mesa->refresh()));
+
         return redirect()
             ->back()
             ->with('success', 'Pedido(s) cobrado(s) correctamente');
@@ -331,6 +339,7 @@ class PedidoController extends Controller
     public function caja()
     {
         $pedidos = Pedido::with('mesa')
+            ->whereNull('delivery_id')
             ->where('estado', 'listo')
             ->orderBy('created_at', 'asc')
             ->get();
@@ -375,6 +384,20 @@ class PedidoController extends Controller
             return redirect()
                 ->back()
                 ->with('error', 'El empleado no pertenece a esta sede.');
+        }
+
+        if (! empty($validated['mesa_id'])) {
+            $mesaDePedido = Mesa::query()->find($validated['mesa_id']);
+
+            if ($mesaDePedido && ! $mesaDePedido->activa) {
+                return redirect()->back()->withErrors([
+                    'mesa_id' => 'Esta mesa está desactivada y no puede recibir pedidos.',
+                ]);
+            }
+
+            if ($mesaDePedido && $mesaDePedido->estado === 'reserva') {
+                ReservaService::atenderActiva($mesaDePedido);
+            }
         }
 
         $estado = $validated['estado'] ?? 'pendiente';
@@ -439,7 +462,6 @@ class PedidoController extends Controller
                     )
                     ->values();
 
-                // Actualizar estado de la mesa
                 $updatedTable = null;
 
                 if (
@@ -548,6 +570,7 @@ class PedidoController extends Controller
     public function show(Pedido $pedido): RedirectResponse
     {
         $mesaNumero = $pedido->mesa()->value('numero');
+
         return to_route(
             'ventas',
             $mesaNumero ? ['mesa' => $mesaNumero] : []
@@ -556,7 +579,6 @@ class PedidoController extends Controller
 
     public function update(Request $request, Pedido $pedido)
     {
-       
         if ($request->has('productos')) {
             $request->validate([
                 'productos' => 'required|array|min:1',
@@ -614,6 +636,7 @@ class PedidoController extends Controller
             }
 
             $pedido->save();
+
             broadcast(new PedidoActualizado($pedido));
 
             if ($validated['estado'] === 'listo') {
@@ -643,6 +666,7 @@ class PedidoController extends Controller
 
         $pedido->estado = 'cancelado';
         $pedido->save();
+
         return redirect()
             ->back()
             ->with('success', 'Pedido cancelado');
@@ -676,13 +700,14 @@ class PedidoController extends Controller
         }
 
         $pedido->save();
+
         broadcast(new PedidoActualizado($pedido));
         broadcast(new PedidoListo($pedido));
+
         return redirect()
             ->back()
             ->with('success', 'Pedido marcado como listo');
     }
-
 
     public function enviarACocina($id)
     {
@@ -697,6 +722,7 @@ class PedidoController extends Controller
             $pedido->save();
 
             broadcast(new PedidoActualizado($pedido));
+
             return redirect()
                 ->back()
                 ->with('success', 'Pedido enviado a cocina');
@@ -713,6 +739,7 @@ class PedidoController extends Controller
     public function pendientes()
     {
         $pedidos = Pedido::with('mesa')
+            ->whereNull('delivery_id')
             ->whereIn('estado', ['pendiente', 'preparando'])
             ->orderBy('created_at', 'asc')
             ->get();
@@ -723,6 +750,7 @@ class PedidoController extends Controller
     public function listosParaCobrar()
     {
         $pedidos = Pedido::with('mesa')
+            ->whereNull('delivery_id')
             ->where('estado', 'listo')
             ->orderBy('created_at', 'asc')
             ->get();
@@ -740,6 +768,7 @@ class PedidoController extends Controller
         $caja = Caja::query()
             ->where('estado', 'Abierta')
             ->firstOrFail();
+
         $pedido->estado = 'pagado';
         $pedido->metodo_pago = $validated['metodo_pago'];
         $pedido->caja_id = $caja->id;
@@ -769,6 +798,7 @@ class PedidoController extends Controller
     public function destroy(Pedido $pedido)
     {
         $pedido->delete();
+
         return redirect()
             ->back()
             ->with('success', 'Pedido eliminado correctamente');
@@ -777,6 +807,7 @@ class PedidoController extends Controller
     public function entregarTicket($id)
     {
         $pedido = Pedido::findOrFail($id);
+
         if ($pedido->estado !== 'listo') {
             return redirect()
                 ->back()
@@ -790,10 +821,10 @@ class PedidoController extends Controller
         DB::beginTransaction();
 
         try {
-
             $pedido->estado = 'entregado';
             $pedido->hora_entrega = now();
             $pedido->save();
+
             $ticketsPendientes = Pedido::where(
                 'mesa_id',
                 $pedido->mesa_id
@@ -809,16 +840,15 @@ class PedidoController extends Controller
 
                 if ($mesa) {
                     if ($ticketsPendientes === 0) {
-              
                         $mesa->estado = 'listo_cobrar';
                         $mesa->pedido_listo = false;
                         $mesa->save();
 
                         broadcast(new MesaActualizada($mesa));
                     } else {
-              
                         $mesa->pedido_listo = false;
                         $mesa->save();
+
                         DB::afterCommit(
                             fn () =>
                             broadcast(new MesaActualizada($mesa))
@@ -828,7 +858,9 @@ class PedidoController extends Controller
             }
 
             DB::commit();
+
             broadcast(new PedidoActualizado($pedido));
+
             return redirect()
                 ->back()
                 ->with(
@@ -839,6 +871,7 @@ class PedidoController extends Controller
                 );
         } catch (\Exception $e) {
             DB::rollBack();
+
             return redirect()
                 ->back()
                 ->with(
@@ -852,228 +885,242 @@ class PedidoController extends Controller
     // EMITIR COMPROBANTE ELECTRÓNICO (SUNAT)
     // ============================================================
 
-public function emitirComprobante(Request $request)
-{
-    $validated = $request->validate([
-        'pedido_ids' => 'required|array|min:1',
-        'pedido_ids.*' => 'exists:pedidos,id',
-        'tipo_documento' => 'required|in:01,03',
-        'documento' => 'required|string|max:11',
-        'nombre' => 'nullable|string|max:255',
-        'direccion' => 'nullable|string|max:255',
-        'mesa_id' => 'nullable|exists:mesas,id',
-        'metodo_pago' => 'nullable|in:efectivo,tarjeta,yape',
-        'authorization_pin' => 'nullable|string|size:4',
-    ]);
-
-    // 1. Validaciones que NO tocan datos (sin transacción todavía)
-    $pedidos = Pedido::whereIn('id', $validated['pedido_ids'])->get();
-
-    if ($pedidos->isEmpty()) {
-        return response()->json([
-            'success' => false,
-            'error' => 'No se encontraron pedidos para facturar.',
-        ], 404);
-    }
-
-    if (empty($validated['authorization_pin']) || empty($validated['metodo_pago'])) {
-        return response()->json([
-            'success' => false,
-            'error' => 'Se requiere PIN y método de pago.',
-        ], 422);
-    }
-
-    $authorizer = $request->user()->currentTeam?->members()
-        ->active()
-        ->where('pin', $validated['authorization_pin'])
-        ->first();
-
-    if (! $authorizer instanceof User || ! $authorizer->hasPermissionTo('procesar pagos')) {
-        return response()->json([
-            'success' => false,
-            'error' => 'PIN inválido. Solo Caja, Administración o Gerencia pueden confirmar el pago.',
-        ], 403);
-    }
-    // 2. Reservar los pedidos ANTES de llamar a SUNAT, para evitar doble envío
-try {
-    DB::transaction(function () use ($pedidos) {
-        $pedidosLock = Pedido::whereIn('id', $pedidos->pluck('id'))
-            ->lockForUpdate()
-            ->get();
-
-      foreach ($pedidosLock as $pedido) {
-    $facturandoVigente = $pedido->facturando_at !== null
-        && \Illuminate\Support\Carbon::parse($pedido->facturando_at)->gt(now()->subMinutes(2));
-
-    if ($pedido->estado === 'pagado' || $facturandoVigente) {
-        throw new \Exception('Uno o más pedidos ya están siendo facturados o ya fueron pagados.');
-    }
-}
-
-        Pedido::whereIn('id', $pedidos->pluck('id'))->update([
-            'facturando_at' => now(),
+    public function emitirComprobante(Request $request)
+    {
+        $validated = $request->validate([
+            'pedido_ids' => 'required|array|min:1',
+            'pedido_ids.*' => 'exists:pedidos,id',
+            'tipo_documento' => 'required|in:01,03',
+            'documento' => [
+                'nullable',
+                'string',
+                'max:11',
+                Rule::requiredIf(fn () => $request->input('tipo_documento') === '01'),
+                Rule::when($request->input('tipo_documento') === '01', 'digits:11'),
+                Rule::when(
+                    $request->input('tipo_documento') === '03'
+                        && $request->filled('documento')
+                        && $request->input('documento') !== '00000000',
+                    'digits:8',
+                ),
+            ],
+            'nombre' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::requiredIf(fn () => $request->input('tipo_documento') === '01'),
+            ],
+            'direccion' => 'nullable|string|max:255',
+            'mesa_id' => 'nullable|exists:mesas,id',
+            'metodo_pago' => 'nullable|in:efectivo,tarjeta,yape',
+            'authorization_pin' => 'nullable|string|size:4',
         ]);
-    });
-} catch (\Exception $e) {
-    return response()->json([
-        'success' => false,
-        'error' => $e->getMessage(),
-    ], 409);
-}
 
-// refresca los pedidos con el flag ya puesto
-$pedidos = Pedido::whereIn('id', $validated['pedido_ids'])->get();
+        $pedidos = Pedido::whereIn('id', $validated['pedido_ids'])->get();
 
-    // 2. Armar los items (sin tocar pedidos ni mesa todavía)
-    $items = [];
-    foreach ($pedidos as $pedido) {
-        $productos = is_string($pedido->productos)
-            ? json_decode($pedido->productos, true)
-            : $pedido->productos;
-
-        foreach ($productos as $producto) {
-            $items[] = [
-                'code' => (string) ($producto['id'] ?? 'PROD'),
-                'description' => $producto['nombre'],
-                'quantity' => (int) $producto['cantidad'],
-                'unit_price' => (float) $producto['precio'],
-                'idproducto' => (int) ($producto['id'] ?? 1),
-            ];
+        if ($pedidos->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'No se encontraron pedidos para facturar.',
+            ], 404);
         }
-    }
 
-    $serie = $validated['tipo_documento'] === '01' ? 'F001' : 'B001';
+        if (
+            empty($validated['authorization_pin'])
+            || empty($validated['metodo_pago'])
+        ) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Se requiere PIN y método de pago.',
+            ], 422);
+        }
 
-    $payload = [
-        'serie' => $serie,
-        'tipo_documento' => $validated['tipo_documento'],
-        'incluidoigv' => true,
-        'client' => [
-            'ruc' => $validated['tipo_documento'] === '01' ? $validated['documento'] : null,
-            'dni' => $validated['tipo_documento'] === '03' ? $validated['documento'] : null,
-            'razon_social' => $validated['tipo_documento'] === '01' ? ($validated['nombre'] ?? null) : null,
-            'nombres' => $validated['tipo_documento'] === '03' ? 'CLIENTES VARIOS' : null,
-            'direccion' => $validated['direccion'] ?? '-',
-            'ubigeo' => '100101',
-            'departamento' => 'HUANUCO',
-            'provincia' => 'HUANUCO',
-            'distrito' => 'HUANUCO',
-        ],
-        'items' => $items,
-        'vendedor' => [
-            'nombre' => auth()->user()->name ?? 'Cajero',
-        ],
-    ];
+        $authorizer = $request->user()->currentTeam?->members()
+            ->active()
+            ->where('pin', $validated['authorization_pin'])
+            ->first();
 
-   
-try {
-    $facturaController = app(FacturaController::class);
-    $invoiceRequest = Request::create('/facturacion/generar', 'POST', $payload);
-    $invoiceRequest->headers->set('Accept', 'application/json');
-    $response = $facturaController->generateInvoice($invoiceRequest);
-    $resultado = json_decode($response->getContent(), true);
-} catch (\Illuminate\Validation\ValidationException $e) {
-    Pedido::whereIn('id', $pedidos->pluck('id'))->update(['facturando_at' => null]);
+        if (
+            ! $authorizer instanceof User
+            || ! $authorizer->hasPermissionTo('procesar pagos')
+        ) {
+            return response()->json([
+                'success' => false,
+                'error' =>
+                    'PIN inválido. Solo Caja, Administración o Gerencia pueden confirmar el pago.',
+            ], 403);
+        }
 
-    \Log::error('Validación fallida en generateInvoice', $e->errors());
+        try {
+            DB::transaction(function () use ($pedidos) {
+                $pedidosLock = Pedido::whereIn('id', $pedidos->pluck('id'))
+                    ->lockForUpdate()
+                    ->get();
 
-    return response()->json([
-        'success' => false,
-        'error' => collect($e->errors())->flatten()->first(),
-        'errors' => $e->errors(),
-    ], 422);
-} catch (\Throwable $e) {
-    Pedido::whereIn('id', $pedidos->pluck('id'))->update(['facturando_at' => null]);
+                foreach ($pedidosLock as $pedido) {
+                    $facturandoVigente = $pedido->facturando_at !== null
+                        && \Illuminate\Support\Carbon::parse($pedido->facturando_at)->gt(now()->subMinutes(2));
 
-    \Log::error('Excepción al emitir comprobante: ' . $e->getMessage());
+                    if ($pedido->estado === 'pagado' || $facturandoVigente) {
+                        throw new \Exception('Uno o más pedidos ya están siendo facturados o ya fueron pagados.');
+                    }
+                }
 
-    return response()->json([
-        'success' => false,
-        'error' => 'Error al comunicarse con SUNAT: ' . $e->getMessage(),
-    ], 500);
-}
-   
-if (! ($resultado['success'] ?? false)) {
-    \Log::error('SUNAT rechazó el comprobante: ' . ($resultado['error'] ?? 'Error desconocido'));
+                Pedido::whereIn('id', $pedidos->pluck('id'))->update([
+                    'facturando_at' => now(),
+                ]);
+            });
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 409);
+        }
 
-    Pedido::whereIn('id', $pedidos->pluck('id'))->update(['facturando_at' => null]);
+        $items = [];
+        foreach ($pedidos as $pedido) {
+            $productos = is_string($pedido->productos)
+                ? json_decode($pedido->productos, true)
+                : $pedido->productos;
 
-    return response()->json($resultado);
-}
+            foreach ((array) $productos as $producto) {
+                $items[] = [
+                    'code' => (string) ($producto['id'] ?? 'PROD'),
+                    'description' => $producto['nombre'],
+                    'quantity' => (int) $producto['cantidad'],
+                    'unit_price' => (float) $producto['precio'],
+                    'idproducto' => (int) ($producto['id'] ?? 1),
+                ];
+            }
+        }
 
-    // 5. SUNAT aceptó: RECIÉN AHORA se cobra la mesa y se marcan los pedidos.
-    try {
-        DB::beginTransaction();
+        $serie = $validated['tipo_documento'] === '01' ? 'F001' : 'B001';
 
-        if (! empty($validated['mesa_id'])) {
-            $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
-            $mesa = Mesa::where('id', $validated['mesa_id'])->lockForUpdate()->firstOrFail();
+        $payload = [
+            'serie' => $serie,
+            'tipo_documento' => $validated['tipo_documento'],
+            'incluidoigv' => true,
+            'client' => [
+                'ruc' => $validated['tipo_documento'] === '01'
+                    ? $validated['documento']
+                    : null,
+                'dni' => $validated['tipo_documento'] === '03'
+                    ? $validated['documento']
+                    : null,
+                'razon_social' => $validated['tipo_documento'] === '01'
+                    ? ($validated['nombre'] ?? null)
+                    : null,
+                'nombres' => $validated['tipo_documento'] === '03'
+                    ? 'CLIENTES VARIOS'
+                    : null,
+                'direccion' => $validated['direccion'] ?? '-',
+                'ubigeo' => '100101',
+                'departamento' => 'HUANUCO',
+                'provincia' => 'HUANUCO',
+                'distrito' => 'HUANUCO',
+            ],
+            'items' => $items,
+            'vendedor' => [
+                'nombre' => auth()->user()->name ?? 'Cajero',
+            ],
+        ];
+
+        $facturaController = app(FacturaController::class);
+        $invoiceRequest = Request::create('/facturacion/generar', 'POST', $payload);
+        $invoiceRequest->headers->set('Accept', 'application/json');
+
+        try {
+            $response = $facturaController->generateInvoice($invoiceRequest);
+            $resultado = json_decode($response->getContent(), true);
+        } catch (\Throwable $e) {
+            Pedido::whereIn('id', $pedidos->pluck('id'))->update(['facturando_at' => null]);
+
+            \Log::error('Excepción al emitir comprobante: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Error al comunicarse con SUNAT: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        if (! ($resultado['success'] ?? false)) {
+            \Log::error('SUNAT rechazó el comprobante: ' . ($resultado['error'] ?? 'Error desconocido'));
+
+            Pedido::whereIn('id', $pedidos->pluck('id'))->update(['facturando_at' => null]);
+
+            return response()->json($resultado);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            if (! empty($validated['mesa_id'])) {
+                $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
+                $mesa = Mesa::where('id', $validated['mesa_id'])->lockForUpdate()->firstOrFail();
+
+                $mesa->estado = 'libre';
+                $mesa->user_id = null;
+                $mesa->cliente = null;
+                $mesa->personas = null;
+                $mesa->pedido_listo = false;
+                $mesa->save();
+
+                broadcast(new MesaActualizada($mesa));
+            } else {
+                $caja = Caja::query()->where('estado', 'Abierta')->firstOrFail();
+            }
+
+            $ventaGrupo = ! empty($validated['mesa_id'])
+                ? 'mesa-' . $validated['mesa_id'] . '-' . now()->format('YmdHis')
+                : 'caja-' . now()->format('YmdHis') . '-' . uniqid();
 
             foreach ($pedidos as $pedido) {
                 $pedido->estado = 'pagado';
+                $pedido->tipo_documento = $validated['tipo_documento'];
+                $pedido->documento_cliente = $validated['documento'];
+                $pedido->nombre_cliente = $validated['nombre'] ?? 'CLIENTES VARIOS';
                 $pedido->metodo_pago = $validated['metodo_pago'];
                 $pedido->caja_id = $caja->id;
+                $pedido->factura_estado = 'aceptado';
+                $pedido->factura_numero = $resultado['file'] ?? null;
+                $pedido->factura_pdf_url = $resultado['pdf_url'] ?? null;
+                $pedido->factura_xml_url = $resultado['xml_url'] ?? null;
+                $pedido->factura_cdr_url = $resultado['cdr_url'] ?? null;
+                $pedido->factura_respuesta = $resultado['message'] ?? 'Aceptado';
+                $pedido->venta_grupo = $ventaGrupo;
+                $pedido->facturando_at = null;
+                $pedido->error_sunat = null;
                 $pedido->save();
             }
 
-            $mesa->estado = 'libre';
-            $mesa->user_id = null;
-            $mesa->cliente = null;
-            $mesa->personas = null;
-            $mesa->pedido_listo = false;
-            $mesa->save();
+            $this->clienteService->sincronizarDesdeVenta(
+                (int) auth()->user()->current_team_id,
+                $validated['tipo_documento'],
+                $validated['documento'],
+                $validated['nombre'] ?? null,
+            );
 
-            broadcast(new MesaActualizada($mesa));
+            DB::commit();
+
+            $pedidos->each(fn (Pedido $p) => broadcast(new PedidoActualizado($p)));
+
+            return response()->json($resultado);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            \Log::critical('SUNAT aceptó el comprobante pero falló el registro del cobro: ' . $e->getMessage(), [
+                'factura_id' => $resultado['factura_id'] ?? null,
+                'file' => $resultado['file'] ?? null,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'El comprobante fue aceptado por SUNAT, pero ocurrió un error al registrar el cobro. Contacta a soporte con este número de comprobante: ' . ($resultado['file'] ?? 'desconocido'),
+                'factura_id' => $resultado['factura_id'] ?? null,
+            ], 500);
         }
-
-        $ventaGrupo = ! empty($validated['mesa_id'])
-            ? 'mesa-' . $validated['mesa_id'] . '-' . now()->format('YmdHis')
-            : 'caja-' . now()->format('YmdHis') . '-' . uniqid();
-
-            foreach ($pedidos as $pedido) {
-            $pedido->estado = 'pagado';
-            $pedido->tipo_documento = $validated['tipo_documento'];
-            $pedido->documento_cliente = $validated['documento'];
-            $pedido->nombre_cliente = $validated['nombre'] ?? 'CLIENTES VARIOS';
-            $pedido->metodo_pago = $validated['metodo_pago'];
-            $pedido->factura_estado = 'aceptado';
-            $pedido->factura_numero = $resultado['file'] ?? null;
-            $pedido->factura_pdf_url = $resultado['pdf_url'] ?? null;
-            $pedido->factura_xml_url = $resultado['xml_url'] ?? null;
-            $pedido->factura_cdr_url = $resultado['cdr_url'] ?? null;
-            $pedido->factura_respuesta = $resultado['message'] ?? 'Aceptado';
-            $pedido->venta_grupo = $ventaGrupo;
-            $pedido->facturando_at = null;
-            $pedido->save();
-        }
-
-        $this->clienteService->sincronizarDesdeVenta(
-            (int) auth()->user()->current_team_id,
-            $validated['tipo_documento'],
-            $validated['documento'],
-            $validated['nombre'] ?? null,
-        );
-
-        DB::commit();
-
-        $pedidos->each(fn (Pedido $p) => broadcast(new PedidoActualizado($p)));
-
-        return response()->json($resultado);
-    } catch (\Exception $e) {
-        DB::rollBack();
-
-        \Log::critical('SUNAT aceptó el comprobante pero falló el registro del cobro: ' . $e->getMessage(), [
-            'factura_id' => $resultado['factura_id'] ?? null,
-            'file' => $resultado['file'] ?? null,
-        ]);
-
-        return response()->json([
-            'success' => false,
-            'error' => 'El comprobante fue aceptado por SUNAT, pero ocurrió un error al registrar el cobro. Contacta a soporte con este número de comprobante: ' . ($resultado['file'] ?? 'desconocido'),
-            'factura_id' => $resultado['factura_id'] ?? null,
-        ], 500);
     }
-}
 
     public function datosEnvio(Request $request, Pedido $pedido)
     {
@@ -1099,4 +1146,3 @@ if (! ($resultado['success'] ?? false)) {
         ]);
     }
 }
-

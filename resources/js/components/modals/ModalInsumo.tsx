@@ -8,7 +8,12 @@ interface ModalInsumoProps {
     onSave: (data: any) => void;
 }
 
-export default function ModalInsumo({ isOpen, onClose, insumo, onSave }: ModalInsumoProps) {
+export default function ModalInsumo({
+    isOpen,
+    onClose,
+    insumo,
+    onSave,
+}: ModalInsumoProps) {
     const [formulario, setFormulario] = useState({
         nombre: '',
         categoria: '',
@@ -52,7 +57,9 @@ export default function ModalInsumo({ isOpen, onClose, insumo, onSave }: ModalIn
         }
     }, [insumo]);
 
-    if (!isOpen) return null;
+    if (!isOpen) {
+        return null;
+    }
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -60,61 +67,84 @@ export default function ModalInsumo({ isOpen, onClose, insumo, onSave }: ModalIn
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-card shadow-2xl">
                 {/* HEADER */}
-                <div className="flex justify-between items-center p-6 border-b border-[#F3E1C8] sticky top-0 bg-white rounded-t-3xl">
+                <div className="sticky top-0 flex items-center justify-between rounded-t-3xl border-b border-sand bg-card p-6">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                            <Package className="w-5 h-5 text-white" />
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500 shadow-lg">
+                            <Package className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-[#2D1B1A]">
+                            <h2 className="text-xl font-bold text-chocolate">
                                 {insumo ? 'Editar Insumo' : 'Nuevo Insumo'}
                             </h2>
-                            <p className="text-xs text-[#5A3D2B]">
-                                {insumo ? 'Modifica los datos del insumo' : 'Registra un nuevo insumo'}
+                            <p className="text-xs text-cocoa">
+                                {insumo
+                                    ? 'Modifica los datos del insumo'
+                                    : 'Registra un nuevo insumo'}
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 transition text-gray-400 hover:text-gray-600"
+                        className="flex h-9 w-9 items-center justify-center rounded-full text-cocoa-soft transition hover:bg-sand hover:text-cocoa"
                     >
-                        <X className="w-5 h-5" />
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
                 {/* BODY */}
-                <div className="p-6 space-y-4">
+                <div className="space-y-4 p-6">
                     <div>
-                        <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Nombre *</label>
+                        <label className="mb-1.5 block text-sm font-semibold text-chocolate">
+                            Nombre *
+                        </label>
                         <input
                             type="text"
-                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                            className="w-full rounded-xl border-2 border-wheat bg-cream-soft px-4 py-3 text-sm text-chocolate transition outline-none placeholder:text-cocoa-soft hover:bg-card focus:border-transparent focus:ring-2 focus:ring-gold"
                             value={formulario.nombre}
-                            onChange={(e) => setFormulario({ ...formulario, nombre: e.target.value })}
+                            onChange={(e) =>
+                                setFormulario({
+                                    ...formulario,
+                                    nombre: e.target.value,
+                                })
+                            }
                             placeholder="Ej: Café molido"
                         />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Categoría</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-chocolate">
+                                Categoría
+                            </label>
                             <input
                                 type="text"
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                className="w-full rounded-xl border-2 border-wheat bg-cream-soft px-4 py-3 text-sm text-chocolate transition outline-none placeholder:text-cocoa-soft hover:bg-card focus:border-transparent focus:ring-2 focus:ring-gold"
                                 value={formulario.categoria}
-                                onChange={(e) => setFormulario({ ...formulario, categoria: e.target.value })}
+                                onChange={(e) =>
+                                    setFormulario({
+                                        ...formulario,
+                                        categoria: e.target.value,
+                                    })
+                                }
                                 placeholder="Ej: Cafetería"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Unidad *</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-chocolate">
+                                Unidad *
+                            </label>
                             <select
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                className="w-full rounded-xl border-2 border-wheat bg-cream-soft px-4 py-3 text-sm text-chocolate transition outline-none hover:bg-card focus:border-transparent focus:ring-2 focus:ring-gold"
                                 value={formulario.unidad}
-                                onChange={(e) => setFormulario({ ...formulario, unidad: e.target.value })}
+                                onChange={(e) =>
+                                    setFormulario({
+                                        ...formulario,
+                                        unidad: e.target.value,
+                                    })
+                                }
                             >
                                 <option value="kg">kg</option>
                                 <option value="g">g</option>
@@ -126,82 +156,135 @@ export default function ModalInsumo({ isOpen, onClose, insumo, onSave }: ModalIn
                     </div>
 
                     <div>
-                        <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Área responsable *</label>
+                        <label className="mb-1.5 block text-sm font-semibold text-chocolate">
+                            Área responsable *
+                        </label>
                         <select
-                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50"
+                            className="w-full rounded-xl border-2 border-wheat bg-cream-soft px-4 py-3 text-sm text-chocolate outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                             value={formulario.area}
-                            onChange={(e) => setFormulario({ ...formulario, area: e.target.value })}
+                            onChange={(e) =>
+                                setFormulario({
+                                    ...formulario,
+                                    area: e.target.value,
+                                })
+                            }
                         >
                             <option value="cocina">Cocina</option>
                             <option value="bar">Bar</option>
                         </select>
-                        <p className="mt-1 text-xs text-gray-500">Administración define quién podrá visualizar este insumo.</p>
+                        <p className="mt-1 text-xs text-cocoa">
+                            Administración define quién podrá visualizar este
+                            insumo.
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Stock mínimo</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-chocolate">
+                                Stock mínimo
+                            </label>
                             <input
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50"
+                                className="w-full rounded-xl border-2 border-wheat bg-cream-soft px-4 py-3 text-sm text-chocolate outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                 value={formulario.stock_minimo}
-                                onChange={(e) => setFormulario({ ...formulario, stock_minimo: parseFloat(e.target.value) || 0 })}
+                                onChange={(e) =>
+                                    setFormulario({
+                                        ...formulario,
+                                        stock_minimo:
+                                            parseFloat(e.target.value) || 0,
+                                    })
+                                }
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Fecha de vencimiento</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-chocolate">
+                                Fecha de vencimiento
+                            </label>
                             <input
                                 type="date"
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none bg-gray-50"
+                                className="w-full rounded-xl border-2 border-wheat bg-cream-soft px-4 py-3 text-sm text-chocolate outline-none focus:border-transparent focus:ring-2 focus:ring-gold"
                                 value={formulario.fecha_vencimiento}
-                                onChange={(e) => setFormulario({ ...formulario, fecha_vencimiento: e.target.value })}
+                                onChange={(e) =>
+                                    setFormulario({
+                                        ...formulario,
+                                        fecha_vencimiento: e.target.value,
+                                    })
+                                }
                             />
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Precio (S/)</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-chocolate">
+                                Precio (S/)
+                            </label>
                             <input
                                 type="number"
                                 step="0.01"
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                className="w-full rounded-xl border-2 border-wheat bg-cream-soft px-4 py-3 text-sm text-chocolate transition outline-none placeholder:text-cocoa-soft hover:bg-card focus:border-transparent focus:ring-2 focus:ring-gold"
                                 value={formulario.precio}
-                                onChange={(e) => setFormulario({ ...formulario, precio: parseFloat(e.target.value) || 0 })}
+                                onChange={(e) =>
+                                    setFormulario({
+                                        ...formulario,
+                                        precio: parseFloat(e.target.value) || 0,
+                                    })
+                                }
                                 placeholder="0.00"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Stock inicial</label>
+                            <label className="mb-1.5 block text-sm font-semibold text-chocolate">
+                                Stock inicial
+                            </label>
                             <input
                                 type="number"
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                                className="w-full rounded-xl border-2 border-wheat bg-cream-soft px-4 py-3 text-sm text-chocolate transition outline-none placeholder:text-cocoa-soft hover:bg-card focus:border-transparent focus:ring-2 focus:ring-gold"
                                 value={formulario.stock}
-                                onChange={(e) => setFormulario({ ...formulario, stock: parseFloat(e.target.value) || 0 })}
+                                onChange={(e) =>
+                                    setFormulario({
+                                        ...formulario,
+                                        stock: parseFloat(e.target.value) || 0,
+                                    })
+                                }
                                 placeholder="0"
                             />
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Proveedor</label>
+                        <label className="mb-1.5 block text-sm font-semibold text-chocolate">
+                            Proveedor
+                        </label>
                         <input
                             type="text"
-                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm placeholder-gray-400 focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                            className="w-full rounded-xl border-2 border-wheat bg-cream-soft px-4 py-3 text-sm text-chocolate transition outline-none placeholder:text-cocoa-soft hover:bg-card focus:border-transparent focus:ring-2 focus:ring-gold"
                             value={formulario.proveedor}
-                            onChange={(e) => setFormulario({ ...formulario, proveedor: e.target.value })}
+                            onChange={(e) =>
+                                setFormulario({
+                                    ...formulario,
+                                    proveedor: e.target.value,
+                                })
+                            }
                             placeholder="Nombre del proveedor"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-semibold text-[#2D1B1A] mb-1.5">Estado</label>
+                        <label className="mb-1.5 block text-sm font-semibold text-chocolate">
+                            Estado
+                        </label>
                         <select
-                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-[#2D1B1A] text-sm focus:ring-2 focus:ring-[#C9A96E] focus:border-transparent outline-none transition bg-gray-50 hover:bg-white"
+                            className="w-full rounded-xl border-2 border-wheat bg-cream-soft px-4 py-3 text-sm text-chocolate transition outline-none hover:bg-card focus:border-transparent focus:ring-2 focus:ring-gold"
                             value={formulario.activo ? '1' : '0'}
-                            onChange={(e) => setFormulario({ ...formulario, activo: e.target.value === '1' })}
+                            onChange={(e) =>
+                                setFormulario({
+                                    ...formulario,
+                                    activo: e.target.value === '1',
+                                })
+                            }
                         >
                             <option value="1">Activo</option>
                             <option value="0">Inactivo</option>
@@ -210,18 +293,18 @@ export default function ModalInsumo({ isOpen, onClose, insumo, onSave }: ModalIn
                 </div>
 
                 {/* FOOTER */}
-                <div className="border-t border-[#F3E1C8] p-6 flex justify-end gap-3 sticky bottom-0 bg-white rounded-b-3xl">
+                <div className="sticky bottom-0 flex justify-end gap-3 rounded-b-3xl border-t border-sand bg-card p-6">
                     <button
                         onClick={onClose}
-                        className="px-6 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-100 font-semibold text-sm transition"
+                        className="rounded-xl border-2 border-wheat px-6 py-2.5 text-sm font-semibold text-cocoa transition hover:bg-sand"
                     >
                         Cancelar
                     </button>
                     <button
                         onClick={handleSubmit}
-                        className="px-6 py-2.5 rounded-xl bg-[#C9A96E] hover:bg-[#B8975D] text-white font-semibold text-sm transition flex items-center gap-2 shadow-md hover:shadow-lg active:scale-95"
+                        className="flex items-center gap-2 rounded-xl bg-gold px-6 py-2.5 text-sm font-semibold text-ink shadow-md transition hover:bg-gold-deep hover:shadow-lg active:scale-95"
                     >
-                        <Check className="w-4 h-4" />
+                        <Check className="h-4 w-4" />
                         {insumo ? 'Actualizar' : 'Crear'}
                     </button>
                 </div>

@@ -1,3 +1,84 @@
+<IfModule mod_deflate.c>
+    ## ============================================================
+    ## COMPRESIÓN GZIP (mod_deflate)
+    ## Reduce el tamaño de texto/JS/CSS que viaja por la red.
+    ## ============================================================
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE image/svg+xml
+    AddOutputFilterByType DEFLATE application/wasm
+    AddOutputFilterByType DEFLATE font/woff
+    AddOutputFilterByType DEFLATE font/woff2
+</IfModule>
+
+<IfModule mod_brotli.c>
+    ## ============================================================
+    ## COMPRESIÓN BROTLI (mod_brotli) — prioridad sobre gzip si existe
+    ## ============================================================
+    AddOutputFilterByType BROTLI_COMPRESS text/plain
+    AddOutputFilterByType BROTLI_COMPRESS text/html
+    AddOutputFilterByType BROTLI_COMPRESS text/xml
+    AddOutputFilterByType BROTLI_COMPRESS text/css
+    AddOutputFilterByType BROTLI_COMPRESS text/javascript
+    AddOutputFilterByType BROTLI_COMPRESS application/javascript
+    AddOutputFilterByType BROTLI_COMPRESS application/x-javascript
+    AddOutputFilterByType BROTLI_COMPRESS application/json
+    AddOutputFilterByType BROTLI_COMPRESS application/xml
+    AddOutputFilterByType BROTLI_COMPRESS image/svg+xml
+    AddOutputFilterByType BROTLI_COMPRESS application/wasm
+</IfModule>
+
+<IfModule mod_expires.c>
+    ## ============================================================
+    ## CACHÉ DE NAVEGADOR (mod_expires)
+    ## Los assets de Vite tienen hash en el nombre (immutable):
+    ## pueden cachearse por 1 año sin riesgo de contenido viejo.
+    ## ============================================================
+    ExpiresActive On
+
+    # HTML no se cachea en el navegador (siempre revisa)
+    ExpiresByType text/html "access plus 0 seconds"
+
+    # Assets hasheados (JS/CSS) — 1 año, ir a verificar
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType text/javascript "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType application/json "access plus 1 month"
+
+    # Imágenes y fuentes
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/avif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/x-icon "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+<IfModule mod_headers.c>
+    ## ============================================================
+    ## HEADERS DE CACHÉ (mod_headers)
+    ## Refuerza la caché para archivos con hash inmutables.
+    ## ============================================================
+    <FilesMatch "\.(js|css|woff2?)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+
+    <FilesMatch "\.(png|jpe?g|webp|avif|gif|svg|ico)$">
+        Header set Cache-Control "public, max-age=31536000"
+    </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

@@ -89,6 +89,49 @@ test('al cerrar la caja y abrir otra, la secuencia vuelve a empezar', function (
     expect((int) $pedidoNuevo->numero_pedido)->toBe(1);
 });
 
+test('cancelar la última venta devuelve el numero_pedido y reutiliza la secuencia', function () {
+    $user = cajaNumeroPedidoUser();
+    registrarPedidoCaja($user, 'Pedido Uno');
+
+    $caja = Caja::query()->where('estado', 'Abierta')->first();
+    $pedido1 = Pedido::query()->where('cliente', 'Pedido Uno')->first();
+
+    expect((int) $caja->contador_pedidos)->toBe(1);
+
+    $this->actingAs($user)->post(route('caja.cancelar', $pedido1))
+        ->assertJson(['success' => true]);
+
+    $caja->refresh();
+
+    expect((int) $caja->contador_pedidos)->toBe(0);
+
+    // El siguiente pedido vuelve a usar el número 1.
+    $pedidoNuevo = registrarPedidoCaja($user, 'Reutilizado');
+
+    expect((int) $pedidoNuevo->numero_pedido)->toBe(1)
+        ->and((int) $caja->refresh()->contador_pedidos)->toBe(1);
+});
+
+test('cancelar una venta intermedia no rompe la secuencia de numero_pedido', function () {
+    $user = cajaNumeroPedidoUser();
+    registrarPedidoCaja($user, 'Primero');
+    registrarPedidoCaja($user, 'Segundo');
+
+    // Se anula el pedido 1, pero el 2 sigue vigente: el contador no baja.
+    $primero = Pedido::query()->where('cliente', 'Primero')->first();
+
+    $this->actingAs($user)->post(route('caja.cancelar', $primero))
+        ->assertJson(['success' => true]);
+
+    $caja = Caja::query()->where('estado', 'Abierta')->first();
+
+    expect((int) $caja->refresh()->contador_pedidos)->toBe(2);
+
+    $pedidoNuevo = registrarPedidoCaja($user, 'Nuevo');
+
+    expect((int) $pedidoNuevo->numero_pedido)->toBe(3);
+});
+
 test('los pedidos de mesa no reciben numero_pedido (se mantiene numbero global)', function () {
     $user = cajaNumeroPedidoUser();
     registrarPedidoCaja($user, 'Venta Directa');

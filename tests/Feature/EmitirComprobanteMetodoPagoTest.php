@@ -30,15 +30,15 @@ function emitirComprobanteUser(): User
     return $user;
 }
 
-test('emitir comprobante de una venta directa persiste el metodo_pago en el pedido', function () {
-    $user = emitirComprobanteUser();
+function emitirComprobantePedido(User $user, string $cliente = 'Venta Directa'): Pedido
+{
     $plato = Plato::firstWhere('nombre', 'Cafe Americano');
 
-    $pedido = Pedido::query()->create([
+    return Pedido::query()->create([
         'team_id' => $user->current_team_id,
         'user_id' => $user->id,
         'numero' => Pedido::generarNumero(),
-        'cliente' => 'Venta Directa',
+        'cliente' => $cliente,
         'tipo' => 'llevar',
         'productos' => [
             ['id' => $plato->id, 'nombre' => 'Cafe Americano', 'cantidad' => 1, 'precio' => 7.50, 'subtotal' => 7.50],
@@ -49,12 +49,11 @@ test('emitir comprobante de una venta directa persiste el metodo_pago en el pedi
         'estado' => 'pagado',
         'caja_id' => Caja::query()->where('estado', 'Abierta')->first()->id,
     ]);
+}
 
-    $this->mock(FacturaController::class, function ($mock) {
-        $mock->shouldReceive('nuevoCorrelativo')
-            ->once()
-            ->andReturn(response()->json(['correlativo' => 1]));
-
+function mockGenerateInvoice(): void
+{
+    test()->mock(FacturaController::class, function ($mock) {
         $mock->shouldReceive('generateInvoice')
             ->once()
             ->andReturn(response()->json([
@@ -67,6 +66,32 @@ test('emitir comprobante de una venta directa persiste el metodo_pago en el pedi
                 'cdr_url' => null,
             ]));
     });
+}
+
+test('emitir comprobante de una venta directa persiste el metodo_pago en el pedido', function () {
+    $user = emitirComprobanteUser();
+    $pedido = emitirComprobantePedido($user);
+
+    mockGenerateInvoice();
+
+    test()->actingAs($user)->post(route('pedidos.emitir-comprobante'), [
+        'pedido_ids' => [$pedido->id],
+        'tipo_documento' => '03',
+        'documento' => '00000000',
+        'nombre' => 'Venta Directa',
+        'direccion' => '-',
+        'metodo_pago' => 'tarjeta',
+        'authorization_pin' => '0000',
+    ])->assertOk()->assertJson(['success' => true]);
+
+    expect($pedido->refresh()->metodo_pago)->toBe('tarjeta');
+});
+
+test('emitir boleta sin DNI ni nombre funciona (consumidor final)', function () {
+    $user = emitirComprobanteUser();
+    $pedido = emitirComprobantePedido($user, 'Cliente Anónimo');
+
+    mockGenerateInvoice();
 
     test()->actingAs($user)->post(route('pedidos.emitir-comprobante'), [
         'pedido_ids' => [$pedido->id],
@@ -74,9 +99,39 @@ test('emitir comprobante de una venta directa persiste el metodo_pago en el pedi
         'documento' => '00000000',
         'nombre' => '',
         'direccion' => '-',
-        'metodo_pago' => 'tarjeta',
+        'metodo_pago' => 'efectivo',
         'authorization_pin' => '0000',
     ])->assertOk()->assertJson(['success' => true]);
 
-    expect($pedido->refresh()->metodo_pago)->toBe('tarjeta');
+    expect($pedido->refresh()->nombre_cliente)->toBe('CLIENTES VARIOS');
+});
+
+test('emitir boleta con DNI inválido es rechazada', function () {
+    $user = emitirComprobanteUser();
+    $pedido = emitirComprobantePedido($user);
+
+    test()->actingAs($user)->withHeaders(['Accept' => 'application/json'])->post(route('pedidos.emitir-comprobante'), [
+        'pedido_ids' => [$pedido->id],
+        'tipo_documento' => '03',
+        'documento' => '123',
+        'nombre' => '',
+        'direccion' => '-',
+        'metodo_pago' => 'efectivo',
+        'authorization_pin' => '0000',
+    ])->assertJsonValidationErrors('documento');
+});
+
+test('emitir factura sin RUC ni razon social es rechazada', function () {
+    $user = emitirComprobanteUser();
+    $pedido = emitirComprobantePedido($user);
+
+    test()->actingAs($user)->withHeaders(['Accept' => 'application/json'])->post(route('pedidos.emitir-comprobante'), [
+        'pedido_ids' => [$pedido->id],
+        'tipo_documento' => '01',
+        'documento' => '',
+        'nombre' => '',
+        'direccion' => '',
+        'metodo_pago' => 'efectivo',
+        'authorization_pin' => '0000',
+    ])->assertJsonValidationErrors(['documento', 'nombre']);
 });

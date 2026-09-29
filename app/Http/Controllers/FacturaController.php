@@ -44,10 +44,14 @@ class FacturaController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            if (!$control) {
+            if (! $control) {
+                $ultimoCorrelativo = Factura::where('serie', $serie)
+                    ->pluck('correlativo')
+                    ->max(fn ($correlativo) => (int) $correlativo) ?? 0;
+
                 DB::table('correlativos_control')->insert([
                     'serie' => $serie,
-                    'ultimo_correlativo' => 0,
+                    'ultimo_correlativo' => $ultimoCorrelativo,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -66,7 +70,7 @@ class FacturaController extends Controller
                     'updated_at' => now(),
                 ]);
 
-            $factura = new Factura();
+            $factura = new Factura;
             $factura->serie = $serie;
             $factura->correlativo = $nuevoCorrelativo;
             $factura->vendedor = $request->input('vendedor.nombre');
@@ -104,12 +108,14 @@ class FacturaController extends Controller
                 'items.*.idproducto' => 'required|exists:platos,id',
             ]);
 
-            // Configurar empresa emisora
-            $company = new Company();
-            $company->setRuc(config('sunat.ruc'))
-                ->setRazonSocial('SEVEN HEART SOCIEDAD ANONIMA CERRADA')
-                ->setNombreComercial('SEVEN HEART')
-                ->setAddress((new Address())
+           
+
+            $company = new Company;
+            $company->setRuc('20000000001')
+                ->setRazonSocial('DOLCE CAFFE SAC')
+                ->setNombreComercial('DOLCE CAFFE')
+                ->setAddress((new Address)
+
                     ->setUbigueo('100101')
                     ->setDepartamento('HUANUCO')
                     ->setProvincia('HUANUCO')
@@ -119,7 +125,7 @@ class FacturaController extends Controller
                     ->setCodLocal('0000'));
 
             // Configurar cliente
-            $client = new Client();
+            $client = new Client;
             if ($request->input('tipo_documento') === '01') {
                 $client->setTipoDoc('6')
                     ->setNumDoc($request->input('client.ruc'))
@@ -129,7 +135,7 @@ class FacturaController extends Controller
                     ->setNumDoc($request->input('client.dni'))
                     ->setRznSocial($request->input('client.nombres'));
             }
-            $client->setAddress((new Address())
+            $client->setAddress((new Address)
                 ->setUbigueo($request->input('client.ubigeo'))
                 ->setDepartamento($request->input('client.departamento'))
                 ->setProvincia($request->input('client.provincia'))
@@ -143,14 +149,14 @@ class FacturaController extends Controller
             $correlativo = $factura->correlativo;
 
             // Crear factura/boleta
-            $invoice = (new Invoice())
+            $invoice = (new Invoice)
                 ->setUblVersion('2.1')
                 ->setTipoOperacion('0101')
                 ->setTipoDoc($request->input('tipo_documento'))
                 ->setSerie($serie)
                 ->setCorrelativo($correlativo)
-                ->setFechaEmision(new \DateTime())
-                ->setFormaPago(new FormaPagoContado())
+                ->setFechaEmision(new \DateTime)
+                ->setFormaPago(new FormaPagoContado)
                 ->setTipoMoneda('PEN')
                 ->setCompany($company)
                 ->setClient($client);
@@ -178,7 +184,7 @@ class FacturaController extends Controller
                     $precioUnitarioFinal = $precioUnitario;
                 }
 
-                $detail = (new SaleDetail())
+                $detail = (new SaleDetail)
                     ->setCodProducto($item['code'])
                     ->setUnidad('NIU')
                     ->setDescripcion($item['description'])
@@ -208,7 +214,7 @@ class FacturaController extends Controller
                 ->setMtoImpVenta($totalVenta)
                 ->setDetails($details)
                 ->setLegends([
-                    (new Legend())
+                    (new Legend)
                         ->setCode('1000')
                         ->setValue($this->numberToWords($totalVenta)),
                 ]);
@@ -232,7 +238,7 @@ class FacturaController extends Controller
 
                 $vendedor = $request->input('vendedor.nombre');
                 $factura->montototal = $totalVenta;
-                $factura->documento = $filename . '.pdf';
+                $factura->documento = $filename.'.pdf';
                 $factura->estado_sunat = 'aceptado';
                 $factura->codigo_sunat = $cdr->getCode();
                 $factura->save();
@@ -256,6 +262,7 @@ class FacturaController extends Controller
                 ];
     } else {
 
+
     $errorCode = $result->getError()->getCode();
     $errorMessage = $result->getError()->getMessage();
     $factura->montototal = $totalVenta;
@@ -264,6 +271,13 @@ class FacturaController extends Controller
     $factura->error_sunat = $errorMessage;
     $factura->codigo_sunat = $errorCode ?: 'ERROR';
     $factura->save();
+
+                \Log::error('SUNAT rechazó el comprobante: '.$errorMessage, [
+                    'serie' => $serie,
+                    'correlativo' => $correlativo,
+                    'tipo_documento' => $request->input('tipo_documento'),
+                ]);
+
 
     \Log::error('SUNAT rechazó el comprobante', [
         'codigo' => $errorCode,
@@ -295,7 +309,7 @@ class FacturaController extends Controller
                 $factura->save();
             }
 
-            \Log::error('Error generando comprobante: ' . $e->getMessage(), [
+            \Log::error('Error generando comprobante: '.$e->getMessage(), [
                 'serie' => $serie ?? null,
                 'correlativo' => $correlativo ?? null,
             ]);
@@ -323,12 +337,12 @@ class FacturaController extends Controller
     {
         try {
             $xmlPath = "invoices/{$filename}.xml";
-            if (!Storage::exists($xmlPath)) {
+            if (! Storage::exists($xmlPath)) {
                 throw new \Exception("XML no encontrado: {$xmlPath}");
             }
 
             $xmlContent = Storage::get($xmlPath);
-            $dom = new \DOMDocument();
+            $dom = new \DOMDocument;
             $dom->loadXML($xmlContent, LIBXML_NOCDATA);
             $xpath = new \DOMXPath($dom);
             $xpath->registerNamespace('cbc', 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2');
@@ -380,7 +394,7 @@ class FacturaController extends Controller
                 margin: 5,
             );
 
-            $writer = new PngWriter();
+            $writer = new PngWriter;
             $result = $writer->write($qrCode);
 
             $qrPath = storage_path("app/qr_{$filename}.png");
@@ -440,7 +454,7 @@ class FacturaController extends Controller
 
             return "invoices/{$filename}.pdf";
         } catch (\Exception $e) {
-            \Log::error('Error generando PDF: ' . $e->getMessage());
+            \Log::error('Error generando PDF: '.$e->getMessage());
             throw $e;
         }
     }
@@ -448,27 +462,30 @@ class FacturaController extends Controller
     public function downloadXml($filename)
     {
         $path = "invoices/{$filename}.xml";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'XML no encontrado'], 404);
         }
+
         return Storage::download($path);
     }
 
     public function downloadCdr($filename)
     {
         $path = "invoices/cdr/{$filename}.zip";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'CDR no encontrado'], 404);
         }
+
         return Storage::download($path);
     }
 
     public function downloadPdf($filename)
     {
         $path = "invoices/{$filename}.pdf";
-        if (!Storage::exists($path)) {
+        if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'PDF no encontrado'], 404);
         }
+
         return Storage::download($path);
     }
 
@@ -477,17 +494,18 @@ class FacturaController extends Controller
         $token = 'apis-token-10424.XUaCDKAX2Wgac4w6lR7-u39Ael3LTdCc';
         $curl = curl_init();
         curl_setopt_array($curl, [
-            CURLOPT_URL => 'https://api.apis.net.pe/v2/sunat/ruc?numero=' . $ruccliente,
+            CURLOPT_URL => 'https://api.apis.net.pe/v2/sunat/ruc?numero='.$ruccliente,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => 0,
             CURLOPT_CUSTOMREQUEST => 'GET',
             CURLOPT_HTTPHEADER => [
                 'Referer: http://apis.net.pe/api-ruc',
-                'Authorization: Bearer ' . $token,
+                'Authorization: Bearer '.$token,
             ],
         ]);
         $response = curl_exec($curl);
         curl_close($curl);
+
         return response()->json(json_decode($response));
     }
 
@@ -496,23 +514,25 @@ class FacturaController extends Controller
         $token = 'apis-token-10424.XUaCDKAX2Wgac4w6lR7-u39Ael3LTdCc';
         $curl = curl_init();
         curl_setopt_array($curl, [
-            CURLOPT_URL => 'https://api.apis.net.pe/v2/reniec/dni?numero=' . $dnicliente,
+            CURLOPT_URL => 'https://api.apis.net.pe/v2/reniec/dni?numero='.$dnicliente,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => 0,
             CURLOPT_CUSTOMREQUEST => 'GET',
             CURLOPT_HTTPHEADER => [
                 'Referer: https://apis.net.pe/consulta-dni-api',
-                'Authorization: Bearer ' . $token,
+                'Authorization: Bearer '.$token,
             ],
         ]);
         $response = curl_exec($curl);
         curl_close($curl);
+
         return response()->json(json_decode($response));
     }
 
     public function correlativoActual()
     {
         $correlativo = Factura::max('correlativo');
+
         return response()->json(['correlativo' => $correlativo]);
     }
 
@@ -520,12 +540,14 @@ class FacturaController extends Controller
     {
         $serie = $request->input('serie', 'B001');
         $correlativo = Factura::where('serie', $serie)->max('correlativo');
+
         return response()->json(['correlativo' => ($correlativo ?? 0) + 1]);
     }
 
     public function verificarCorreltaivo($correlativo)
     {
         $factura = Factura::where('correlativo', $correlativo)->first();
+
         return response()->json(['existe' => $factura !== null]);
     }
 }
