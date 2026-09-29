@@ -220,6 +220,17 @@ class CajaController extends Controller
             if ($caja) {
                 $caja->total_ventas_caja = max(0, (float) $caja->total_ventas_caja - (float) $pedido->total);
                 $caja->total_pedidos = max(0, (int) $caja->total_pedidos - 1);
+
+                // Solo se devuelve el número de pedido si la venta anulada es la
+                // última registrada en la caja; si hay ventas posteriores, la
+                // secuencia sigue para no repetir un número ya emitido.
+                if (
+                    $pedido->numero_pedido !== null
+                    && (int) $pedido->numero_pedido === (int) $caja->contador_pedidos
+                ) {
+                    $caja->contador_pedidos = max(0, (int) $caja->contador_pedidos - 1);
+                }
+
                 $caja->save();
             }
 

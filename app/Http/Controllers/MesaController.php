@@ -202,14 +202,6 @@ class MesaController extends Controller
         return redirect()->back()->with('success', 'Estado de mesa actualizado');
     }
 
-    //  Ver detalle de una mesa
-    public function show(Mesa $mesa)
-    {
-        return Inertia::render('restaurante/mesa-detalle', [
-            'mesa' => $mesa,
-        ]);
-    }
-
     //  Eliminar una mesa (solo si está libre y sin historial de pedidos)
     public function destroy(Mesa $mesa)
     {

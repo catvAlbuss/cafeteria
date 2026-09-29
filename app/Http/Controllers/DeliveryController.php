@@ -2,24 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\PedidoActualizado;
-use App\Events\PedidoCreado;
 use App\Models\Delivery;
-use App\Models\Pedido;
 use App\Models\Plato;
-use App\Services\ProductionAreaClassifier;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DeliveryController extends Controller
 {
-    protected $areaClassifier;
-
-    public function __construct(ProductionAreaClassifier $areaClassifier)
-    {
-        $this->areaClassifier = $areaClassifier;
-    }
-
     public function index()
     {
         $pedidos = Delivery::whereDate('created_at', today())
@@ -84,17 +73,16 @@ class DeliveryController extends Controller
     public function entregar(Delivery $delivery, Request $request)
     {
         $validated = $request->validate(['metodo_pago' => 'required|in:efectivo,tarjeta,yape']);
+
+        if ($delivery->estado === 'pagado') {
+            return back()->with('error', 'Este delivery ya fue entregado y cobrado.');
+        }
+
         $delivery->update([
             'metodo_pago' => $validated['metodo_pago'],
             'estado' => 'pagado',
             'estado_delivery' => 'entregado',
         ]);
-
-        $pedidos = Pedido::where('delivery_id', $delivery->id)->get();
-        foreach ($pedidos as $pedido) {
-            $pedido->update(['estado' => 'pagado']);
-            broadcast(new PedidoActualizado($pedido));
-        }
 
         return back()->with('success', 'Delivery entregado y cobrado');
     }
@@ -140,35 +128,8 @@ class DeliveryController extends Controller
     public function cocina(Delivery $delivery)
     {
         $delivery->update(['estado_delivery' => 'preparando']);
-        $productos = is_array($delivery->productos)
-            ? $delivery->productos
-            : json_decode($delivery->productos, true) ?? [];
 
-        foreach ($productos as $producto) {
-            // Detectar el área del producto
-            $area = $this->areaClassifier->detect($producto, 'cocina');
-
-            $pedido = Pedido::create([
-                'numero' => Pedido::generarNumero(),
-                'team_id' => auth()->user()->current_team_id,
-                'user_id' => auth()->id(),
-                'mesa_id' => null,
-                'mesa' => null,
-                'delivery_id' => $delivery->id,
-                'cliente' => $delivery->cliente,
-                'tipo' => 'delivery',
-                'productos' => [$producto],
-                'total' => (float) $producto['subtotal'],
-                'estado' => 'pendiente',
-                'area' => $area,
-                'observaciones' => 'Delivery '.$delivery->codigo.' - '.$producto['nombre'],
-                'hora_pedido' => now(),
-            ]);
-
-            broadcast(new PedidoCreado($pedido));
-        }
-
-        return back()->with('success', 'Pedido enviado a cocina correctamente');
+        return back()->with('success', 'Pedido en preparación');
     }
 
     public function listoParaEntregar($id)
@@ -177,12 +138,6 @@ class DeliveryController extends Controller
         $delivery->update([
             'estado_delivery' => 'listo_para_entregar',
         ]);
-
-        $pedidos = Pedido::where('delivery_id', $delivery->id)->get();
-        foreach ($pedidos as $pedido) {
-            $pedido->update(['estado' => 'listo']);
-            broadcast(new PedidoActualizado($pedido));
-        }
 
         return back()->with('success', 'Pedido listo para entregar');
     }
@@ -193,12 +148,6 @@ class DeliveryController extends Controller
         $delivery->update([
             'estado_delivery' => 'en_ruta',
         ]);
-
-        $pedidos = Pedido::where('delivery_id', $delivery->id)->get();
-        foreach ($pedidos as $pedido) {
-            $pedido->update(['estado' => 'entregado']);
-            broadcast(new PedidoActualizado($pedido));
-        }
 
         return back()->with('success', 'Delivery en camino');
     }

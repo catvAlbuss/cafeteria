@@ -415,14 +415,16 @@ export default function ModalBoleta({
                             </p>
                         </div>
                     </div>
-                    <button
-                        onClick={() =>
-                            mesaId ? onClose() : setConfirmandoSalida(true)
-                        }
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-cocoa-soft transition hover:bg-sand hover:text-cocoa"
-                    >
-                        <X className="h-4 w-4" />
-                    </button>
+                    {!comprobanteEmitido && (
+                        <button
+                            onClick={() =>
+                                mesaId ? onClose() : setConfirmandoSalida(true)
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-cocoa-soft transition hover:bg-sand hover:text-cocoa"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
                 </div>
 
                 {/* ===== CONTENIDO ===== */}
@@ -501,7 +503,10 @@ export default function ModalBoleta({
                                 <button
                                     type="button"
                                     onClick={() =>
-                                        window.open(comprobanteEmitido.pdfUrl, '_blank')
+                                        window.open(
+                                            comprobanteEmitido.pdfUrl,
+                                            '_blank',
+                                        )
                                     }
                                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2D1B1A] py-3 text-sm font-semibold text-white transition hover:bg-[#1A0F0E]"
                                 >

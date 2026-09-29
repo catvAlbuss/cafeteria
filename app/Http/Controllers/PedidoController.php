@@ -19,6 +19,7 @@ use App\Services\ReservaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class PedidoController extends Controller
@@ -868,8 +869,25 @@ class PedidoController extends Controller
             'pedido_ids' => 'required|array|min:1',
             'pedido_ids.*' => 'exists:pedidos,id',
             'tipo_documento' => 'required|in:01,03',
-            'documento' => 'required|string|max:11',
-            'nombre' => 'required|string|max:255',
+            'documento' => [
+                'nullable',
+                'string',
+                'max:11',
+                Rule::requiredIf(fn () => $request->input('tipo_documento') === '01'),
+                Rule::when($request->input('tipo_documento') === '01', 'digits:11'),
+                Rule::when(
+                    $request->input('tipo_documento') === '03'
+                        && $request->filled('documento')
+                        && $request->input('documento') !== '00000000',
+                    'digits:8',
+                ),
+            ],
+            'nombre' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::requiredIf(fn () => $request->input('tipo_documento') === '01'),
+            ],
             'direccion' => 'nullable|string|max:255',
             'mesa_id' => 'nullable|exists:mesas,id',
             'metodo_pago' => 'nullable|in:efectivo,tarjeta,yape',

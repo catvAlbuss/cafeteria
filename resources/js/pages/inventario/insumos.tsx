@@ -396,7 +396,12 @@ export default function Insumos() {
                                 <Plus className="h-4 w-4" />
                                 Nuevo Insumo
                             </button>
-                            <button className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20">
+                            <button
+                                onClick={() =>
+                                    window.open('/insumos/export', '_blank')
+                                }
+                                className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20"
+                            >
                                 <FileSpreadsheet className="h-4 w-4" />
                                 Exportar
                             </button>

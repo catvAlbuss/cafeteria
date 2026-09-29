@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\MermasExport;
 use App\Models\Insumo;
 use App\Models\MovimientoInventario;
 use App\Models\Plato;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class MermaController extends Controller
 {
@@ -149,5 +151,18 @@ class MermaController extends Controller
         $merma->delete();
 
         return redirect()->back()->with('success', 'Merma eliminada correctamente');
+    }
+
+    public function export()
+    {
+        $teamId = auth()->user()->current_team_id;
+        $mermas = MovimientoInventario::where('team_id', $teamId)
+            ->where('motivo', 'merma')
+            ->with(['user', 'item'])
+            ->orderBy('created_at', 'desc')
+            ->limit(500)
+            ->get();
+
+        return Excel::download(new MermasExport($mermas), 'mermas_'.now()->format('Y-m-d_His').'.xlsx');
     }
 }

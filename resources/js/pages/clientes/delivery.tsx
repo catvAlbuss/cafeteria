@@ -11,7 +11,6 @@ import {
     Search,
     Plus,
     Trash2,
-    X,
     Banknote,
     CreditCard,
     Smartphone,
@@ -40,12 +39,6 @@ interface DeliveryPedido {
     horaEntrega?: string | null;
 }
 
-interface ItemNuevo {
-    nombre: string;
-    cantidad: number;
-    precio: number;
-}
-
 interface Plato {
     id: number;
     nombre: string;
@@ -60,108 +53,6 @@ function reloadParcial(only: string[]) {
     router.reload({ only, preserveScroll: true } as Parameters<
         typeof router.reload
     >[0]);
-}
-
-// ============================================================
-// MODAL: Asignar repartidor y enviar
-// ============================================================
-function ModalAsignarRepartidor({
-    isOpen,
-    pedido,
-    onClose,
-}: {
-    isOpen: boolean;
-    pedido: DeliveryPedido | null;
-    onClose: () => void;
-}) {
-    const [nombre, setNombre] = useState('');
-    const [enviando, setEnviando] = useState(false);
-
-    if (!isOpen || !pedido) {
-        return null;
-    }
-
-    const confirmar = () => {
-        if (!nombre.trim()) {
-            alert('Ingresa el nombre del repartidor');
-
-            return;
-        }
-
-        setEnviando(true);
-        router.patch(`/delivery/${pedido.id}/enviar`, { repartidor: nombre }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setEnviando(false);
-                setNombre('');
-                onClose();
-                reloadParcial(['pedidos']);
-            },
-            onError: () => setEnviando(false),
-        } as Parameters<typeof router.patch>[2]);
-    };
-    const enviarACocina = (id: number) => {
-        router.patch(
-            `/delivery/${id}/cocina`,
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => reloadParcial(['pedidos']),
-            },
-        );
-    };
-    const marcarEnRuta = (id: number) => {
-        if (!confirm('¿Confirmas que el repartidor está en camino?')) {
-            return;
-        }
-
-        router.patch(
-            `/delivery/${id}/en-ruta`,
-            {},
-            {
-                preserveScroll: true,
-                onSuccess: () => reloadParcial(['pedidos']),
-                onError: (errors) => {
-                    alert(
-                        'Error al marcar en ruta: ' +
-                            Object.values(errors).join(' '),
-                    );
-                },
-            },
-        );
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-sm rounded-2xl bg-card p-5 shadow-2xl">
-                <h3 className="mb-3 font-semibold text-chocolate">
-                    Asignar repartidor — {pedido.codigo}
-                </h3>
-                <input
-                    autoFocus
-                    placeholder="Nombre del repartidor"
-                    className="w-full rounded-xl border border-wheat px-3 py-2 text-sm text-chocolate outline-none focus:ring-2 focus:ring-gold"
-                    value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
-                />
-                <div className="mt-4 flex gap-2">
-                    <button
-                        onClick={onClose}
-                        className="flex-1 rounded-xl border-2 border-wheat py-2 text-sm font-medium text-cocoa hover:border-gold hover:bg-sand/40"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={confirmar}
-                        disabled={enviando}
-                        className="flex-1 rounded-xl bg-blue-500 py-2 text-sm font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
-                    >
-                        {enviando ? '...' : 'Enviar'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
 }
 
 // ============================================================
@@ -269,7 +160,6 @@ export default function Delivery() {
     const [busqueda, setBusqueda] = useState('');
     const [filtroEstado, setFiltroEstado] = useState('');
     const [modalNuevo, setModalNuevo] = useState(false);
-    const [modalRepartidor, setModalRepartidor] = useState(false);
     const [modalCobro, setModalCobro] = useState(false);
     const [pedidoActivo, setPedidoActivo] = useState<DeliveryPedido | null>(
         null,
@@ -353,10 +243,6 @@ export default function Delivery() {
     const formatCurrency = (amount: number): string =>
         `S/ ${amount.toFixed(2)}`;
 
-    const abrirAsignar = (p: DeliveryPedido) => {
-        setPedidoActivo(p);
-        setModalRepartidor(true);
-    };
     const abrirCobro = (p: DeliveryPedido) => {
         setPedidoActivo(p);
         setModalCobro(true);
@@ -392,6 +278,19 @@ export default function Delivery() {
                 onSuccess: () => reloadParcial(['pedidos']),
                 onError: (error) => {
                     alert('Error al enviar el pedido a cocina');
+                },
+            },
+        );
+    };
+    const marcarListoParaEntregar = (id: number) => {
+        router.patch(
+            `/delivery/${id}/listo`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => reloadParcial(['pedidos']),
+                onError: () => {
+                    alert('Error al marcar el pedido como listo');
                 },
             },
         );
@@ -632,6 +531,32 @@ export default function Delivery() {
                                                                 className="rounded-lg bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-700 transition hover:bg-orange-200"
                                                             >
                                                                 Enviar a cocina
+                                                            </button>
+                                                            <button
+                                                                onClick={() =>
+                                                                    cancelarPedido(
+                                                                        pedido,
+                                                                    )
+                                                                }
+                                                                className="rounded-lg bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-200"
+                                                            >
+                                                                Cancelar
+                                                            </button>
+                                                        </>
+                                                    )}
+
+                                                    {pedido.estado_delivery ===
+                                                        'preparando' && (
+                                                        <>
+                                                            <button
+                                                                onClick={() =>
+                                                                    marcarListoParaEntregar(
+                                                                        pedido.id,
+                                                                    )
+                                                                }
+                                                                className="rounded-lg bg-purple-100 px-2.5 py-1 text-xs font-semibold text-purple-700 transition hover:bg-purple-200"
+                                                            >
+                                                                Marcar listo
                                                             </button>
                                                             <button
                                                                 onClick={() =>

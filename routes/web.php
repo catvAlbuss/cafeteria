@@ -22,7 +22,6 @@ use App\Http\Controllers\ResumenController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 // ============================================================
 //  RUTAS PÚBLICAS (Sin autenticación)
@@ -73,7 +72,6 @@ Route::middleware(['auth'])->group(function () {
     // ----------------------------
     //  RESTAURANTE
     // ----------------------------
-    Route::get('/mesas/distribucion', fn () => Inertia::render('restaurante/mesas-distribucion'))->middleware('can:ver mesas')->name('mesas.distribucion');
     Route::controller(CoverController::class)->group(function () {
         Route::get('/covers', 'index')->middleware('can:ver covers')->name('covers.index');
         Route::post('/covers', 'store')->middleware('cash.session')->name('covers.store');
@@ -129,20 +127,14 @@ Route::middleware(['auth'])->group(function () {
     // ----------------------------
 
     // PLATOS
-    Route::get('/configuracion', fn () => Inertia::render('configuracion/configuracion'))->middleware('can:configuracion sistema')->name('configuracion');
-    Route::get('/perfil', fn () => Inertia::render('configuracion/perfil'))->name('perfil');
-
-    // ----------------------------
-    //  API/RECURSOS (Controladores)
-    // ----------------------------
-
-    // PLATOS
     Route::resource('platos', PlatoController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
         ->middlewareFor('index', 'can:ver platos')
         ->middlewareFor(['store', 'update', 'destroy'], 'cash.session');
 
     // MESAS
     Route::resource('mesas', MesaController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
         ->middlewareFor('index', 'can:ver mesas')
         ->middlewareFor(['store', 'update', 'destroy'], 'cash.session')
         ->middlewareFor(['store', 'destroy'], 'can:gestionar mesas');
@@ -168,7 +160,7 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/pedidos/{pedido}/cobrar', [PedidoController::class, 'cobrar'])->middleware('cash.session')->name('pedidos.cobrar');
     Route::patch('/pedidos/{pedido}/cancelar', [PedidoController::class, 'cancelar'])->middleware('cash.session')->name('pedidos.cancelar');
     Route::resource('pedidos', PedidoController::class)
-        ->except(['store'])
+        ->only(['index', 'show', 'update', 'destroy'])
         ->middlewareFor(['update', 'destroy'], 'cash.session');
     Route::post('/pedidos', [PedidoController::class, 'store'])->middleware(['operating.hours', 'cash.session'])->name('pedidos.store');
     // EMITIR COMPROBANTE ELECTRÓNICO (SUNAT)   ← AGREGAR ESTO
