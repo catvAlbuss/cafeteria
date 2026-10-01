@@ -318,6 +318,11 @@ class FacturaController extends Controller
 
             return response()->json($response);
         } catch (ValidationException $e) {
+            \Log::warning('Validación falló al generar comprobante', [
+                'errors' => $e->errors(),
+                'input' => $request->except(['authorization_pin']),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'error' => 'Error de validación',
