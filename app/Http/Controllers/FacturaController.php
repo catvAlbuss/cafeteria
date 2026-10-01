@@ -111,18 +111,17 @@ class FacturaController extends Controller
            
 
             $company = new Company;
-            $company->setRuc('20000000001')
-                ->setRazonSocial('DOLCE CAFFE SAC')
-                ->setNombreComercial('DOLCE CAFFE')
-                ->setAddress((new Address)
-
-                    ->setUbigueo('100101')
-                    ->setDepartamento('HUANUCO')
-                    ->setProvincia('HUANUCO')
-                    ->setDistrito('HUANUCO')
-                    ->setUrbanizacion('-')
-                    ->setDireccion('JR. SIMON BOLIVAR NRO. 487 (A UNA CUADRA DE TIENDAS YOLU) HUANUCO - HUANUCO - HUANUCO')
-                    ->setCodLocal('0000'));
+$company->setRuc('20607955990')
+    ->setRazonSocial('SEVEN HEART SOCIEDAD ANONIMA CERRADA')
+    ->setNombreComercial('SEVEN HEART')
+    ->setAddress((new Address)
+        ->setUbigueo('100101')
+        ->setDepartamento('HUANUCO')
+        ->setProvincia('HUANUCO')
+        ->setDistrito('HUANUCO')
+        ->setUrbanizacion('-')
+        ->setDireccion('JR. SIMON BOLIVAR NRO. 487 (A UNA CUADRA DE TIENDAS YOLU) HUANUCO - HUANUCO - HUANUCO')
+        ->setCodLocal('0000'));
 
             // Configurar cliente
             $client = new Client;
@@ -296,13 +295,18 @@ class FacturaController extends Controller
 }
 
             return response()->json($response);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Error de validación',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
+      } catch (ValidationException $e) {
+    \Log::warning('Validación falló al generar comprobante', [
+        'errors' => $e->errors(),
+        'input' => $request->except(['authorization_pin']),
+    ]);
+
+    return response()->json([
+        'success' => false,
+        'error' => 'Error de validación',
+        'errors' => $e->errors(),
+    ], 422);
+} catch (\Exception $e) {
             if (isset($factura) && $factura->exists) {
                 $factura->estado_sunat = 'error_tecnico';
                 $factura->error_sunat = $e->getMessage();

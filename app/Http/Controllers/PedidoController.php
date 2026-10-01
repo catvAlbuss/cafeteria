@@ -81,7 +81,6 @@ class PedidoController extends Controller
     {
         $user = $request->user();
         $teamId = $user->current_team_id;
-
         $areasDisponibles = collect([
             'cocina' => $user->can('ver cocina'),
             'bar' => $user->can('ver bar'),
@@ -90,7 +89,6 @@ class PedidoController extends Controller
         abort_if($areasDisponibles->isEmpty(), 403);
 
         $areaSolicitada = $request->string('area')->toString();
-
         $areaActiva = $areasDisponibles->contains($areaSolicitada)
             ? $areaSolicitada
             : $areasDisponibles->first();
@@ -149,7 +147,6 @@ class PedidoController extends Controller
         }
 
         $productosMasPedidos = [];
-
         $pedidosRecientes = Pedido::query()
             ->where('team_id', $teamId)
             ->whereNull('delivery_id')
@@ -169,7 +166,6 @@ class PedidoController extends Controller
         }
 
         arsort($productosMasPedidos);
-
         $insumos = Insumo::query()
             ->where('team_id', $teamId)
             ->where('activo', true)
@@ -281,7 +277,6 @@ class PedidoController extends Controller
             }
 
             $idsEnviados = collect($validated['pedido_ids']);
-
             $pedidosACobrar = $pedidosActuales->filter(
                 function ($pedido) use ($idsEnviados) {
                     return $idsEnviados->contains($pedido->id);
@@ -293,7 +288,6 @@ class PedidoController extends Controller
             }
 
             $ventaGrupo = 'mesa-' . $mesa->id . '-' . now()->format('YmdHis');
-
             foreach ($pedidosACobrar as $pedido) {
                 $pedido->update([
                     'estado' => 'pagado',
@@ -330,7 +324,6 @@ class PedidoController extends Controller
         );
 
         broadcast(new MesaActualizada($mesa->refresh()));
-
         return redirect()
             ->back()
             ->with('success', 'Pedido(s) cobrado(s) correctamente');
@@ -370,7 +363,7 @@ class PedidoController extends Controller
             'estado' => 'nullable|string|in:pendiente,preparando,listo,entregado,pagado,cancelado',
             'area' => 'nullable|string|in:cocina,bar,horno,postres',
             'observaciones' => 'nullable|string',
-            'user_id' => 'nullable|integer|exists:users,id',
+            'user_id' => 'nullable|integer|exists:users,id',    
         ]);
 
         if (
@@ -402,7 +395,6 @@ class PedidoController extends Controller
 
         $estado = $validated['estado'] ?? 'pendiente';
         $userId = $validated['user_id'] ?? auth()->id();
-
         [$orders, $updatedTable] = DB::transaction(
             function () use ($validated, $estado, $userId) {
                 $orders = collect($validated['productos'])
@@ -1057,7 +1049,6 @@ class PedidoController extends Controller
             if (! empty($validated['mesa_id'])) {
                 $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
                 $mesa = Mesa::where('id', $validated['mesa_id'])->lockForUpdate()->firstOrFail();
-
                 $mesa->estado = 'libre';
                 $mesa->user_id = null;
                 $mesa->cliente = null;
@@ -1135,8 +1126,8 @@ class PedidoController extends Controller
             'pedido_id' => $pedido->id,
             'numero' => $pedido->numero,
             'cliente' => $pedido->nombre_cliente
-                ?? $pedido->cliente
-                ?? 'Cliente',
+            ?? $pedido->cliente
+            ?? 'Cliente',
             'documento' => $pedido->documento_cliente,
             'tipo_documento' => $tipoDoc,
             'total' => (float) $pedido->total,
@@ -1145,4 +1136,4 @@ class PedidoController extends Controller
             'telefono' => $pedido->telefono,
         ]);
     }
-}
+}   
