@@ -165,6 +165,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/pedidos', [PedidoController::class, 'store'])->middleware(['operating.hours', 'cash.session'])->name('pedidos.store');
     // EMITIR COMPROBANTE ELECTRÓNICO (SUNAT)   ← AGREGAR ESTO
     Route::post('/pedidos/emitir-comprobante', [PedidoController::class, 'emitirComprobante'])
+        ->middleware('sunat.auth')
         ->name('pedidos.emitir-comprobante');
     // ----------------------------
     //  INVITACIONES (Opcional)
@@ -180,22 +181,22 @@ Route::middleware(['auth'])->group(function () {
         Route::get('buscar-dni/{dni}', [FacturaController::class, 'buscarClientedni'])->name('factura.buscar-dni');
         Route::get('correlativo', [FacturaController::class, 'nuevoCorrelativo'])->name('factura.correlativo');
         Route::get('correlativo-actual', [FacturaController::class, 'correlativoActual'])->name('factura.correlativo-actual');
-        Route::post('generar', [FacturaController::class, 'generateInvoice'])->name('factura.generar');
+        Route::post('generar', [FacturaController::class, 'generateInvoice'])->middleware('sunat.auth')->name('factura.generar');
         Route::get('pdf/{filename}', [FacturaController::class, 'downloadPdf'])->name('factura.pdf');
         Route::get('xml/{filename}', [FacturaController::class, 'downloadXml'])->name('factura.xml');
         Route::get('cdr/{filename}', [FacturaController::class, 'downloadCdr'])->name('factura.cdr');
     });
     Route::prefix('sunat/resumen')->group(function () {
-        Route::post('enviar', [ResumenController::class, 'enviar'])->name('sunat.resumen.enviar');
+        Route::post('enviar', [ResumenController::class, 'enviar'])->middleware('sunat.auth')->name('sunat.resumen.enviar');
         Route::get('xml/{filename}', [ResumenController::class, 'downloadXml'])->name('sunat.resumen.xml');
         Route::get('cdr/{filename}', [ResumenController::class, 'downloadCdr'])->name('sunat.resumen.cdr');
-        Route::post('consultar-cdr', [ResumenController::class, 'consultarCdr'])->name('sunat.resumen.consultar');
+        Route::post('consultar-cdr', [ResumenController::class, 'consultarCdr'])->middleware('sunat.auth')->name('sunat.resumen.consultar');
     });
     // ============================================================
     // NOTAS DE CRÉDITO (SUNAT)
     // ============================================================
     Route::prefix('sunat/nota-credito')->group(function () {
-        Route::post('emitir', [NotaCreditoController::class, 'emitir'])->name('sunat.nota-credito.emitir');
+        Route::post('emitir', [NotaCreditoController::class, 'emitir'])->middleware('sunat.auth')->name('sunat.nota-credito.emitir');
         Route::get('xml/{filename}', [NotaCreditoController::class, 'downloadXml'])->name('sunat.nota-credito.xml');
         Route::get('cdr/{filename}', [NotaCreditoController::class, 'downloadCdr'])->name('sunat.nota-credito.cdr');
         Route::get('pdf/{filename}', [NotaCreditoController::class, 'downloadPdf'])->name('sunat.nota-credito.pdf');

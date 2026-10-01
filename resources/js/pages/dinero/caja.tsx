@@ -206,6 +206,7 @@ export default function Caja() {
         mesas = [],
         pedidos = [],
         caja = null,
+        proximoBoleta = null,
     } = usePage().props as any;
     const siguienteNumeroPedido = String(
         (Number(caja?.contador_pedidos) || 0) + 1,
@@ -653,6 +654,14 @@ export default function Caja() {
                         <span className="rounded-lg border border-black/5 bg-card px-3 py-1">
                             Caja {caja?.caja || '—'}
                         </span>
+                        {proximoBoleta && (
+                            <span
+                                className="rounded-lg border border-black/5 bg-card px-3 py-1"
+                                title="Próximo correlativo fiscal ante SUNAT"
+                            >
+                                Boleta {proximoBoleta}
+                            </span>
+                        )}
                     </div>
                     <span className="flex items-center gap-1.5 rounded-lg bg-green-100 px-3 py-1 text-green-700">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />

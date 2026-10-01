@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureOpenCashSession;
 use App\Http\Middleware\EnsureOperatingHours;
 use App\Http\Middleware\EnsureReliableInertiaResponses;
+use App\Http\Middleware\EnsureSunatAuthorization;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetPermissionsTeam;
@@ -37,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'operating.hours' => EnsureOperatingHours::class,
             'cash.session' => EnsureOpenCashSession::class,
+            'sunat.auth' => EnsureSunatAuthorization::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

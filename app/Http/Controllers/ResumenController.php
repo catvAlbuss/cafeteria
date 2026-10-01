@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Factura;
+use App\Services\CorrelativoService;
 use Greenter\Model\Company\Address;
 use Greenter\Model\Company\Company;
 use Greenter\Model\Summary\Summary;
@@ -15,11 +16,17 @@ class ResumenController extends Controller
 {
     private $see;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly CorrelativoService $correlativos,
+    ) {
         $this->see = new See;
-        $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
-        $this->see->setService(env('SUNAT_URL'));
+        $this->see->setCertificate(file_get_contents(storage_path(config('sunat.certificado'))));
+        $this->see->setService(config('sunat.url'));
+        $this->see->setClaveSOL(
+            config('sunat.ruc'),
+            config('sunat.usuario_sol'),
+            config('sunat.clave_sol')
+        );
     }
 
     /**
@@ -35,10 +42,11 @@ class ResumenController extends Controller
 
             $fecha = $request->input('fecha');
 
-            // 2. Obtener las boletas del día que no hayan sido resumidas
+            // 2. Obtener las boletas del día que no hayan sido resumidas.
             $boletas = Factura::where('serie', 'LIKE', 'B%')
                 ->whereDate('fecha_emitido', $fecha)
                 ->whereNull('resumen_id')
+                ->where('estado_sunat', 'aceptado')
                 ->get();
 
             if ($boletas->isEmpty()) {
@@ -50,17 +58,17 @@ class ResumenController extends Controller
 
             // 3. Configurar empresa emisora
             $company = new Company;
-            $company->setRuc(env('GREENTER_RUC'))
-                ->setRazonSocial('SEVEN HEART SOCIEDAD ANONIMA CERRADA')
-                ->setNombreComercial('DOLCE CAFFE')
+            $company->setRuc(config('sunat.ruc'))
+                ->setRazonSocial(config('sunat.razon_social'))
+                ->setNombreComercial(config('sunat.nombre_comercial'))
                 ->setAddress((new Address)
-                    ->setUbigueo('100101')
-                    ->setDepartamento('HUANUCO')
-                    ->setProvincia('HUANUCO')
-                    ->setDistrito('HUANUCO')
+                    ->setUbigueo(config('sunat.ubigeo'))
+                    ->setDepartamento(config('sunat.departamento'))
+                    ->setProvincia(config('sunat.provincia'))
+                    ->setDistrito(config('sunat.distrito'))
                     ->setUrbanizacion('-')
-                    ->setDireccion('DIRECCION REAL')
-                    ->setCodLocal('0000'));
+                    ->setDireccion(config('sunat.direccion'))
+                    ->setCodLocal(config('sunat.cod_local')));
 
             // 4. Crear el Resumen
             $resumen = (new Summary)
@@ -219,22 +227,13 @@ class ResumenController extends Controller
     }
 
     /**
-     * Genera un nuevo correlativo para el resumen.
+     * Reserva el siguiente correlativo del resumen diario. Va por el servicio
+     * con bloqueo de fila: leer el maximo de las facturas enviadas permite que
+     * dos resumenes concurrentes obtengan el mismo numero.
      */
     private function nuevoCorrelativoResumen()
     {
-        $ultimoResumen = Factura::whereNotNull('resumen_id')
-            ->orderBy('idfactura', 'desc')
-            ->first();
-
-        if (! $ultimoResumen) {
-            return '1';
-        }
-
-        $partes = explode('-', $ultimoResumen->resumen_id);
-        $ultimoCorrelativo = (int) str_replace('.zip', '', ($partes[3] ?? '0'));
-
-        return (string) ($ultimoCorrelativo + 1);
+        return (string) $this->correlativos->siguiente('RC01');
     }
 
     /**

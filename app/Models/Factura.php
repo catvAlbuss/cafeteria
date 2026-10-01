@@ -19,10 +19,12 @@ class Factura extends Model
         'montototal',
         'fecha_emitido',
         'Cliente',
+        'documento_cliente',
         'documento',
         'estado_sunat',
         'error_sunat',
         'codigo_sunat',
+        'team_id',
     ];
 
     protected $casts = [
@@ -31,25 +33,38 @@ class Factura extends Model
         'correlativo' => 'integer',
     ];
 
-    // Accessors para las URLs (adaptados a las rutas de la cafetería)
-    public function getPdfUrlAttribute()
+    /**
+     * `documento` es el nombre del PDF emitido. Es null mientras el comprobante
+     * no ha sido aceptado, por eso las URLs devuelven null en vez de una ruta
+     * rota.
+     */
+    public function getPdfUrlAttribute(): ?string
     {
-        $filename = str_replace('.pdf', '', $this->documento);
+        $filename = $this->nombreArchivo();
 
-        return url("facturacion/pdf/{$filename}");
+        return $filename === null ? null : url("facturacion/pdf/{$filename}");
     }
 
-    public function getXmlUrlAttribute()
+    public function getXmlUrlAttribute(): ?string
     {
-        $filename = str_replace('.pdf', '', $this->documento);
+        $filename = $this->nombreArchivo();
 
-        return url("facturacion/xml/{$filename}");
+        return $filename === null ? null : url("facturacion/xml/{$filename}");
     }
 
-    public function getCdrUrlAttribute()
+    public function getCdrUrlAttribute(): ?string
     {
-        $filename = str_replace('.pdf', '', $this->documento);
+        $filename = $this->nombreArchivo();
 
-        return url("facturacion/cdr/{$filename}");
+        return $filename === null ? null : url("facturacion/cdr/{$filename}");
+    }
+
+    private function nombreArchivo(): ?string
+    {
+        if ($this->documento === null || trim($this->documento) === '') {
+            return null;
+        }
+
+        return str_replace('.pdf', '', $this->documento);
     }
 }

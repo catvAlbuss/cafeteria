@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Caja;
+use App\Models\Factura;
 use App\Models\Mesa;
 use App\Models\Pedido;
 use App\Models\User;
@@ -59,6 +60,13 @@ test('a table is released only after payment with an authorized pin', function (
         ->and($mesa->user_id)->toBeNull()
         ->and($pedido->estado)->toBe('pagado')
         ->and($pedido->caja_id)->toBe($caja->id);
+
+    // El cobro del mesero es un ticket interno: no genera comprobante ni deja
+    // datos fiscales en el pedido.
+    expect(Factura::query()->count())->toBe(0)
+        ->and($pedido->factura_numero)->toBeNull()
+        ->and($pedido->factura_estado)->toBeNull()
+        ->and($pedido->tipo_documento)->toBeNull();
 });
 
 test('an occupied table with unpaid orders cannot be released manually', function () {

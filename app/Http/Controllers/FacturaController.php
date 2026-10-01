@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Factura;
+use App\Services\CorrelativoService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Endroid\QrCode\Encoding\Encoding;
 use Endroid\QrCode\QrCode;
@@ -15,6 +16,7 @@ use Greenter\Model\Sale\Invoice;
 use Greenter\Model\Sale\Legend;
 use Greenter\Model\Sale\SaleDetail;
 use Greenter\See;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -24,65 +26,73 @@ class FacturaController extends Controller
 {
     private $see;
 
-   public function __construct()
-{
-    $this->see = new See;
-    $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
-    $this->see->setService(config('sunat.url'));
-    $this->see->setClaveSOL(
-        config('sunat.ruc'),
-        config('sunat.usuario_sol'),
-        config('sunat.clave_sol')
-    );
-}
+    public function __construct(
+        private readonly CorrelativoService $correlativos,
+    ) {
+        $this->see = new See;
+        $this->see->setCertificate($this->certificado());
+        $this->see->setService(config('sunat.url'));
+        $this->see->setClaveSOL(
+            config('sunat.ruc'),
+            config('sunat.usuario_sol'),
+            config('sunat.clave_sol')
+        );
+    }
+
+    /**
+     * Lee el certificado digital configurado. Falla con un mensaje claro si no
+     * existe, en lugar de propagar un error de tipo al iniciar la emision.
+     */
+    private function certificado(): string
+    {
+        $ruta = storage_path(config('sunat.certificado'));
+
+        if (! is_file($ruta)) {
+            throw new \RuntimeException("No se encontro el certificado digital en {$ruta}. Verifique SUNAT_CERT_PATH.");
+        }
+
+        $contenido = file_get_contents($ruta);
+
+        if ($contenido === false || $contenido === '') {
+            throw new \RuntimeException("El certificado digital en {$ruta} esta vacio o no se pudo leer.");
+        }
+
+        return $contenido;
+    }
 
     private function reservarCorrelativoYCrearFactura(string $serie, Request $request): Factura
     {
-        return DB::transaction(function () use ($serie, $request) {
-            $control = DB::table('correlativos_control')
-                ->where('serie', $serie)
-                ->lockForUpdate()
-                ->first();
+        // Siembra el contador desde las facturas existentes para no repetir
+        // un correlativo que SUNAT ya tenga registrado.
+        $this->correlativos->sembrarDesdeFacturas($serie);
 
-            if (! $control) {
-                $ultimoCorrelativo = Factura::where('serie', $serie)
-                    ->pluck('correlativo')
-                    ->max(fn ($correlativo) => (int) $correlativo) ?? 0;
+        $nuevoCorrelativo = $this->correlativos->siguiente($serie);
+        $cliente = $this->datosCliente($request);
 
-                DB::table('correlativos_control')->insert([
-                    'serie' => $serie,
-                    'ultimo_correlativo' => $ultimoCorrelativo,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-                $control = DB::table('correlativos_control')
-                    ->where('serie', $serie)
-                    ->lockForUpdate()
-                    ->first();
-            }
+        $factura = new Factura;
+        $factura->serie = $serie;
+        $factura->correlativo = $nuevoCorrelativo;
+        $factura->vendedor = $request->input('vendedor.nombre');
+        $factura->fecha_emitido = now();
+        $factura->Cliente = $cliente['razon_social'];
+        $factura->documento_cliente = $cliente['numero'];
 
-            $nuevoCorrelativo = $control->ultimo_correlativo + 1;
+        // `documento` es exclusivamente el nombre del PDF emitido. Antes de
+        // que SUNAT responde no hay archivo, asi que queda en null.
+        $factura->documento = null;
+        $factura->estado_sunat = 'procesando';
+        $factura->montototal = 0;
 
-            DB::table('correlativos_control')
-                ->where('serie', $serie)
-                ->update([
-                    'ultimo_correlativo' => $nuevoCorrelativo,
-                    'updated_at' => now(),
-                ]);
+        // La sede solo ordena la informacion para la UI: el correlativo es
+        // compartido por RUC, no por equipo.
+        $teamId = auth()->user()?->current_team_id;
+        if (is_int($teamId) && $teamId > 0) {
+            $factura->team_id = $teamId;
+        }
 
-            $factura = new Factura;
-            $factura->serie = $serie;
-            $factura->correlativo = $nuevoCorrelativo;
-            $factura->vendedor = $request->input('vendedor.nombre');
-            $factura->fecha_emitido = now();
-            $factura->Cliente = $request->input('client.razon_social') ?? $request->input('client.nombres');
-            $factura->documento = $request->input('client.ruc') ?? $request->input('client.dni') ?? '00000000';
-            $factura->estado_sunat = 'procesando';
-            $factura->montototal = 0;
-            $factura->save();
+        $factura->save();
 
-            return $factura;
-        });
+        return $factura;
     }
 
     public function generateInvoice(Request $request)
@@ -94,9 +104,11 @@ class FacturaController extends Controller
                 'incluidoigv' => 'boolean',
                 'client' => 'required|array',
                 'client.ruc' => 'required_if:tipo_documento,01',
-                'client.dni' => 'required_if:tipo_documento,03',
                 'client.razon_social' => 'required_if:tipo_documento,01',
-                'client.nombres' => 'required_if:tipo_documento,03',
+                // En boleta el DNI es opcional y el nombre nunca se usa: ambos
+                // los fija datosCliente().
+                'client.dni' => 'nullable|string',
+                'client.nombres' => 'nullable|string',
                 'client.direccion' => 'required|string',
                 'client.ubigeo' => 'required|string',
                 'items' => 'required|array|min:1',
@@ -108,33 +120,27 @@ class FacturaController extends Controller
                 'items.*.idproducto' => 'required|exists:platos,id',
             ]);
 
-           
-
             $company = new Company;
-            $company->setRuc('20000000001')
-                ->setRazonSocial('DOLCE CAFFE SAC')
-                ->setNombreComercial('DOLCE CAFFE')
+            $company->setRuc(config('sunat.ruc'))
+                ->setRazonSocial(config('sunat.razon_social'))
+                ->setNombreComercial(config('sunat.nombre_comercial'))
                 ->setAddress((new Address)
-
-                    ->setUbigueo('100101')
-                    ->setDepartamento('HUANUCO')
-                    ->setProvincia('HUANUCO')
-                    ->setDistrito('HUANUCO')
+                    ->setUbigueo(config('sunat.ubigeo'))
+                    ->setDepartamento(config('sunat.departamento'))
+                    ->setProvincia(config('sunat.provincia'))
+                    ->setDistrito(config('sunat.distrito'))
                     ->setUrbanizacion('-')
-                    ->setDireccion('JR. SIMON BOLIVAR NRO. 487 (A UNA CUADRA DE TIENDAS YOLU) HUANUCO - HUANUCO - HUANUCO')
-                    ->setCodLocal('0000'));
+                    ->setDireccion(config('sunat.direccion'))
+                    ->setCodLocal(config('sunat.cod_local')));
 
             // Configurar cliente
+            $datos = $this->datosCliente($request);
+
             $client = new Client;
-            if ($request->input('tipo_documento') === '01') {
-                $client->setTipoDoc('6')
-                    ->setNumDoc($request->input('client.ruc'))
-                    ->setRznSocial($request->input('client.razon_social'));
-            } else {
-                $client->setTipoDoc('1')
-                    ->setNumDoc($request->input('client.dni'))
-                    ->setRznSocial($request->input('client.nombres'));
-            }
+            $client->setTipoDoc($datos['tipo_doc'])
+                ->setNumDoc($datos['numero'])
+                ->setRznSocial($datos['razon_social']);
+
             $client->setAddress((new Address)
                 ->setUbigueo($request->input('client.ubigeo'))
                 ->setDepartamento($request->input('client.departamento'))
@@ -154,34 +160,40 @@ class FacturaController extends Controller
                 ->setTipoOperacion('0101')
                 ->setTipoDoc($request->input('tipo_documento'))
                 ->setSerie($serie)
-                ->setCorrelativo($correlativo)
+                ->setCorrelativo((string) $correlativo)
                 ->setFechaEmision(new \DateTime)
                 ->setFormaPago(new FormaPagoContado)
                 ->setTipoMoneda('PEN')
                 ->setCompany($company)
                 ->setClient($client);
 
-            // Procesar detalles
+            // Procesar detalles. SUNAT valida que MtoValorVenta sea exactamente
+            // MtoValorUnitario * Cantidad y que el IGV sea el 18% de la base, por
+            // eso la aritmetica va de la base hacia el total. Derivando la base
+            // con una division y luego repartiendo el IGV, el redondeo a dos
+            // decimales descuadra en la mayoria de los precios (por ejemplo
+            // 1.00 x 2 daba 0.85 * 2 != 1.69) y SUNAT rechaza la linea.
             $details = [];
-            $total = 0;
-            $totalIGV = 0;
+            $baseImponible = 0.0;
+            $impuestoTotal = 0.0;
+            $totalPagado = 0.0;
 
             $incluidoIgv = $request->input('incluidoigv', false);
+
             foreach ($request->input('items') as $item) {
-                $precioUnitario = floatval($item['unit_price']);
-                $cantidad = floatval($item['quantity']);
+                $cantidad = (float) $item['quantity'];
+                $precioUnitario = (float) $item['unit_price'];
 
                 if ($incluidoIgv) {
-                    $mtoPrecio = round($precioUnitario * $cantidad, 2);
-                    $valorVenta = round($mtoPrecio / 1.18, 2);
-                    $igv = round($mtoPrecio - $valorVenta, 2);
-                    $valorUnitario = round($valorVenta / $cantidad, 2);
-                    $precioUnitarioFinal = $precioUnitario;
-                } else {
-                    $valorUnitario = $precioUnitario;
+                    $valorUnitario = round($precioUnitario / 1.18, 2);
                     $valorVenta = round($valorUnitario * $cantidad, 2);
-                    $igv = 0;
-                    $precioUnitarioFinal = $precioUnitario;
+                    $igv = round($valorVenta * 0.18, 2);
+                    $mtoPrecioUnitario = round($valorVenta + $igv / $cantidad, 2);
+                } else {
+                    $valorUnitario = round($precioUnitario, 2);
+                    $valorVenta = round($valorUnitario * $cantidad, 2);
+                    $igv = 0.0;
+                    $mtoPrecioUnitario = $valorUnitario;
                 }
 
                 $detail = (new SaleDetail)
@@ -196,57 +208,66 @@ class FacturaController extends Controller
                     ->setIgv($igv)
                     ->setTipAfeIgv($incluidoIgv ? '10' : '20')
                     ->setTotalImpuestos($igv)
-                    ->setMtoPrecioUnitario($precioUnitarioFinal);
+                    ->setMtoPrecioUnitario($mtoPrecioUnitario);
 
                 $details[] = $detail;
-                $total += $valorVenta;
-                $totalIGV += $igv;
+                $baseImponible = round($baseImponible + $valorVenta, 2);
+                $impuestoTotal = round($impuestoTotal + $igv, 2);
+                $totalPagado = round($totalPagado + $valorVenta + $igv, 2);
             }
 
-            $totalVenta = round($total + $totalIGV, 2);
-
-            $invoice->setMtoOperGravadas($incluidoIgv ? $total : 0)
-                ->setMtoOperExoneradas($incluidoIgv ? 0 : $total)
-                ->setMtoIGV($totalIGV)
-                ->setTotalImpuestos($totalIGV)
-                ->setValorVenta($total)
-                ->setSubTotal($totalVenta)
-                ->setMtoImpVenta($totalVenta)
+            // El total del comprobante se reconstruye sumando las lineas ya
+            // cuadreadas, no multiplicando el precio original.
+            $invoice->setMtoOperGravadas($incluidoIgv ? $baseImponible : 0.0)
+                ->setMtoOperExoneradas($incluidoIgv ? 0.0 : $baseImponible)
+                ->setMtoIGV($impuestoTotal)
+                ->setTotalImpuestos($impuestoTotal)
+                ->setValorVenta($baseImponible)
+                ->setSubTotal($totalPagado)
+                ->setMtoImpVenta($totalPagado)
                 ->setDetails($details)
                 ->setLegends([
                     (new Legend)
                         ->setCode('1000')
-                        ->setValue($this->numberToWords($totalVenta)),
+                        ->setValue($this->numberToWords($totalPagado)),
                 ]);
 
-                       $filename = $invoice->getName();
+            $filename = $invoice->getName();
 
             if (Storage::exists("invoices/{$filename}.xml")) {
                 \Log::critical("Intento de sobrescribir un comprobante ya emitido: {$filename}");
                 throw new \Exception("Ya existe un comprobante emitido con el nombre {$filename}.");
             }
 
+            // El XML se firma y se guarda ANTES de enviarlo. Si la peticion se
+            // pierde o send() lanza una excepcion, este archivo es lo unico que
+            // deja constancia del numero que salio hacia SUNAT; leerlo despues
+            // del envio perderia esa evidencia.
+            Storage::makeDirectory('invoices');
+            $xmlFirmado = $this->see->getXmlSigned($invoice);
+            Storage::put("invoices/{$filename}.xml", $xmlFirmado);
+
             $result = $this->see->send($invoice);
 
             if ($result->isSuccess()) {
                 $cdr = $result->getCdrResponse();
 
-                Storage::makeDirectory('invoices');
                 Storage::makeDirectory('invoices/cdr');
-                Storage::put("invoices/{$filename}.xml", $this->see->getFactory()->getLastXml());
                 Storage::put("invoices/cdr/{$filename}.zip", $result->getCdrZip());
 
                 $vendedor = $request->input('vendedor.nombre');
-                $factura->montototal = $totalVenta;
+                $factura->montototal = $totalPagado;
                 $factura->documento = $filename.'.pdf';
                 $factura->estado_sunat = 'aceptado';
                 $factura->codigo_sunat = $cdr->getCode();
                 $factura->save();
 
+                $this->correlativos->registrarEstado($serie, 'aceptado', $filename);
+
                 try {
                     $this->generatePdfFromXml($filename, $vendedor);
                 } catch (\Throwable $e) {
-                    \Log::error("Comprobante {$filename} aceptado por SUNAT pero falló el PDF: " . $e->getMessage());
+                    \Log::error("Comprobante {$filename} aceptado por SUNAT pero falló el PDF: ".$e->getMessage());
                 }
 
                 $response = [
@@ -260,17 +281,18 @@ class FacturaController extends Controller
                     'xml_url' => url("facturacion/xml/{$filename}"),
                     'cdr_url' => url("facturacion/cdr/{$filename}"),
                 ];
-    } else {
+            } else {
 
+                $errorCode = $result->getError()->getCode();
+                $errorMessage = $result->getError()->getMessage();
+                $factura->montototal = $totalPagado;
+                $factura->documento = null;
+                $factura->estado_sunat = 'rechazado';
+                $factura->error_sunat = $errorMessage;
+                $factura->codigo_sunat = $errorCode ?: 'ERROR';
+                $factura->save();
 
-    $errorCode = $result->getError()->getCode();
-    $errorMessage = $result->getError()->getMessage();
-    $factura->montototal = $totalVenta;
-    $factura->documento = 'rechazado.pdf';
-    $factura->estado_sunat = 'rechazado';
-    $factura->error_sunat = $errorMessage;
-    $factura->codigo_sunat = $errorCode ?: 'ERROR';
-    $factura->save();
+                $this->correlativos->registrarEstado($serie, 'rechazado', $filename);
 
                 \Log::error('SUNAT rechazó el comprobante: '.$errorMessage, [
                     'serie' => $serie,
@@ -278,22 +300,21 @@ class FacturaController extends Controller
                     'tipo_documento' => $request->input('tipo_documento'),
                 ]);
 
+                \Log::error('SUNAT rechazó el comprobante', [
+                    'codigo' => $errorCode,
+                    'mensaje' => $errorMessage,
+                    'serie' => $serie,
+                    'correlativo' => $correlativo,
+                    'tipo_documento' => $request->input('tipo_documento'),
+                ]);
 
-    \Log::error('SUNAT rechazó el comprobante', [
-        'codigo' => $errorCode,
-        'mensaje' => $errorMessage,
-        'serie' => $serie,
-        'correlativo' => $correlativo,
-        'tipo_documento' => $request->input('tipo_documento'),
-    ]);
-
-    $response = [
-        'success' => false,
-        'error' => $errorMessage,
-        'codigo' => $errorCode,
-        'factura_id' => $factura->idfactura,
-    ];
-}
+                $response = [
+                    'success' => false,
+                    'error' => $errorMessage,
+                    'codigo' => $errorCode,
+                    'factura_id' => $factura->idfactura,
+                ];
+            }
 
             return response()->json($response);
         } catch (ValidationException $e) {
@@ -307,6 +328,8 @@ class FacturaController extends Controller
                 $factura->estado_sunat = 'error_tecnico';
                 $factura->error_sunat = $e->getMessage();
                 $factura->save();
+
+                $this->correlativos->registrarEstado($factura->serie, 'error_tecnico', $filename ?? null);
             }
 
             \Log::error('Error generando comprobante: '.$e->getMessage(), [
@@ -461,92 +484,177 @@ class FacturaController extends Controller
 
     public function downloadXml($filename)
     {
-        $path = "invoices/{$filename}.xml";
-        if (! Storage::exists($path)) {
-            return response()->json(['success' => false, 'error' => 'XML no encontrado'], 404);
-        }
-
-        return Storage::download($path);
+        return $this->descargarComprobante($filename, "invoices/{$filename}.xml", 'XML');
     }
 
     public function downloadCdr($filename)
     {
-        $path = "invoices/cdr/{$filename}.zip";
-        if (! Storage::exists($path)) {
-            return response()->json(['success' => false, 'error' => 'CDR no encontrado'], 404);
-        }
-
-        return Storage::download($path);
+        return $this->descargarComprobante($filename, "invoices/cdr/{$filename}.zip", 'CDR');
     }
 
     public function downloadPdf($filename)
     {
-        $path = "invoices/{$filename}.pdf";
-        if (! Storage::exists($path)) {
-            return response()->json(['success' => false, 'error' => 'PDF no encontrado'], 404);
+        return $this->descargarComprobante($filename, "invoices/{$filename}.pdf", 'PDF');
+    }
+
+    /**
+     * Sirve un archivo de comprobante solo si pertenece a la sede actual. El
+     * nombre del archivo es el RUC seguido de la serie y el correlativo, asi que
+     * sin esta comprobacion cualquier usuario autenticado podria descargar
+     * comprobantes de otra sede por simple intuicion.
+     */
+    private function descargarComprobante(string $filename, string $ruta, string $tipo): mixed
+    {
+        if (! Storage::exists($ruta)) {
+            return response()->json(['success' => false, 'error' => $tipo.' no encontrado'], 404);
         }
 
-        return Storage::download($path);
+        $pertenece = Factura::where('documento', $filename.'.pdf')
+            ->where(function ($query) {
+                $query->whereNull('team_id')
+                    ->orWhere('team_id', auth()->user()?->current_team_id);
+            })
+            ->exists();
+
+        if (! $pertenece) {
+            abort(403, 'Este comprobante no pertenece a tu sede.');
+        }
+
+        return Storage::download($ruta);
     }
 
     public function buscarClienteruc(Request $request, $ruccliente)
     {
-        $token = 'apis-token-10424.XUaCDKAX2Wgac4w6lR7-u39Ael3LTdCc';
-        $curl = curl_init();
-        curl_setopt_array($curl, [
-            CURLOPT_URL => 'https://api.apis.net.pe/v2/sunat/ruc?numero='.$ruccliente,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_SSL_VERIFYPEER => 0,
-            CURLOPT_CUSTOMREQUEST => 'GET',
-            CURLOPT_HTTPHEADER => [
-                'Referer: http://apis.net.pe/api-ruc',
-                'Authorization: Bearer '.$token,
-            ],
-        ]);
-        $response = curl_exec($curl);
-        curl_close($curl);
-
-        return response()->json(json_decode($response));
+        return $this->consultarApis('ruc', $ruccliente);
     }
 
     public function buscarClientedni(Request $request, $dnicliente)
     {
-        $token = 'apis-token-10424.XUaCDKAX2Wgac4w6lR7-u39Ael3LTdCc';
+        return $this->consultarApis('reniec/dni', $dnicliente);
+    }
+
+    /**
+     * Resuelve los datos del cliente segun el tipo de comprobante. Es la unica
+     * fuente de verdad: la usan tanto la fila de `facturas` como el XML que se
+     * manda a SUNAT, para que no puedan divergir.
+     *
+     * Factura (01): RUC y razon social obligatorios, tipo de documento 6.
+     *
+     * Boleta (03): la razon social es siempre CLIENTES VARIOS y el DNI es
+     * opcional; si no se informa se usa 00000000. El nombre que escriba el
+     * cajero se descarta a proposito: en una cafeteria la boleta no identifica
+     * a la persona, y permitirlo abriria la puerta a comprobantes con datos
+     * inconsistentes frente a lo que el RENIEC devuelve.
+     *
+     * @return array{tipo_doc: string, numero: string, razon_social: string}
+     */
+    private function datosCliente(Request $request): array
+    {
+        if ($request->input('tipo_documento') === '01') {
+            return [
+                'tipo_doc' => '6',
+                'numero' => (string) $request->input('client.ruc'),
+                'razon_social' => (string) $request->input('client.razon_social'),
+            ];
+        }
+
+        $dni = trim((string) $request->input('client.dni'));
+
+        return [
+            'tipo_doc' => '1',
+            'numero' => $dni === '' ? '00000000' : $dni,
+            'razon_social' => 'CLIENTES VARIOS',
+        ];
+    }
+
+    /**
+     * Consulta RUC o DNI al proveedor externo usando el token de configuracion.
+     */
+    private function consultarApis(string $recurso, string $numero): JsonResponse
+    {
+        $token = config('sunat.token_consulta');
+
+        if (! $token) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Falta configurar SUNAT_TOKEN_CONSULTA en el archivo .env',
+            ], 500);
+        }
+
         $curl = curl_init();
         curl_setopt_array($curl, [
-            CURLOPT_URL => 'https://api.apis.net.pe/v2/reniec/dni?numero='.$dnicliente,
+            CURLOPT_URL => 'https://api.apis.net.pe/v2/'.$recurso.'?numero='.urlencode($numero),
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_SSL_VERIFYPEER => 0,
+            // La peticion viaja con el token de la API: verificar el
+            // certificado del servidor es obligatorio.
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 20,
             CURLOPT_CUSTOMREQUEST => 'GET',
             CURLOPT_HTTPHEADER => [
-                'Referer: https://apis.net.pe/consulta-dni-api',
+                'Referer: https://apis.net.pe/api-ruc',
                 'Authorization: Bearer '.$token,
             ],
         ]);
+
         $response = curl_exec($curl);
+        $error = curl_error($curl);
         curl_close($curl);
 
-        return response()->json(json_decode($response));
+        if (! is_string($response)) {
+            \Log::error('Fallo consultando el proveedor de RUC/DNI: '.$error);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'No se pudo consultar el servicio externo: '.($error ?: 'respuesta vacia'),
+            ], 502);
+        }
+
+        return response()->json(json_decode($response, true));
     }
 
-    public function correlativoActual()
+    public function correlativoActual(Request $request)
     {
-        $correlativo = Factura::max('correlativo');
+        $serie = $request->input('serie', 'B001');
 
-        return response()->json(['correlativo' => $correlativo]);
+        $control = DB::table('correlativos_control')
+            ->where('ruc', config('sunat.ruc'))
+            ->where('serie', $serie)
+            ->first();
+
+        $correlativo = $control
+            ? (int) $control->ultimo_correlativo
+            : (int) (Factura::where('serie', $serie)->max('correlativo') ?? 0);
+
+        return response()->json([
+            'serie' => $serie,
+            'correlativo' => $correlativo,
+            'estado' => $control->estado ?? null,
+            'documento' => $control->documento ?? null,
+        ]);
     }
 
     public function nuevoCorrelativo(Request $request)
     {
         $serie = $request->input('serie', 'B001');
-        $correlativo = Factura::where('serie', $serie)->max('correlativo');
 
-        return response()->json(['correlativo' => ($correlativo ?? 0) + 1]);
+        $this->correlativos->sembrarDesdeFacturas($serie);
+
+        return response()->json([
+            'serie' => $serie,
+            'correlativo' => $this->correlativos->proximo($serie),
+        ]);
     }
 
-    public function verificarCorreltaivo($correlativo)
+    public function verificarCorreltaivo(Request $request, $correlativo)
     {
-        $factura = Factura::where('correlativo', $correlativo)->first();
+        $serie = $request->input('serie');
+
+        $factura = Factura::query()
+            ->when($serie, fn ($query) => $query->where('serie', $serie))
+            ->where('correlativo', $correlativo)
+            ->first();
 
         return response()->json(['existe' => $factura !== null]);
     }

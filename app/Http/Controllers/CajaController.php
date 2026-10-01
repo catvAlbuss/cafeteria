@@ -8,12 +8,17 @@ use App\Models\Mesa;
 use App\Models\MovimientoInventario;
 use App\Models\Pedido;
 use App\Models\Plato;
+use App\Services\CorrelativoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class CajaController extends Controller
 {
+    public function __construct(
+        private readonly CorrelativoService $correlativos,
+    ) {}
+
     public function index()
     {
         $teamId = auth()->user()->current_team_id;
@@ -36,11 +41,16 @@ class CajaController extends Controller
             ->where('estado', 'Abierta')
             ->first();
 
+        // El proximo boleta se muestra junto al numero de pedido para que el
+        // cajero concilie contra SUNAT y no solo contra el turno de caja.
+        $this->correlativos->sembrarDesdeFacturas('B001');
+
         return Inertia::render('dinero/caja', [
             'platos' => $platos,
             'mesas' => $mesas->values()->all(),
             'pedidos' => $pedidos->values()->all(),
             'caja' => $caja,
+            'proximoBoleta' => 'B001-'.$this->correlativos->proximo('B001'),
         ]);
     }
 
@@ -144,7 +154,7 @@ class CajaController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            \Log::error('❌ Error al registrar pedido:', [
+            \Log::error('âŒ Error al registrar pedido:', [
                 'mensaje' => $e->getMessage(),
                 'linea' => $e->getLine(),
                 'archivo' => $e->getFile(),
@@ -204,7 +214,7 @@ class CajaController extends Controller
                     'referencia_type' => 'pedido',
                     'referencia_id' => $pedido->id,
                     'user_id' => $request->user()->id,
-                    'observaciones' => 'Anulación de venta #'.$pedido->numero,
+                    'observaciones' => 'AnulaciÃ³n de venta #'.$pedido->numero,
                 ]);
             }
 
@@ -221,9 +231,9 @@ class CajaController extends Controller
                 $caja->total_ventas_caja = max(0, (float) $caja->total_ventas_caja - (float) $pedido->total);
                 $caja->total_pedidos = max(0, (int) $caja->total_pedidos - 1);
 
-                // Solo se devuelve el número de pedido si la venta anulada es la
-                // última registrada en la caja; si hay ventas posteriores, la
-                // secuencia sigue para no repetir un número ya emitido.
+                // Solo se devuelve el nÃºmero de pedido si la venta anulada es la
+                // Ãºltima registrada en la caja; si hay ventas posteriores, la
+                // secuencia sigue para no repetir un nÃºmero ya emitido.
                 if (
                     $pedido->numero_pedido !== null
                     && (int) $pedido->numero_pedido === (int) $caja->contador_pedidos
