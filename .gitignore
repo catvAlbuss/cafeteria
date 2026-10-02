@@ -29,3 +29,5 @@ yarn-error.log
 AGENTS.md
 dev.sh
 "/public/build" 
+*.sql
+backup_*.sql
