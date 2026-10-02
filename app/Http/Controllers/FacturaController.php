@@ -24,17 +24,17 @@ class FacturaController extends Controller
 {
     private $see;
 
-   public function __construct()
-{
-    $this->see = new See;
-    $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
-    $this->see->setService(config('sunat.url'));
-    $this->see->setClaveSOL(
-        config('sunat.ruc'),
-        config('sunat.usuario_sol'),
-        config('sunat.clave_sol')
-    );
-}
+    public function __construct()
+    {
+        $this->see = new See;
+        $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
+        $this->see->setService(config('sunat.url'));
+        $this->see->setClaveSOL(
+            config('sunat.ruc'),
+            config('sunat.usuario_sol'),
+            config('sunat.clave_sol')
+        );
+    }
 
     private function reservarCorrelativoYCrearFactura(string $serie, Request $request): Factura
     {
@@ -108,33 +108,52 @@ class FacturaController extends Controller
                 'items.*.idproducto' => 'required|exists:platos,id',
             ]);
 
-           
+            // ✅ Leer configuración de la BD (con fallback a hardcoded)
+            $teamId = auth()->user()->current_team_id;
+            $config = \App\Models\ConfiguracionFacturacion::where('team_id', $teamId)->first();
 
-// ✅ Leer configuración de la BD (con fallback a hardcoded)
-$teamId = auth()->user()->current_team_id;
-$config = \App\Models\ConfiguracionFacturacion::where('team_id', $teamId)->first();
+            $ruc = $config?->ruc ?? '20607955990';
+            $razonSocial = $config?->razon_social ?? 'SEVEN HEART SOCIEDAD ANONIMA CERRADA';
+            $nombreComercial = $config?->nombre_comercial ?? 'SEVEN HEART';
+            $direccion = $config?->direccion ?? 'JR. SIMON BOLIVAR NRO. 487 (A UNA CUADRA DE TIENDAS YOLU) HUANUCO - HUANUCO - HUANUCO';
+            $ubigeo = $config?->ubigeo ?? '100101';
+            $departamento = $config?->departamento ?? 'HUANUCO';
+            $provincia = $config?->provincia ?? 'HUANUCO';
+            $distrito = $config?->distrito ?? 'HUANUCO';
 
-$ruc = $config?->ruc ?? '20607955990';
-$razonSocial = $config?->razon_social ?? 'SEVEN HEART SOCIEDAD ANONIMA CERRADA';
-$nombreComercial = $config?->nombre_comercial ?? 'SEVEN HEART';
-$direccion = $config?->direccion ?? 'JR. SIMON BOLIVAR NRO. 487 (A UNA CUADRA DE TIENDAS YOLU) HUANUCO - HUANUCO - HUANUCO';
-$ubigeo = $config?->ubigeo ?? '100101';
-$departamento = $config?->departamento ?? 'HUANUCO';
-$provincia = $config?->provincia ?? 'HUANUCO';
-$distrito = $config?->distrito ?? 'HUANUCO';
+            // ✅ Configurar certificado y SOL desde BD (con fallback a .env)
+            if ($config) {
+                // Certificado desde la BD (si existe)
+                if ($config->certificado_path) {
+                    $certPath = storage_path('app/certificates/'.$config->certificado_path);
+                    if (file_exists($certPath)) {
+                        $this->see->setCertificate(file_get_contents($certPath));
+                    }
+                }
 
-$company = new Company;
-$company->setRuc($ruc)
-    ->setRazonSocial($razonSocial)
-    ->setNombreComercial($nombreComercial)
-    ->setAddress((new Address)
-        ->setUbigueo($ubigeo)
-        ->setDepartamento($departamento)
-        ->setProvincia($provincia)
-        ->setDistrito($distrito)
-        ->setUrbanizacion('-')
-        ->setDireccion($direccion)
-        ->setCodLocal('0000'));
+                // Credenciales SOL desde la BD
+                if ($config->sol_usuario && $config->sol_clave) {
+                    $this->see->setClaveSOL($config->ruc, $config->sol_usuario, $config->sol_clave);
+                }
+
+                // URL de SUNAT desde la BD
+                if ($config->sunat_url) {
+                    $this->see->setService($config->sunat_url);
+                }
+            }
+
+            $company = new Company;
+            $company->setRuc($ruc)
+                ->setRazonSocial($razonSocial)
+                ->setNombreComercial($nombreComercial)
+                ->setAddress((new Address)
+                    ->setUbigueo($ubigeo)
+                    ->setDepartamento($departamento)
+                    ->setProvincia($provincia)
+                    ->setDistrito($distrito)
+                    ->setUrbanizacion('-')
+                    ->setDireccion($direccion)
+                    ->setCodLocal('0000'));
 
             // Configurar cliente
             $client = new Client;
@@ -231,7 +250,7 @@ $company->setRuc($ruc)
                         ->setValue($this->numberToWords($totalVenta)),
                 ]);
 
-                       $filename = $invoice->getName();
+            $filename = $invoice->getName();
 
             if (Storage::exists("invoices/{$filename}.xml")) {
                 \Log::critical("Intento de sobrescribir un comprobante ya emitido: {$filename}");
@@ -258,7 +277,7 @@ $company->setRuc($ruc)
                 try {
                     $this->generatePdfFromXml($filename, $vendedor);
                 } catch (\Throwable $e) {
-                    \Log::error("Comprobante {$filename} aceptado por SUNAT pero falló el PDF: " . $e->getMessage());
+                    \Log::error("Comprobante {$filename} aceptado por SUNAT pero falló el PDF: ".$e->getMessage());
                 }
 
                 $response = [
@@ -272,17 +291,15 @@ $company->setRuc($ruc)
                     'xml_url' => url("facturacion/xml/{$filename}"),
                     'cdr_url' => url("facturacion/cdr/{$filename}"),
                 ];
-    } else {
-
-
-    $errorCode = $result->getError()->getCode();
-    $errorMessage = $result->getError()->getMessage();
-    $factura->montototal = $totalVenta;
-    $factura->documento = 'rechazado.pdf';
-    $factura->estado_sunat = 'rechazado';
-    $factura->error_sunat = $errorMessage;
-    $factura->codigo_sunat = $errorCode ?: 'ERROR';
-    $factura->save();
+            } else {
+                $errorCode = $result->getError()->getCode();
+                $errorMessage = $result->getError()->getMessage();
+                $factura->montototal = $totalVenta;
+                $factura->documento = 'rechazado.pdf';
+                $factura->estado_sunat = 'rechazado';
+                $factura->error_sunat = $errorMessage;
+                $factura->codigo_sunat = $errorCode ?: 'ERROR';
+                $factura->save();
 
                 \Log::error('SUNAT rechazó el comprobante: '.$errorMessage, [
                     'serie' => $serie,
@@ -290,36 +307,35 @@ $company->setRuc($ruc)
                     'tipo_documento' => $request->input('tipo_documento'),
                 ]);
 
+                \Log::error('SUNAT rechazó el comprobante', [
+                    'codigo' => $errorCode,
+                    'mensaje' => $errorMessage,
+                    'serie' => $serie,
+                    'correlativo' => $correlativo,
+                    'tipo_documento' => $request->input('tipo_documento'),
+                ]);
 
-    \Log::error('SUNAT rechazó el comprobante', [
-        'codigo' => $errorCode,
-        'mensaje' => $errorMessage,
-        'serie' => $serie,
-        'correlativo' => $correlativo,
-        'tipo_documento' => $request->input('tipo_documento'),
-    ]);
-
-    $response = [
-        'success' => false,
-        'error' => $errorMessage,
-        'codigo' => $errorCode,
-        'factura_id' => $factura->idfactura,
-    ];
-}
+                $response = [
+                    'success' => false,
+                    'error' => $errorMessage,
+                    'codigo' => $errorCode,
+                    'factura_id' => $factura->idfactura,
+                ];
+            }
 
             return response()->json($response);
-      } catch (ValidationException $e) {
-    \Log::warning('Validación falló al generar comprobante', [
-        'errors' => $e->errors(),
-        'input' => $request->except(['authorization_pin']),
-    ]);
+        } catch (ValidationException $e) {
+            \Log::warning('Validación falló al generar comprobante', [
+                'errors' => $e->errors(),
+                'input' => $request->except(['authorization_pin']),
+            ]);
 
-    return response()->json([
-        'success' => false,
-        'error' => 'Error de validación',
-        'errors' => $e->errors(),
-    ], 422);
-} catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Error de validación',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
             if (isset($factura) && $factura->exists) {
                 $factura->estado_sunat = 'error_tecnico';
                 $factura->error_sunat = $e->getMessage();
