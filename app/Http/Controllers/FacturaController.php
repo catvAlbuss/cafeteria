@@ -36,54 +36,66 @@ class FacturaController extends Controller
         );
     }
 
-    private function reservarCorrelativoYCrearFactura(string $serie, Request $request): Factura
-    {
-        return DB::transaction(function () use ($serie, $request) {
+private function reservarCorrelativoYCrearFactura(string $serie, Request $request): Factura
+{
+    return DB::transaction(function () use ($serie, $request) {
+        
+        $teamId = auth()->user()->current_team_id;
+
+     
+        $control = DB::table('correlativos_control')
+            ->where('team_id', $teamId)
+            ->where('serie', $serie)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $control) {
+          
+            $ultimoCorrelativo = Factura::where('team_id', $teamId)
+                ->where('serie', $serie)
+                ->pluck('correlativo')
+                ->max(fn ($correlativo) => (int) $correlativo) ?? 0;
+
+            DB::table('correlativos_control')->insert([
+                'team_id' => $teamId,
+                'serie' => $serie,
+                'ultimo_correlativo' => $ultimoCorrelativo,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             $control = DB::table('correlativos_control')
+                ->where('team_id', $teamId)
                 ->where('serie', $serie)
                 ->lockForUpdate()
                 ->first();
+        }
 
-            if (! $control) {
-                $ultimoCorrelativo = Factura::where('serie', $serie)
-                    ->pluck('correlativo')
-                    ->max(fn ($correlativo) => (int) $correlativo) ?? 0;
+        $nuevoCorrelativo = $control->ultimo_correlativo + 1;
 
-                DB::table('correlativos_control')->insert([
-                    'serie' => $serie,
-                    'ultimo_correlativo' => $ultimoCorrelativo,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-                $control = DB::table('correlativos_control')
-                    ->where('serie', $serie)
-                    ->lockForUpdate()
-                    ->first();
-            }
+        
+        DB::table('correlativos_control')
+            ->where('team_id', $teamId)
+            ->where('serie', $serie)
+            ->update([
+                'ultimo_correlativo' => $nuevoCorrelativo,
+                'updated_at' => now(),
+            ]);
 
-            $nuevoCorrelativo = $control->ultimo_correlativo + 1;
+        $factura = new Factura;
+        $factura->serie = $serie;
+        $factura->correlativo = $nuevoCorrelativo;
+        $factura->vendedor = $request->input('vendedor.nombre');
+        $factura->fecha_emitido = now();
+        $factura->Cliente = $request->input('client.razon_social') ?? $request->input('client.nombres');
+        $factura->documento = $request->input('client.ruc') ?? $request->input('client.dni') ?? '00000000';
+        $factura->estado_sunat = 'procesando';
+        $factura->montototal = 0;
+        $factura->save();
 
-            DB::table('correlativos_control')
-                ->where('serie', $serie)
-                ->update([
-                    'ultimo_correlativo' => $nuevoCorrelativo,
-                    'updated_at' => now(),
-                ]);
-
-            $factura = new Factura;
-            $factura->serie = $serie;
-            $factura->correlativo = $nuevoCorrelativo;
-            $factura->vendedor = $request->input('vendedor.nombre');
-            $factura->fecha_emitido = now();
-            $factura->Cliente = $request->input('client.razon_social') ?? $request->input('client.nombres');
-            $factura->documento = $request->input('client.ruc') ?? $request->input('client.dni') ?? '00000000';
-            $factura->estado_sunat = 'procesando';
-            $factura->montototal = 0;
-            $factura->save();
-
-            return $factura;
-        });
-    }
+        return $factura;
+    });
+}
 
     public function generateInvoice(Request $request)
     {
