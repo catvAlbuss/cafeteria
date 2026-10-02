@@ -110,17 +110,30 @@ class FacturaController extends Controller
 
            
 
-            $company = new Company;
-$company->setRuc('20607955990')
-    ->setRazonSocial('SEVEN HEART SOCIEDAD ANONIMA CERRADA')
-    ->setNombreComercial('SEVEN HEART')
+// ✅ Leer configuración de la BD (con fallback a hardcoded)
+$teamId = auth()->user()->current_team_id;
+$config = \App\Models\ConfiguracionFacturacion::where('team_id', $teamId)->first();
+
+$ruc = $config?->ruc ?? '20607955990';
+$razonSocial = $config?->razon_social ?? 'SEVEN HEART SOCIEDAD ANONIMA CERRADA';
+$nombreComercial = $config?->nombre_comercial ?? 'SEVEN HEART';
+$direccion = $config?->direccion ?? 'JR. SIMON BOLIVAR NRO. 487 (A UNA CUADRA DE TIENDAS YOLU) HUANUCO - HUANUCO - HUANUCO';
+$ubigeo = $config?->ubigeo ?? '100101';
+$departamento = $config?->departamento ?? 'HUANUCO';
+$provincia = $config?->provincia ?? 'HUANUCO';
+$distrito = $config?->distrito ?? 'HUANUCO';
+
+$company = new Company;
+$company->setRuc($ruc)
+    ->setRazonSocial($razonSocial)
+    ->setNombreComercial($nombreComercial)
     ->setAddress((new Address)
-        ->setUbigueo('100101')
-        ->setDepartamento('HUANUCO')
-        ->setProvincia('HUANUCO')
-        ->setDistrito('HUANUCO')
+        ->setUbigueo($ubigeo)
+        ->setDepartamento($departamento)
+        ->setProvincia($provincia)
+        ->setDistrito($distrito)
         ->setUrbanizacion('-')
-        ->setDireccion('JR. SIMON BOLIVAR NRO. 487 (A UNA CUADRA DE TIENDAS YOLU) HUANUCO - HUANUCO - HUANUCO')
+        ->setDireccion($direccion)
         ->setCodLocal('0000'));
 
             // Configurar cliente
