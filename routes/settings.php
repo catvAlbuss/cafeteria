@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Settings\ConfiguracionFacturacionController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Settings\SecurityController;
 use App\Http\Controllers\Teams\TeamController;
@@ -28,6 +29,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('user-password.update');
 
     Route::inertia('settings/appearance', 'settings/appearance')->name('appearance.edit');
+
+    // ============================================================
+    // Configuración de Empresa (Facturación Electrónica)
+    // ⚠️ FUERA de EnsureTeamMembership porque la URL no tiene {team}
+    // El controlador valida el team con current_team_id
+    // ============================================================
+    Route::get('settings/empresa', [ConfiguracionFacturacionController::class, 'edit'])
+        ->name('empresa.edit');
+    Route::patch('settings/empresa', [ConfiguracionFacturacionController::class, 'update'])
+        ->name('empresa.update');
 
     Route::get('settings/teams', [TeamController::class, 'index'])->name('teams.index');
     Route::post('settings/teams', [TeamController::class, 'store'])->name('teams.store');

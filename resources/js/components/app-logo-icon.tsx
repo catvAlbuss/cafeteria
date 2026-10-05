@@ -4,7 +4,7 @@ export default function AppLogoIcon(
     props: ImgHTMLAttributes<HTMLImageElement>,
 ) {
     return (
-        <img src="./logo.png" alt="Logo de la Aplicación" {...props} />
+          <img src="/img/logoTiket.png" alt="Dolce Caffé" {...props} />
         // <svg {...props} viewBox="0 0 40 42" xmlns="http://www.w3.org/2000/svg">
         //     <path
         //         fillRule="evenodd"

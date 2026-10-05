@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ConfiguracionFacturacion extends Model
 {
@@ -23,6 +24,7 @@ class ConfiguracionFacturacion extends Model
         'serie_factura',
         'serie_boleta',
         'certificado_path',
+        'logo_path',        // <-- AGREGADO: Para el logo del PDF
         'sol_usuario',
         'sol_clave',
         'sunat_url',
@@ -30,6 +32,14 @@ class ConfiguracionFacturacion extends Model
     ];
 
     protected $casts = [
-        'sol_clave' => 'encrypted',
+        'sol_clave' => 'encrypted', // Encripta automáticamente al guardar/leer
     ];
+
+    /**
+     * Relación con el Team (Empresa)
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(Team::class);
+    }
 }

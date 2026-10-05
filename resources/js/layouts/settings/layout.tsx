@@ -9,33 +9,20 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import { index as teams } from '@/routes/teams';
+import { edit as editEmpresa } from '@/routes/empresa';
 import type { NavItem } from '@/types';
 
 const sidebarNavItems: NavItem[] = [
-    {
-        title: 'Profile',
-        href: edit(),
-        icon: null,
-    },
-    {
-        title: 'Security',
-        href: editSecurity(),
-        icon: null,
-    },
-    {
-        title: 'Teams',
-        href: teams(),
-        icon: null,
-    },
-    {
-        title: 'Appearance',
-        href: editAppearance(),
-        icon: null,
-    },
+    { title: 'Profile', href: edit(), icon: null },
+    { title: 'Security', href: editSecurity(), icon: null },
+    { title: 'Empresa', href: editEmpresa(), icon: null },
+    { title: 'Teams', href: teams(), icon: null },
+    { title: 'Appearance', href: editAppearance(), icon: null },
 ];
 
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
+    const isEmpresaPage = isCurrentOrParentUrl('/settings/empresa');
 
     return (
         <div className="px-4 py-6">
@@ -44,10 +31,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                 description="Manage your profile and account settings"
             />
 
-            <div className="flex flex-col lg:flex-row lg:space-x-12">
-                <aside className="w-full max-w-xl lg:w-48">
+            <div className="flex flex-col lg:flex-row lg:gap-12">
+                {/* Sidebar: ancho fijo */}
+                <aside className="shrink-0 w-full lg:w-48">
                     <nav
-                        className="flex flex-col space-y-1 space-x-0"
+                        className="flex flex-col space-y-1"
                         aria-label="Settings"
                     >
                         {sidebarNavItems.map((item, index) => (
@@ -73,8 +61,12 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
                 <Separator className="my-6 lg:hidden" />
 
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">
+                {/* Contenido: empieza justo al lado del sidebar (sin centrar) */}
+                <div className={cn(
+                    'flex-1 min-w-0',
+                    isEmpresaPage ? 'lg:max-w-4xl' : 'max-w-xl'
+                )}>
+                    <section className="space-y-12">
                         {children}
                     </section>
                 </div>

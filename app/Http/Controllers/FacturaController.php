@@ -26,6 +26,7 @@ class FacturaController extends Controller
 
     public function __construct()
     {
+        // MANTENEMOS TU CONSTRUCTOR ORIGINAL COMO RESPALDO GLOBAL
         $this->see = new See;
         $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
         $this->see->setService(config('sunat.url'));
@@ -36,66 +37,63 @@ class FacturaController extends Controller
         );
     }
 
-private function reservarCorrelativoYCrearFactura(string $serie, Request $request): Factura
-{
-    return DB::transaction(function () use ($serie, $request) {
-        
-        $teamId = auth()->user()->current_team_id;
-
-     
-        $control = DB::table('correlativos_control')
-            ->where('team_id', $teamId)
-            ->where('serie', $serie)
-            ->lockForUpdate()
-            ->first();
-
-        if (! $control) {
-          
-            $ultimoCorrelativo = Factura::where('team_id', $teamId)
-                ->where('serie', $serie)
-                ->pluck('correlativo')
-                ->max(fn ($correlativo) => (int) $correlativo) ?? 0;
-
-            DB::table('correlativos_control')->insert([
-                'team_id' => $teamId,
-                'serie' => $serie,
-                'ultimo_correlativo' => $ultimoCorrelativo,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+    private function reservarCorrelativoYCrearFactura(string $serie, Request $request): Factura
+    {
+        return DB::transaction(function () use ($serie, $request) {
+            
+            $teamId = auth()->user()->current_team_id;
 
             $control = DB::table('correlativos_control')
                 ->where('team_id', $teamId)
                 ->where('serie', $serie)
                 ->lockForUpdate()
                 ->first();
-        }
 
-        $nuevoCorrelativo = $control->ultimo_correlativo + 1;
+            if (! $control) {
+                $ultimoCorrelativo = Factura::where('team_id', $teamId)
+                    ->where('serie', $serie)
+                    ->pluck('correlativo')
+                    ->max(fn ($correlativo) => (int) $correlativo) ?? 0;
 
-        
-        DB::table('correlativos_control')
-            ->where('team_id', $teamId)
-            ->where('serie', $serie)
-            ->update([
-                'ultimo_correlativo' => $nuevoCorrelativo,
-                'updated_at' => now(),
-            ]);
+                DB::table('correlativos_control')->insert([
+                    'team_id' => $teamId,
+                    'serie' => $serie,
+                    'ultimo_correlativo' => $ultimoCorrelativo,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
-        $factura = new Factura;
-        $factura->serie = $serie;
-        $factura->correlativo = $nuevoCorrelativo;
-        $factura->vendedor = $request->input('vendedor.nombre');
-        $factura->fecha_emitido = now();
-        $factura->Cliente = $request->input('client.razon_social') ?? $request->input('client.nombres');
-        $factura->documento = $request->input('client.ruc') ?? $request->input('client.dni') ?? '00000000';
-        $factura->estado_sunat = 'procesando';
-        $factura->montototal = 0;
-        $factura->save();
+                $control = DB::table('correlativos_control')
+                    ->where('team_id', $teamId)
+                    ->where('serie', $serie)
+                    ->lockForUpdate()
+                    ->first();
+            }
 
-        return $factura;
-    });
-}
+            $nuevoCorrelativo = $control->ultimo_correlativo + 1;
+
+            DB::table('correlativos_control')
+                ->where('team_id', $teamId)
+                ->where('serie', $serie)
+                ->update([
+                    'ultimo_correlativo' => $nuevoCorrelativo,
+                    'updated_at' => now(),
+                ]);
+
+            $factura = new Factura;
+            $factura->serie = $serie;
+            $factura->correlativo = $nuevoCorrelativo;
+            $factura->vendedor = $request->input('vendedor.nombre');
+            $factura->fecha_emitido = now();
+            $factura->Cliente = $request->input('client.razon_social') ?? $request->input('client.nombres');
+            $factura->documento = $request->input('client.ruc') ?? $request->input('client.dni') ?? '00000000';
+            $factura->estado_sunat = 'procesando';
+            $factura->montototal = 0;
+            $factura->save();
+
+            return $factura;
+        });
+    }
 
     public function generateInvoice(Request $request)
     {
@@ -120,11 +118,12 @@ private function reservarCorrelativoYCrearFactura(string $serie, Request $reques
                 'items.*.idproducto' => 'required|exists:platos,id',
             ]);
 
-            // ✅ Leer configuración de la BD (con fallback a hardcoded)
+            // ✅ 1. Leer configuración de la BD
             $teamId = auth()->user()->current_team_id;
             $config = \App\Models\ConfiguracionFacturacion::where('team_id', $teamId)->first();
 
-            $ruc = $config?->ruc ?? '20607955990';
+            // ✅ 2. Definir variables con Fallback (Si no hay config, usa lo global)
+            $ruc = $config?->ruc ?? config('sunat.ruc') ?? '20607955990';
             $razonSocial = $config?->razon_social ?? 'SEVEN HEART SOCIEDAD ANONIMA CERRADA';
             $nombreComercial = $config?->nombre_comercial ?? 'SEVEN HEART';
             $direccion = $config?->direccion ?? 'JR. SIMON BOLIVAR NRO. 487 (A UNA CUADRA DE TIENDAS YOLU) HUANUCO - HUANUCO - HUANUCO';
@@ -132,10 +131,15 @@ private function reservarCorrelativoYCrearFactura(string $serie, Request $reques
             $departamento = $config?->departamento ?? 'HUANUCO';
             $provincia = $config?->provincia ?? 'HUANUCO';
             $distrito = $config?->distrito ?? 'HUANUCO';
+            
+            // Datos para el PDF
+            $telefonoEmpresa = $config?->telefono ?? '(+51) 962-XXX-XXX';
+            $emailEmpresa = $config?->email ?? 'facturacion@sevenheart.pe';
+            $logoPath = $config?->logo_path ? storage_path('app/public/'.$config->logo_path) : public_path('img/logoTiket.png');
 
-            // ✅ Configurar certificado y SOL desde BD (con fallback a .env)
+            // ✅ 3. Configurar certificado y SOL desde BD (Sobrescribe lo global si existe)
             if ($config) {
-                // Certificado desde la BD (si existe)
+                // Certificado desde la BD
                 if ($config->certificado_path) {
                     $certPath = storage_path('app/certificates/'.$config->certificado_path);
                     if (file_exists($certPath)) {
@@ -287,7 +291,8 @@ private function reservarCorrelativoYCrearFactura(string $serie, Request $reques
                 $factura->save();
 
                 try {
-                    $this->generatePdfFromXml($filename, $vendedor);
+                    // ✅ Pasamos los datos de la empresa para el PDF
+                    $this->generatePdfFromXml($filename, $vendedor, $telefonoEmpresa, $emailEmpresa, $logoPath);
                 } catch (\Throwable $e) {
                     \Log::error("Comprobante {$filename} aceptado por SUNAT pero falló el PDF: ".$e->getMessage());
                 }
@@ -378,7 +383,8 @@ private function reservarCorrelativoYCrearFactura(string $serie, Request $reques
         return "SON {$words} CON {$decPart}/100 SOLES";
     }
 
-    private function generatePdfFromXml($filename, $vendedor)
+    // ✅ Método actualizado para recibir datos de la empresa
+    private function generatePdfFromXml($filename, $vendedor, $telefono, $email, $logoPath)
     {
         try {
             $xmlPath = "invoices/{$filename}.xml";
@@ -449,10 +455,10 @@ private function reservarCorrelativoYCrearFactura(string $serie, Request $reques
                 'company' => [
                     'name' => $xpath->evaluate('string(//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName)'),
                     'address' => $xpath->evaluate('string(//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cac:RegistrationAddress/cac:AddressLine/cbc:Line)'),
-                    'phone' => '(+51) 962-XXX-XXX',
-                    'email' => 'facturacion@sevenheart.pe',
+                    'phone' => $telefono, // ✅ Dinámico
+                    'email' => $email,   // ✅ Dinámico
                     'ruc' => $xpath->evaluate('string(//cac:AccountingSupplierParty/cac:Party/cac:PartyIdentification/cbc:ID)'),
-                    'logo' => public_path('img/logoTiket.png'),
+                    'logo' => $logoPath, // ✅ Dinámico
                 ],
                 'invoice' => [
                     'ID' => $filename,
@@ -576,22 +582,29 @@ private function reservarCorrelativoYCrearFactura(string $serie, Request $reques
 
     public function correlativoActual()
     {
-        $correlativo = Factura::max('correlativo');
+        $teamId = auth()->user()->current_team_id;
+        $correlativo = Factura::where('team_id', $teamId)->max('correlativo');
 
         return response()->json(['correlativo' => $correlativo]);
     }
 
     public function nuevoCorrelativo(Request $request)
     {
+        $teamId = auth()->user()->current_team_id;
         $serie = $request->input('serie', 'B001');
-        $correlativo = Factura::where('serie', $serie)->max('correlativo');
+        $correlativo = Factura::where('team_id', $teamId)
+                              ->where('serie', $serie)
+                              ->max('correlativo');
 
         return response()->json(['correlativo' => ($correlativo ?? 0) + 1]);
     }
 
     public function verificarCorreltaivo($correlativo)
     {
-        $factura = Factura::where('correlativo', $correlativo)->first();
+        $teamId = auth()->user()->current_team_id;
+        $factura = Factura::where('team_id', $teamId)
+                          ->where('correlativo', $correlativo)
+                          ->first();
 
         return response()->json(['existe' => $factura !== null]);
     }
