@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\CajaActualizada;
 use App\Events\MesaActualizada;
 use App\Events\ReservaActualizada;
 use App\Models\Caja;
 use App\Models\Mesa;
-use App\Models\MovimientoCaja;
 use App\Models\Reserva;
+use App\Services\ReservaService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,7 @@ class ReservaController extends Controller
             'notas' => 'nullable|string|max:255',
             // Toda reserva deja un adelanto en caja; no existe la reserva "gratis".
             'adelanto' => "required|numeric|min:{$minimo}|max:9999",
-            'adelanto_metodo' => 'nullable|in:efectivo,tarjeta,yape',
+            'adelanto_metodo_pago' => 'nullable|in:efectivo,tarjeta,yape',
         ]);
 
         $margen = config('reservas.margen_minutos', 15);
@@ -57,7 +58,7 @@ class ReservaController extends Controller
         $conflictos = Reserva::query()
             ->where('mesa_id', $mesa->id)
             ->whereDate('fecha', $validated['fecha'])
-            ->whereNotIn('estado', [Reserva::ESTADO_CANCELADA, Reserva::ESTADO_EXPIRADA])
+            ->whereNotIn('estado', [Reserva::ESTADO_CANCELADA, Reserva::ESTADO_NO_PRESENTADO])
             ->where(function ($q) use ($inicio, $fin) {
                 $q->whereTime('hora_inicio', '<', $fin)
                     ->whereTime('hora_fin', '>', $inicio);
@@ -70,10 +71,11 @@ class ReservaController extends Controller
             ])->withInput();
         }
 
-        $metodo = $validated['adelanto_metodo'] ?? 'efectivo';
+        $metodo = $validated['adelanto_metodo_pago'] ?? 'efectivo';
 
-        // La reserva y el ingreso del adelanto van juntos: una reserva creada
-        // sin su dinero en caja no es una reserva.
+        // La reserva y su dinero van juntos: sin caja abierta no se reserva.
+        // El adelanto no deja movimiento de caja —es temporal y puede
+        // devolverse—, se contabiliza en la línea de adelantos del arqueo.
         $reserva = DB::transaction(function () use ($validated, $mesa, $metodo) {
             $caja = Caja::query()
                 ->where('team_id', auth()->user()->current_team_id)
@@ -81,7 +83,7 @@ class ReservaController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $reserva = Reserva::query()->create([
+            return Reserva::query()->create([
                 'team_id' => auth()->user()->current_team_id,
                 'mesa_id' => $mesa->id,
                 'cliente' => $validated['cliente'],
@@ -91,26 +93,21 @@ class ReservaController extends Controller
                 'hora_fin' => $validated['hora_fin'],
                 'personas' => $validated['personas'],
                 'adelanto_pagado' => $validated['adelanto'],
-                'adelanto_metodo' => $metodo,
+                'adelanto_metodo_pago' => $metodo,
+                'adelanto_pagado_at' => now(),
+                'adelanto_caja_id' => $caja->id,
+                'adelanto_pagado_por' => auth()->id(),
+                'adelanto_estado' => Reserva::ADELANTO_PAGADO,
                 'notas' => $validated['notas'] ?? null,
                 'estado' => Reserva::ESTADO_CONFIRMADA,
             ]);
-
-            MovimientoCaja::query()->create([
-                'team_id' => $reserva->team_id,
-                'caja_id' => $caja->id,
-                'user_id' => auth()->id(),
-                'tipo' => 'ingreso',
-                'concepto' => "Adelanto de reserva de {$validated['cliente']}",
-                'monto' => $validated['adelanto'],
-            ]);
-
-            return $reserva;
         });
 
         ReservaActualizada::dispatch($reserva->fresh());
 
-        $this->reflejarActivaEnMesa($mesa, $reserva);
+        if (ReservaService::aplicarReservaActiva($mesa)) {
+            MesaActualizada::dispatch($mesa->fresh());
+        }
 
         return redirect()->back()->with(
             'success',
@@ -146,20 +143,9 @@ class ReservaController extends Controller
 
         ReservaActualizada::dispatch($activa->fresh());
 
-        $siguienteActiva = Reserva::activaDeMesa($mesa->id);
-
-        if ($siguienteActiva) {
-            $mesa->update([
-                'cliente' => $siguienteActiva->cliente,
-                'personas' => $siguienteActiva->personas,
-            ]);
-        } else {
-            $mesa->update([
-                'estado' => 'libre',
-                'cliente' => null,
-                'personas' => null,
-            ]);
-
+        // Al liberarse, la mesa vuelve a mirar sus reservas: si hay otra en
+        // ventana se queda pintada con ese cliente, y si no queda libre.
+        if (ReservaService::aplicarReservaActiva($mesa)) {
             MesaActualizada::dispatch($mesa->fresh());
         }
 
@@ -170,32 +156,165 @@ class ReservaController extends Controller
     }
 
     /**
-     * Refleja en la mesa la reserva activa del día (estado "reserva" + datos).
+     * Devolver el adelanto que todavía está en caja (pagado sin aplicar o
+     * retenido de una reserva no presentada) y la reserva queda como
+     * "devuelto". El dinero sale de la línea de adelantos del arqueo; solo
+     * si fue cobrado en otra jornada se registra además un egreso.
+     *
+     * El dinero solo sale de caja con "autorizar cancelaciones": el cajero
+     * ve y aplica, pero devolver es de Supervisor para arriba.
      */
-    private function reflejarActivaEnMesa(Mesa $mesa, Reserva $reserva): void
+    public function devolver(Request $request, Reserva $reserva): RedirectResponse
     {
-        // Solo las reservas de HOY afectan el estado operativo de la mesa.
-        if ($reserva->fecha !== now()->toDateString()) {
-            return;
+        if (! in_array($reserva->adelanto_estado, [Reserva::ADELANTO_PAGADO, Reserva::ADELANTO_RETENIDO], true)) {
+            return redirect()->back()->withErrors([
+                'reserva' => 'El adelanto de esta reserva ya no está en caja.',
+            ]);
         }
 
-        $activa = Reserva::activaDeMesa($mesa->id);
-
-        if (! $activa || $activa->id !== $reserva->id) {
-            return;
+        if ((float) $reserva->adelanto_pagado <= 0) {
+            return redirect()->back()->withErrors([
+                'reserva' => 'Esta reserva no tiene adelanto que devolver.',
+            ]);
         }
 
-        $estadoAnterior = $mesa->estado;
+        $caja = DB::transaction(function () use ($request, $reserva) {
+            $caja = Caja::query()
+                ->where('team_id', auth()->user()->current_team_id)
+                ->where('estado', 'Abierta')
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $mesa->update([
-            'estado' => $mesa->estado === 'libre' ? 'reserva' : $mesa->estado,
-            'cliente' => $activa->cliente,
-            'personas' => $activa->personas,
+            ReservaService::devolverAdelanto($reserva, $caja, $request->user());
+
+            return $caja;
+        });
+
+        ReservaActualizada::dispatch($reserva->fresh());
+        broadcast(new CajaActualizada($caja->fresh()));
+
+        return redirect()->back()->with(
+            'success',
+            'Devolución de S/ '.number_format((float) $reserva->adelanto_pagado, 2)
+            ." a {$reserva->cliente} registrada en caja."
+        );
+    }
+
+    /**
+     * El cliente llegó y caja lo confirma (es caja quien recibe la reserva,
+     * no tiene sentido ir mesa por mesa buscando el nombre): la reserva pasa
+     * a atendida con su hora y la mesa queda ocupada con los datos del
+     * cliente, opcionalmente asignada a un mesero para abrir el pedido.
+     *
+     * No se mueve dinero: el adelanto sigue esperando a que se cobre o a que
+     * caja lo devuelva.
+     */
+    public function llegada(Request $request, Reserva $reserva): RedirectResponse
+    {
+        $validated = $request->validate([
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
 
-        if ($mesa->estado !== $estadoAnterior) {
-            MesaActualizada::dispatch($mesa->fresh());
+        $pendiente = $this->comprobarPendienteDeLlegada($reserva);
+
+        if ($pendiente !== null) {
+            return redirect()->back()->withErrors(['reserva' => $pendiente]);
         }
+
+        $mesa = $reserva->mesa;
+
+        if (! $mesa->activa) {
+            return redirect()->back()->withErrors([
+                'reserva' => "La mesa #{$mesa->numero} de esta reserva está desactivada.",
+            ]);
+        }
+
+        $ocupada = ! in_array($mesa->estado, ['libre', 'reserva'], true)
+            || $mesa->pedidos()->whereNotIn('estado', ['pagado', 'cancelado'])->exists();
+
+        if ($ocupada) {
+            return redirect()->back()->withErrors([
+                'reserva' => "La mesa #{$mesa->numero} ya está ocupada: no se puede sentar a {$reserva->cliente}.",
+            ]);
+        }
+
+        if (! empty($validated['user_id'])
+            && ! auth()->user()->currentTeam->members()->where('users.id', $validated['user_id'])->exists()) {
+            return redirect()->back()->withErrors(['user_id' => 'El mesero no pertenece a esta sede.']);
+        }
+
+        DB::transaction(function () use ($reserva, $mesa, $validated) {
+            $mesa->update([
+                'estado' => 'ocupada',
+                'cliente' => $reserva->cliente,
+                'personas' => $reserva->personas,
+                'user_id' => $validated['user_id'] ?? null,
+            ]);
+
+            $reserva->update([
+                'estado' => Reserva::ESTADO_ATENDIDA,
+                'hora_llegada' => now()->format('H:i'),
+            ]);
+        });
+
+        ReservaActualizada::dispatch($reserva->fresh());
+        broadcast(new MesaActualizada($mesa->fresh()));
+
+        return redirect()->back()->with(
+            'success',
+            "{$reserva->cliente} llegó a la mesa #{$mesa->numero}."
+        );
+    }
+
+    /**
+     * Adelantar el "no presentado" que el programador de reservas marca solo
+     * pasada la tolerancia: la reserva sale de la cola de por llegar y su
+     * adelanto queda retenido en caja hasta que alguien decida devolverlo.
+     */
+    public function noLlego(Reserva $reserva): RedirectResponse
+    {
+        $pendiente = $this->comprobarPendienteDeLlegada($reserva);
+
+        if ($pendiente !== null) {
+            return redirect()->back()->withErrors(['reserva' => $pendiente]);
+        }
+
+        $reserva->update(['estado' => Reserva::ESTADO_NO_PRESENTADO]);
+
+        if ((float) $reserva->adelanto_pagado > 0
+            && $reserva->adelanto_estado === Reserva::ADELANTO_PAGADO) {
+            $reserva->update(['adelanto_estado' => Reserva::ADELANTO_RETENIDO]);
+        }
+
+        ReservaActualizada::dispatch($reserva->fresh());
+
+        $mesa = $reserva->mesa;
+
+        if (ReservaService::aplicarReservaActiva($mesa)) {
+            broadcast(new MesaActualizada($mesa->fresh()));
+        }
+
+        return redirect()->back()->with(
+            'success',
+            "{$reserva->cliente} no llegó. El adelanto queda en caja por si vuelve a reclamar."
+        );
+    }
+
+    /**
+     * Solo una reserva de hoy todavía confirmada puede marcar llegada o
+     * ausencia; devuelve el mensaje de error o null si se puede actuar.
+     */
+    private function comprobarPendienteDeLlegada(Reserva $reserva): ?string
+    {
+        if ($reserva->estado !== Reserva::ESTADO_CONFIRMADA) {
+            return "La reserva de {$reserva->cliente} ya no está esperando la llegada del cliente.";
+        }
+
+        if ($reserva->fecha > now()->toDateString()) {
+            return "La reserva de {$reserva->cliente} es para el {$reserva->fecha}.";
+        }
+
+        return null;
     }
 
     private function autorizarGestion(): void

@@ -14,6 +14,7 @@ class MovimientoCajaController extends Controller
     {
         $validated = $request->validate([
             'tipo' => ['required', 'in:ingreso,egreso,retiro,aporte'],
+            'metodo_pago' => ['nullable', 'in:efectivo,tarjeta,yape'],
             'concepto' => ['required', 'string', 'max:255'],
             'monto' => ['required', 'numeric', 'gt:0'],
         ]);

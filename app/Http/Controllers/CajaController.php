@@ -8,6 +8,7 @@ use App\Models\Mesa;
 use App\Models\MovimientoInventario;
 use App\Models\Pedido;
 use App\Models\Plato;
+use App\Models\Reserva;
 use App\Services\CorrelativoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,10 +37,40 @@ class CajaController extends Controller
             ->get()
             ->values();
 
+        // Reservas de hoy: las que siguen vivas y las que dejaron dinero en
+        // caja sin resolver (canceladas o no presentadas). El cajero necesita
+        // ver ese S/ 20 antes de que alguien lo olvide.
+        $reservas = Reserva::query()
+            ->where('team_id', $teamId)
+            ->whereDate('fecha', now()->toDateString())
+            ->where(function ($query) {
+                $query->whereNotIn('estado', [Reserva::ESTADO_CANCELADA])
+                    ->orWhereIn('adelanto_estado', [
+                        Reserva::ADELANTO_PAGADO,
+                        Reserva::ADELANTO_RETENIDO,
+                    ]);
+            })
+            ->orderBy('hora_inicio')
+            ->get([
+                'id', 'mesa_id', 'cliente', 'fecha', 'hora_inicio', 'hora_fin',
+                'personas', 'estado', 'hora_llegada', 'adelanto_pagado',
+                'adelanto_aplicado', 'adelanto_metodo_pago', 'adelanto_estado',
+                'adelanto_caja_id',
+            ])
+            ->values();
+
         $caja = Caja::query()
             ->where('team_id', $teamId)
             ->where('estado', 'Abierta')
             ->first();
+
+        // Meseros entre los que caja reparte a los clientes que llegan con
+        // reserva (el resto de miembros aparece en la pantalla de mesas).
+        $meseros = auth()->user()->currentTeam?->members()
+            ->where('users.id', '!=', auth()->id())
+            ->get(['users.id', 'users.name'])
+            ->values()
+            ->all();
 
         // El proximo boleta se muestra junto al numero de pedido para que el
         // cajero concilie contra SUNAT y no solo contra el turno de caja.
@@ -49,6 +80,9 @@ class CajaController extends Controller
             'platos' => $platos,
             'mesas' => $mesas->values()->all(),
             'pedidos' => $pedidos->values()->all(),
+            'reservas' => $reservas->all(),
+            'meseros' => $meseros,
+            'hoy' => now()->toDateString(),
             'caja' => $caja,
             'proximoBoleta' => 'B001-'.$this->correlativos->proximo('B001'),
         ]);
@@ -59,7 +93,7 @@ class CajaController extends Controller
         $validated = $request->validate([
             'cliente' => 'nullable|string|max:100',
             'mesa' => 'nullable|string|max:50',
-            'tipo' => 'required|in:salon,llevar,delivery',
+            'tipo' => 'required|in:salon,llevar',
             'metodoPago' => 'nullable|in:efectivo,tarjeta,yape',
             'productos' => 'required|array|min:1',
             'productos.*.id' => 'required|integer',

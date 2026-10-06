@@ -31,3 +31,8 @@ Broadcast::channel('sede.{teamId}.caja', function (User $user, int $teamId) {
 Broadcast::channel('sede.{teamId}.mesas', function (User $user, int $teamId) {
     return (int) $user->current_team_id === $teamId;
 });
+
+// Reservas: caja y mesas ven llegadas, ausencias y devoluciones al instante
+Broadcast::channel('sede.{teamId}.reservas', function (User $user, int $teamId) {
+    return (int) $user->current_team_id === $teamId;
+});

@@ -20,6 +20,7 @@ import ModalReservasMesa from '@/components/modals/ModalReservasMesa';
 import ModalVerTickets from '@/components/tickets/ModalVerTickets';
 import { useSedeChannel } from '@/hooks/useSedeChannel';
 import { swalError, swalSuccess, errorsToText } from '@/lib/swal';
+import { llegada as llegadaReserva } from '@/routes/reservas';
 import {
     DndContext,
     PointerSensor,
@@ -468,21 +469,33 @@ function MesaCard({
     userRole,
     reservaActiva,
     reservaProxima,
+    reservaVencida,
+    puedeConfirmarLlegada,
+    onConfirmarLlegada,
     onAbrirReservas,
 }: {
     mesa: Mesa;
     onCambiarEstado: (id: number, estado: string) => void;
     onTomarPedido: (mesa: Mesa) => void;
     onAbrirModalCobro: (mesa: Mesa) => void;
-    onVerPedido?: (mesa: Mesa) => void;
     onVerTickets?: (mesa: Mesa) => void;
     onAbrirReservas?: (mesa: Mesa) => void;
     pedidos: any[];
     userRole?: string;
     reservaActiva?: Reserva | null;
     reservaProxima?: Reserva | null;
+    reservaVencida?: Reserva | null;
+    puedeConfirmarLlegada?: boolean;
+    onConfirmarLlegada?: (reserva: Reserva) => void;
 }) {
     const config = getEstadoConfig(mesa.estado);
+
+    // El aviso de la reserva activa ya no depende solo del estado pintado:
+    // una mesa ocupada por otros también tiene que avisar que su cliente de
+    // reserva está en la puerta, que es justo cuando desaparecía antes.
+    const avisoActiva =
+        !!reservaActiva &&
+        (mesa.estado === 'reserva' || mesa.estado === 'ocupada');
 
     const { setNodeRef, isOver } = useDroppable({
         id: `mesa-${mesa.id}`,
@@ -591,12 +604,24 @@ function MesaCard({
 
         if (mesa.estado === 'reserva') {
             return (
-                <button
-                    onClick={() => onAbrirReservas?.(mesa)}
-                    className={`${baseClass} bg-blue-600 text-white hover:bg-blue-700`}
-                >
-                    Ver reserva
-                </button>
+                <div className="flex gap-2">
+                    {puedeConfirmarLlegada && reservaActiva && (
+                        <button
+                            onClick={() => onConfirmarLlegada?.(reservaActiva)}
+                            className={`${baseClass} flex-1 bg-green-600 text-white hover:bg-green-700`}
+                            title="Confirmar que el cliente de la reserva se sentó"
+                        >
+                            Llegó
+                        </button>
+                    )}
+
+                    <button
+                        onClick={() => onAbrirReservas?.(mesa)}
+                        className={`${baseClass} flex-1 bg-blue-600 text-white hover:bg-blue-700`}
+                    >
+                        Ver reserva
+                    </button>
+                </div>
             );
         }
 
@@ -787,7 +812,7 @@ function MesaCard({
                     </p>
                 )}
 
-                {mesa.estado === 'reserva' && reservaActiva && (
+                {reservaActiva && avisoActiva && (
                     <>
                         <p className="mt-0.5 truncate text-[11px] font-semibold text-blue-600 dark:text-blue-400">
                             {reservaActiva.hora_inicio} ·{' '}
@@ -816,10 +841,20 @@ function MesaCard({
                     </>
                 )}
 
-                {mesa.estado !== 'reserva' && reservaProxima && (
+                {!avisoActiva && reservaProxima && (
                     <p className="mt-0.5 truncate text-[10px] font-semibold text-blue-500/80 dark:text-blue-400/80">
                         Reserva {reservaProxima.hora_inicio} ·{' '}
                         {reservaProxima.cliente}
+                    </p>
+                )}
+
+                {reservaVencida && (
+                    <p className="mt-0.5 truncate text-[10px] font-semibold text-red-500 dark:text-red-400">
+                        Reserva vencida
+                        {Number(reservaVencida.adelanto_pagado) > 0 &&
+                        reservaVencida.adelanto_estado === 'retenido'
+                            ? ' · adelanto retenido'
+                            : ''}
                     </p>
                 )}
             </div>
@@ -863,6 +898,11 @@ export default function MesasDistribucion() {
     const userRole = auth?.roles?.[0];
     const canManageTables =
         auth?.permissions?.includes('gestionar mesas') ?? false;
+    // Confirmar la llegada mueve dinero de estado en caja, así que solo lo
+    // ve quien además puede abrir caja; el mesero sienta al cliente tomando
+    // el pedido.
+    const puedeConfirmarLlegada =
+        auth?.permissions?.includes('ver caja') ?? false;
 
     const [mesas, setMesas] = useState<Mesa[]>(() =>
         toArray<Mesa>(mesasIniciales),
@@ -1492,12 +1532,40 @@ export default function MesasDistribucion() {
         );
     };
 
-    // Próxima reserva del día (aún no iniciada): se muestra como aviso.
+    // Próxima reserva del día: se muestra como aviso, incluso si ya pasó de
+    // su hora (entonces es la que hay que perseguir, no la que falta).
     const reservaProximaDe = (mesaId: number): Reserva | null =>
+        reservasHoyPorMesa(mesaId).find((r) => r.estado === 'confirmada') ??
+        null;
+
+    // Reserva que dejó pasar su hora: sigue confirmada (aún no expiró) o quedó
+    // sin presentarse con el adelanto todavía en caja.
+    const reservaVencidaDe = (mesaId: number): Reserva | null =>
         reservasHoyPorMesa(mesaId).find(
             (r) =>
-                r.estado === 'confirmada' && r.hora_inicio > horaActualLocal(),
+                (r.estado === 'confirmada' && r.hora_fin < horaActualLocal()) ||
+                r.estado === 'no_presentado',
         ) ?? null;
+
+    const confirmarLlegadaDeReserva = (reserva: Reserva) => {
+        router.post(
+            llegadaReserva.url(reserva.id),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () =>
+                    swalSuccess(
+                        `${reserva.cliente} llegó`,
+                        'La mesa quedó ocupada con su nombre.',
+                    ),
+                onError: (errors) =>
+                    swalError(
+                        'No se pudo marcar la llegada',
+                        errorsToText(errors),
+                    ),
+            },
+        );
+    };
 
     const abrirReservas = (mesa: Mesa) => {
         setMesaReservas(mesa);
@@ -1695,6 +1763,15 @@ export default function MesasDistribucion() {
                                         reservaProxima={reservaProximaDe(
                                             mesa.id,
                                         )}
+                                        reservaVencida={reservaVencidaDe(
+                                            mesa.id,
+                                        )}
+                                        puedeConfirmarLlegada={
+                                            puedeConfirmarLlegada
+                                        }
+                                        onConfirmarLlegada={
+                                            confirmarLlegadaDeReserva
+                                        }
                                     />
                                 </div>
                             ))}

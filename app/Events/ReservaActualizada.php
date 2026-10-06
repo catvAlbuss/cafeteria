@@ -43,6 +43,11 @@ class ReservaActualizada implements ShouldBroadcastNow, ShouldRescue
             'cliente' => $this->reserva->cliente,
             'personas' => $this->reserva->personas,
             'estado' => $this->reserva->estado,
+            'hora_llegada' => $this->reserva->hora_llegada,
+            'adelanto_pagado' => $this->reserva->adelanto_pagado,
+            'adelanto_aplicado' => $this->reserva->adelanto_aplicado,
+            'adelanto_metodo_pago' => $this->reserva->adelanto_metodo_pago,
+            'adelanto_estado' => $this->reserva->adelanto_estado,
         ];
     }
 }

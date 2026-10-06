@@ -8,6 +8,7 @@ use App\Exports\HistorialSheetExport;
 use App\Exports\IngresosSheetExport;
 use App\Exports\MovimientosSheetExport;
 use App\Models\Caja;
+use App\Models\Reserva;
 use App\Models\Team;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -257,11 +258,34 @@ class ContadorController extends Controller
             ->first();
         $movimientos = $caja->movimientos()->selectRaw("COALESCE(SUM(CASE WHEN tipo IN ('ingreso', 'aporte') THEN monto ELSE 0 END), 0) as entradas")
             ->selectRaw("COALESCE(SUM(CASE WHEN tipo IN ('egreso', 'retiro') THEN monto ELSE 0 END), 0) as salidas")
+            // El efectivo esperado solo suma los movimientos que tocan la
+            // caja física: un adelanto cobrado en Yape no está en el cajón.
+            // metodo_pago null = fila antigua = efectivo.
+            ->selectRaw("COALESCE(SUM(CASE WHEN tipo IN ('ingreso', 'aporte') AND (metodo_pago IS NULL OR metodo_pago = 'efectivo') THEN monto ELSE 0 END), 0) as entradas_efectivo")
+            ->selectRaw("COALESCE(SUM(CASE WHEN tipo IN ('egreso', 'retiro') AND (metodo_pago IS NULL OR metodo_pago = 'efectivo') THEN monto ELSE 0 END), 0) as salidas_efectivo")
+            ->first();
+
+        // El adelanto de una reserva es dinero temporal: entra al cajón y sale
+        // al aplicarse o devolverse, sin registrar movimiento alguno. Se
+        // contabiliza aquí, en una línea propia que nace y muere con ese
+        // estado, y solo mientras el dinero siga en LA caja que lo cobró: al
+        // cerrar la jornada el saldo viaja heredado en el monto inicial de la
+        // siguiente.
+        $adelantos = Reserva::query()
+            ->where('adelanto_caja_id', $caja->id)
+            ->whereIn('adelanto_estado', [Reserva::ADELANTO_PAGADO, Reserva::ADELANTO_RETENIDO])
+            ->where('adelanto_pagado', '>', 0)
+            ->selectRaw('COALESCE(SUM(adelanto_pagado), 0) as total')
+            // Un adelanto en Yape no está en el cajón, igual que las ventas.
+            ->selectRaw("COALESCE(SUM(CASE WHEN adelanto_metodo_pago IS NULL OR adelanto_metodo_pago = 'efectivo' THEN adelanto_pagado ELSE 0 END), 0) as efectivo")
             ->first();
 
         $efectivo = (float) $ventas->efectivo;
         $entradas = (float) $movimientos->entradas;
         $salidas = (float) $movimientos->salidas;
+        $entradasEfectivo = (float) $movimientos->entradas_efectivo;
+        $salidasEfectivo = (float) $movimientos->salidas_efectivo;
+        $adelantosEfectivo = (float) $adelantos->efectivo;
 
         return [
             'fondo_inicial' => (float) $caja->monto_inicial,
@@ -271,7 +295,11 @@ class ContadorController extends Controller
             'ventas_yape' => (float) $ventas->yape,
             'ingresos_aportes' => $entradas,
             'gastos_retiros' => $salidas,
-            'efectivo_esperado' => round((float) $caja->monto_inicial + $efectivo + $entradas - $salidas, 2),
+            'ingresos_aportes_efectivo' => $entradasEfectivo,
+            'gastos_retiros_efectivo' => $salidasEfectivo,
+            'adelantos_en_caja' => (float) $adelantos->total,
+            'adelantos_en_caja_efectivo' => $adelantosEfectivo,
+            'efectivo_esperado' => round((float) $caja->monto_inicial + $efectivo + $entradasEfectivo - $salidasEfectivo + $adelantosEfectivo, 2),
         ];
     }
 
@@ -280,7 +308,10 @@ class ContadorController extends Controller
     {
         return array_fill_keys([
             'fondo_inicial', 'ventas_totales', 'ventas_efectivo', 'ventas_tarjeta',
-            'ventas_yape', 'ingresos_aportes', 'gastos_retiros', 'efectivo_esperado',
+            'ventas_yape', 'ingresos_aportes', 'gastos_retiros',
+            'ingresos_aportes_efectivo', 'gastos_retiros_efectivo',
+            'adelantos_en_caja', 'adelantos_en_caja_efectivo',
+            'efectivo_esperado',
         ], 0.0);
     }
 }

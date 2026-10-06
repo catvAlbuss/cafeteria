@@ -18,11 +18,12 @@ class MesaController extends Controller
     {
         $teamId = auth()->user()->current_team_id;
 
-        // Expiración lazy: reservas vencidas y mesas huérfanas en "reserva".
+        // Expiración lazy: reservas vencidas y mesas que entraron o salieron
+        // de la ventana de su reserva activa.
         Reserva::expirarVencidas();
-        $mesasLiberadas = Reserva::sincronizarMesasEnReserva();
+        $mesasActualizadas = Reserva::sincronizarMesasEnReserva();
 
-        foreach ($mesasLiberadas as $mesa) {
+        foreach ($mesasActualizadas as $mesa) {
             MesaActualizada::dispatch($mesa);
         }
 
@@ -191,12 +192,20 @@ class MesaController extends Controller
             $validated['pedido_listo'] = false;
         }
 
+        $estadoAnterior = $mesa->estado;
+
         $mesa->update($validated);
+
+        // Una mesa liberada a mano no pierde la reserva que ya está esperando.
+        if ($validated['estado'] === 'libre') {
+            ReservaService::aplicarReservaActiva($mesa);
+        }
+
         broadcast(new MesaActualizada($mesa));
 
-        // Al ocupar una mesa en reserva, la reserva activa pasa a atendida.
+        // Al ocupar una mesa que estaba reservada, la reserva pasa a atendida.
         if ($validated['estado'] === 'ocupada') {
-            ReservaService::atenderActiva($mesa);
+            ReservaService::atenderActiva($mesa, $estadoAnterior);
         }
 
         return redirect()->back()->with('success', 'Estado de mesa actualizado');
@@ -267,6 +276,8 @@ class MesaController extends Controller
     //  Tomar pedido: asigna mesero autenticado y ocupa la mesa
     public function tomarPedido(Request $request, Mesa $mesa)
     {
+        $estadoAnterior = $mesa->estado;
+
         $mesa->update([
             'estado' => 'ocupada',
             'user_id' => auth()->id(),
@@ -274,7 +285,7 @@ class MesaController extends Controller
         broadcast(new MesaActualizada($mesa));
 
         // Si la mesa estaba en reserva, su reserva activa pasa a atendida.
-        ReservaService::atenderActiva($mesa);
+        ReservaService::atenderActiva($mesa, $estadoAnterior);
 
         return redirect()->back()->with('success', 'Mesa asignada a '.auth()->user()->name);
     }

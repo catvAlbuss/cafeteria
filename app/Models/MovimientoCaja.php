@@ -12,7 +12,7 @@ class MovimientoCaja extends Model
 
     protected $table = 'movimientos_caja';
 
-    protected $fillable = ['team_id', 'caja_id', 'user_id', 'tipo', 'concepto', 'monto'];
+    protected $fillable = ['team_id', 'caja_id', 'user_id', 'tipo', 'metodo_pago', 'concepto', 'monto'];
 
     protected $casts = ['monto' => 'decimal:2'];
 

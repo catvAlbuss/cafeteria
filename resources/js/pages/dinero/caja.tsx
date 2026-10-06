@@ -5,6 +5,7 @@ import {
     Minus,
     X,
     ArrowRight,
+    Check,
     ShoppingCart,
     ImageOff,
     Coffee as CoffeeIcon,
@@ -21,6 +22,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import ModalBoleta from '@/components/modals/ModalBoleta';
 import { useSedeChannel } from '@/hooks/useSedeChannel';
+import {
+    devolver as devolverAdelanto,
+    llegada as llegadaReserva,
+    noLlego as noLlegoReserva,
+} from '@/routes/reservas';
 
 interface Producto {
     id: number;
@@ -63,6 +69,41 @@ interface PedidoSalon {
     estado: string;
     mesero?: string | null;
 }
+
+interface ReservaCaja {
+    id: number;
+    mesa_id: number;
+    cliente: string;
+    fecha: string;
+    hora_inicio: string;
+    hora_fin: string;
+    personas: number;
+    estado: string;
+    hora_llegada: string | null;
+    adelanto_pagado: number | string;
+    adelanto_aplicado: number | string;
+    adelanto_metodo_pago: string | null;
+    adelanto_estado: string;
+}
+
+interface MeseroCaja {
+    id: number;
+    name: string;
+}
+
+const ESTADO_RESERVA: Record<string, { label: string; chip: string }> = {
+    confirmada: { label: 'Por llegar', chip: 'bg-sand text-cocoa' },
+    atendida: { label: 'En mesa', chip: 'bg-gold text-ink' },
+    cancelada: { label: 'Cancelada', chip: 'bg-red-100 text-red-700' },
+    no_presentado: { label: 'No presentado', chip: 'bg-red-100 text-red-700' },
+};
+
+const AvisoReservaMesa = ({ reserva }: { reserva: ReservaCaja }) => (
+    <p className="truncate text-[11px] font-semibold text-gold">
+        Reserva {reserva.cliente} · S/{' '}
+        {Number(reserva.adelanto_pagado).toFixed(2)} en caja
+    </p>
+);
 
 const toArray = <T,>(
     value: T[] | { data?: T[] } | Record<string, T> | null | undefined,
@@ -205,9 +246,21 @@ export default function Caja() {
         platos = [],
         mesas = [],
         pedidos = [],
+        reservas = [],
+        meseros = [],
+        hoy = null,
         caja = null,
         proximoBoleta = null,
+        auth = null,
     } = usePage().props as any;
+    const meserosLista = useMemo<MeseroCaja[]>(
+        () => toArray<MeseroCaja>(meseros),
+        [meseros],
+    );
+    // Devolver plata de caja es de Supervisor para arriba.
+    const puedeDevolver = (auth?.permissions ?? []).includes(
+        'autorizar cancelaciones',
+    );
     const siguienteNumeroPedido = String(
         (Number(caja?.contador_pedidos) || 0) + 1,
     ).padStart(3, '0');
@@ -217,6 +270,9 @@ export default function Caja() {
     );
     const [pedidosLista, setPedidosLista] = useState<PedidoSalon[]>(() =>
         toArray<PedidoSalon>(pedidos),
+    );
+    const [reservasLista, setReservasLista] = useState<ReservaCaja[]>(() =>
+        toArray<ReservaCaja>(reservas),
     );
     // Procesar platos desde la base de datos
     useEffect(() => {
@@ -257,11 +313,16 @@ export default function Caja() {
     const [modalBoletaAbierto, setModalBoletaAbierto] = useState(false);
     const [busquedaSalon, setBusquedaSalon] = useState('');
     const [visibles, setVisibles] = useState(10);
+    const [meseroDeReserva, setMeseroDeReserva] = useState<
+        Record<number, string>
+    >({});
+    const [reservaEnCurso, setReservaEnCurso] = useState<number | null>(null);
 
     useEffect(() => {
         setMesasLista(toArray<MesaSalon>(mesas));
         setPedidosLista(toArray<PedidoSalon>(pedidos));
-    }, [mesas, pedidos]);
+        setReservasLista(toArray<ReservaCaja>(reservas));
+    }, [mesas, pedidos, reservas]);
 
     // ===== BANDEJA DE PEDIDOS DE SALÓN =====
     const salonPendientes = useMemo(() => {
@@ -345,6 +406,148 @@ export default function Caja() {
         return resto > 0 ? `Hace ${horas} h ${resto} min` : `Hace ${horas} h`;
     };
 
+    // ===== ADELANTOS DE RESERVA QUE SIGUEN EN CAJA =====
+    const reservasEnCaja = useMemo(
+        () =>
+            reservasLista.filter(
+                (r) =>
+                    r.adelanto_estado === 'pagado' ||
+                    r.adelanto_estado === 'retenido',
+            ),
+        [reservasLista],
+    );
+
+    const reservaPorMesa = useMemo(() => {
+        const mapa = new Map<number, ReservaCaja>();
+
+        reservasEnCaja.forEach((r) => {
+            const actual = mapa.get(r.mesa_id);
+
+            if (!actual || r.hora_inicio < actual.hora_inicio) {
+                mapa.set(r.mesa_id, r);
+            }
+        });
+
+        return mapa;
+    }, [reservasEnCaja]);
+
+    const devolverAdelantoEnCaja = (reserva: ReservaCaja) => {
+        router.post(
+            devolverAdelanto.url(reserva.id),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setReservasLista((prev) =>
+                        prev.map((r) =>
+                            r.id === reserva.id
+                                ? { ...r, adelanto_estado: 'devuelto' }
+                                : r,
+                        ),
+                    );
+                    toast.success(
+                        `Devolución de S/ ${Number(
+                            reserva.adelanto_pagado,
+                        ).toFixed(2)} registrada en caja`,
+                    );
+                },
+            },
+        );
+    };
+
+    // ===== RESERVAS DE HOY AGRUPADAS PARA LA PESTAÑA DE CAJA =====
+    const porLlegar = useMemo(
+        () =>
+            reservasLista
+                .filter((r) => r.estado === 'confirmada')
+                .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio)),
+        [reservasLista],
+    );
+
+    const enSala = useMemo(
+        () =>
+            reservasLista
+                .filter((r) => r.estado === 'atendida')
+                .sort((a, b) =>
+                    (a.hora_llegada ?? '').localeCompare(b.hora_llegada ?? ''),
+                ),
+        [reservasLista],
+    );
+
+    const porDevolver = useMemo(
+        () =>
+            reservasLista
+                .filter(
+                    (r) =>
+                        (r.estado === 'cancelada' ||
+                            r.estado === 'no_presentado') &&
+                        (r.adelanto_estado === 'pagado' ||
+                            r.adelanto_estado === 'retenido'),
+                )
+                .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio)),
+        [reservasLista],
+    );
+
+    const numeroDeMesa = (mesaId: number) =>
+        mesasLista.find((m) => m.id === mesaId)?.numero ?? '—';
+
+    const erroresDe = (errors: any) => {
+        const mensaje =
+            typeof errors === 'object' && errors
+                ? Object.values(errors).flat().join(' ')
+                : errors;
+
+        toast.error('No se pudo actualizar la reserva', {
+            description: mensaje || 'Intenta nuevamente',
+        });
+    };
+
+    const marcarLlegada = (reserva: ReservaCaja) => {
+        const userId = meseroDeReserva[reserva.id];
+        const datos = userId ? { user_id: Number(userId) } : {};
+
+        setReservaEnCurso(reserva.id);
+
+        router.post(llegadaReserva.url(reserva.id), datos, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success(
+                    `${reserva.cliente} llegó a la mesa ${numeroDeMesa(
+                        reserva.mesa_id,
+                    )}`,
+                );
+
+                // Con mesero elegido, la caja le abre el pedido en la
+                // pantalla de ventas: la mesa ya quedó ocupada y asignada.
+                if (userId) {
+                    window.location.href = `/ventas?mesa=${numeroDeMesa(
+                        reserva.mesa_id,
+                    )}`;
+                }
+            },
+            onError: erroresDe,
+            onFinish: () => setReservaEnCurso(null),
+        });
+    };
+
+    const marcarNoLlego = (reserva: ReservaCaja) => {
+        setReservaEnCurso(reserva.id);
+
+        router.post(
+            noLlegoReserva.url(reserva.id),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () =>
+                    toast.info(
+                        `${reserva.cliente} no llegó. El adelanto queda en caja.`,
+                    ),
+                onError: erroresDe,
+                onFinish: () => setReservaEnCurso(null),
+            },
+        );
+    };
+
     const abrirCobro = (mesa: MesaSalon, pedidosMesa: PedidoSalon[]) => {
         // Calcular subtotal, igv y total
         const total = pedidosMesa.reduce(
@@ -414,6 +617,34 @@ export default function Caja() {
                     ? prev
                     : [...prev, payload],
             );
+        },
+    });
+
+    // Reservas: llegadas, ausencias y devoluciones hechas en otras pantallas
+    // se reflejan aquí sin recargar.
+    useSedeChannel('reservas', {
+        'reserva.actualizada': (payload: any) => {
+            if (!payload?.id) {
+                return;
+            }
+
+            setReservasLista((prev) => {
+                const existe = prev.some((r) => r.id === payload.id);
+
+                if (payload.fecha && hoy && payload.fecha !== hoy) {
+                    return existe
+                        ? prev.filter((r) => r.id !== payload.id)
+                        : prev;
+                }
+
+                if (!existe) {
+                    return [...prev, { adelanto_aplicado: 0, ...payload }];
+                }
+
+                return prev.map((r) =>
+                    r.id === payload.id ? { ...r, ...payload } : r,
+                );
+            });
         },
     });
 
@@ -563,6 +794,14 @@ export default function Caja() {
     // REALIZAR PEDIDO - CON MODAL DE BOLETA
     // ============================================================
     const realizarPedido = () => {
+        if (tipoPedido === 'reserva') {
+            toast.warning(
+                'Las reservas no se registran como pedido: cobra el consumo desde la mesa.',
+            );
+
+            return;
+        }
+
         if (carrito.length === 0) {
             toast.warning('Agrega productos al pedido');
 
@@ -925,16 +1164,48 @@ export default function Caja() {
                                     Llevar
                                 </button>
                                 <button
-                                    onClick={() => setTipoPedido('delivery')}
+                                    onClick={() => setTipoPedido('reserva')}
                                     className={`rounded-lg py-1.5 text-xs font-medium transition ${
-                                        tipoPedido === 'delivery'
+                                        tipoPedido === 'reserva'
                                             ? 'bg-gold text-ink'
                                             : 'bg-sand text-cocoa hover:bg-wheat'
                                     }`}
                                 >
-                                    Delivery
+                                    Reserva
                                 </button>
                             </div>
+
+                            {/* ==== ADELANTOS DE RESERVA (atajo a la pestaña) ==== */}
+                            {tipoPedido !== 'reserva' &&
+                                reservasEnCaja.length > 0 && (
+                                    <button
+                                        onClick={() => setTipoPedido('reserva')}
+                                        className="mb-3 flex shrink-0 items-center gap-2 rounded-xl border border-gold/50 bg-cream-pale px-3 py-2 text-xs transition hover:bg-gold/10"
+                                    >
+                                        <Clock
+                                            className="h-4 w-4 text-gold"
+                                            strokeWidth={2}
+                                        />
+                                        <span className="font-semibold text-cocoa">
+                                            S/{' '}
+                                            {reservasEnCaja
+                                                .reduce(
+                                                    (suma, r) =>
+                                                        suma +
+                                                        Number(
+                                                            r.adelanto_pagado ||
+                                                                0,
+                                                        ),
+                                                    0,
+                                                )
+                                                .toFixed(2)}{' '}
+                                            en adelantos
+                                        </span>
+                                        <span className="ml-auto font-semibold text-gold">
+                                            Ver reservas
+                                        </span>
+                                    </button>
+                                )}
 
                             {/* ============ BANDEJA DE PEDIDOS DE SALÓN ============ */}
                             {tipoPedido === 'salon' ? (
@@ -1025,6 +1296,15 @@ export default function Caja() {
                                                                             </span>
                                                                         )}
                                                                     </p>
+                                                                    {reservaPorMesa.get(
+                                                                        mesa.id,
+                                                                    ) && (
+                                                                        <AvisoReservaMesa
+                                                                            reserva={reservaPorMesa.get(
+                                                                                mesa.id,
+                                                                            )!}
+                                                                        />
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                             <div className="flex flex-shrink-0 flex-col items-end gap-1">
@@ -1099,6 +1379,338 @@ export default function Caja() {
                                                     : `${pendientesFiltrados.length} pedidos pendientes`}
                                             </p>
                                         </div>
+                                    )}
+                                </div>
+                            ) : tipoPedido === 'reserva' ? (
+                                <div className="flex flex-col gap-3 md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-0.5">
+                                    <div className="flex shrink-0 items-center gap-2 rounded-xl border border-gold/50 bg-cream-pale px-3 py-2">
+                                        <Clock
+                                            className="h-4 w-4 text-gold"
+                                            strokeWidth={2}
+                                        />
+                                        <p className="text-xs font-semibold tracking-wide text-cocoa uppercase">
+                                            Reservas de hoy
+                                        </p>
+                                        <span className="ml-auto rounded-full bg-gold px-2 py-0.5 text-[10px] font-bold text-ink">
+                                            S/{' '}
+                                            {reservasEnCaja
+                                                .reduce(
+                                                    (suma, r) =>
+                                                        suma +
+                                                        Number(
+                                                            r.adelanto_pagado ||
+                                                                0,
+                                                        ),
+                                                    0,
+                                                )
+                                                .toFixed(2)}{' '}
+                                            en caja
+                                        </span>
+                                    </div>
+
+                                    {porLlegar.length === 0 &&
+                                    enSala.length === 0 &&
+                                    porDevolver.length === 0 ? (
+                                        <div className="flex flex-col items-center gap-2 py-6">
+                                            <Receipt
+                                                className="h-8 w-8 text-cocoa-soft"
+                                                strokeWidth={1.5}
+                                            />
+                                            <p className="text-sm text-cocoa-soft">
+                                                No hay reservas para hoy
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {porLlegar.length > 0 && (
+                                                <section>
+                                                    <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-cocoa uppercase">
+                                                        <Clock className="h-3.5 w-3.5 text-gold" />
+                                                        Por llegar
+                                                        <span className="rounded-full bg-sand px-1.5 py-0.5 text-[10px] text-cocoa">
+                                                            {porLlegar.length}
+                                                        </span>
+                                                    </p>
+                                                    <div className="space-y-2">
+                                                        {porLlegar.map((r) => (
+                                                            <div
+                                                                key={r.id}
+                                                                className="rounded-xl border border-black/5 bg-cream p-2.5"
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="rounded-md bg-roast px-1.5 py-0.5 text-xs font-bold text-white">
+                                                                        {numeroDeMesa(
+                                                                            r.mesa_id,
+                                                                        )}
+                                                                    </span>
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <p className="truncate text-sm font-medium text-chocolate">
+                                                                            {
+                                                                                r.cliente
+                                                                            }
+                                                                        </p>
+                                                                        <p className="truncate text-xs text-cocoa-soft">
+                                                                            {
+                                                                                r.hora_inicio
+                                                                            }
+                                                                            –
+                                                                            {
+                                                                                r.hora_fin
+                                                                            }{' '}
+                                                                            ·{' '}
+                                                                            {
+                                                                                r.personas
+                                                                            }{' '}
+                                                                            pers.
+                                                                        </p>
+                                                                    </div>
+                                                                    <span className="shrink-0 text-xs font-semibold text-gold">
+                                                                        S/{' '}
+                                                                        {Number(
+                                                                            r.adelanto_pagado,
+                                                                        ).toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="mt-2 flex items-center gap-2">
+                                                                    {meserosLista.length >
+                                                                        0 && (
+                                                                        <select
+                                                                            value={
+                                                                                meseroDeReserva[
+                                                                                    r
+                                                                                        .id
+                                                                                ] ??
+                                                                                ''
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                setMeseroDeReserva(
+                                                                                    (
+                                                                                        prev,
+                                                                                    ) => ({
+                                                                                        ...prev,
+                                                                                        [r.id]:
+                                                                                            e
+                                                                                                .target
+                                                                                                .value,
+                                                                                    }),
+                                                                                )
+                                                                            }
+                                                                            className="min-w-0 flex-1 rounded-lg border border-black/5 bg-cream-pale px-2 py-1.5 text-xs text-chocolate outline-none focus:ring-1 focus:ring-gold"
+                                                                        >
+                                                                            <option value="">
+                                                                                Sin
+                                                                                mesero
+                                                                            </option>
+                                                                            {meserosLista.map(
+                                                                                (
+                                                                                    m,
+                                                                                ) => (
+                                                                                    <option
+                                                                                        key={
+                                                                                            m.id
+                                                                                        }
+                                                                                        value={
+                                                                                            m.id
+                                                                                        }
+                                                                                    >
+                                                                                        {
+                                                                                            m.name
+                                                                                        }
+                                                                                    </option>
+                                                                                ),
+                                                                            )}
+                                                                        </select>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            marcarLlegada(
+                                                                                r,
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            reservaEnCurso ===
+                                                                            r.id
+                                                                        }
+                                                                        className="flex items-center gap-1 rounded-lg bg-roast px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-ink-deep active:scale-95 disabled:opacity-60"
+                                                                    >
+                                                                        <Check
+                                                                            className="h-3.5 w-3.5"
+                                                                            strokeWidth={
+                                                                                2.5
+                                                                            }
+                                                                        />
+                                                                        Llegó
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() =>
+                                                                            marcarNoLlego(
+                                                                                r,
+                                                                            )
+                                                                        }
+                                                                        disabled={
+                                                                            reservaEnCurso ===
+                                                                            r.id
+                                                                        }
+                                                                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 active:scale-95 disabled:opacity-60"
+                                                                    >
+                                                                        No llegó
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </section>
+                                            )}
+
+                                            {enSala.length > 0 && (
+                                                <section>
+                                                    <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-cocoa uppercase">
+                                                        <Utensils className="h-3.5 w-3.5 text-gold" />
+                                                        En sala
+                                                        <span className="rounded-full bg-sand px-1.5 py-0.5 text-[10px] text-cocoa">
+                                                            {enSala.length}
+                                                        </span>
+                                                    </p>
+                                                    <div className="space-y-2">
+                                                        {enSala.map((r) => (
+                                                            <div
+                                                                key={r.id}
+                                                                className="flex items-center gap-2 rounded-xl border border-black/5 bg-cream p-2.5 text-xs"
+                                                            >
+                                                                <span className="rounded-md bg-roast px-1.5 py-0.5 text-xs font-bold text-white">
+                                                                    {numeroDeMesa(
+                                                                        r.mesa_id,
+                                                                    )}
+                                                                </span>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="truncate text-sm font-medium text-chocolate">
+                                                                        {
+                                                                            r.cliente
+                                                                        }
+                                                                    </p>
+                                                                    <p className="truncate text-cocoa-soft">
+                                                                        Llegó{' '}
+                                                                        {r.hora_llegada ??
+                                                                            r.hora_inicio}{' '}
+                                                                        · S/{' '}
+                                                                        {Number(
+                                                                            r.adelanto_pagado,
+                                                                        ).toFixed(
+                                                                            2,
+                                                                        )}
+                                                                        {' · '}
+                                                                        {r.adelanto_metodo_pago ??
+                                                                            'efectivo'}
+                                                                    </p>
+                                                                </div>
+                                                                {puedeDevolver &&
+                                                                    (r.adelanto_estado ===
+                                                                        'pagado' ||
+                                                                        r.adelanto_estado ===
+                                                                            'retenido') && (
+                                                                        <button
+                                                                            onClick={() =>
+                                                                                devolverAdelantoEnCaja(
+                                                                                    r,
+                                                                                )
+                                                                            }
+                                                                            className="shrink-0 rounded-lg border border-red-200 bg-white px-2 py-1 text-[11px] font-semibold text-red-600 transition hover:bg-red-50 active:scale-95"
+                                                                        >
+                                                                            Devolver
+                                                                        </button>
+                                                                    )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </section>
+                                            )}
+
+                                            {porDevolver.length > 0 && (
+                                                <section>
+                                                    <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-cocoa uppercase">
+                                                        <Receipt className="h-3.5 w-3.5 text-gold" />
+                                                        Por devolver
+                                                        <span className="rounded-full bg-sand px-1.5 py-0.5 text-[10px] text-cocoa">
+                                                            {porDevolver.length}
+                                                        </span>
+                                                    </p>
+                                                    <div className="space-y-2">
+                                                        {porDevolver.map(
+                                                            (r) => {
+                                                                const estado =
+                                                                    ESTADO_RESERVA[
+                                                                        r.estado
+                                                                    ] ??
+                                                                    ESTADO_RESERVA.confirmada;
+
+                                                                return (
+                                                                    <div
+                                                                        key={
+                                                                            r.id
+                                                                        }
+                                                                        className="flex items-center gap-2 rounded-xl border border-red-100 bg-red-50/50 p-2.5 text-xs"
+                                                                    >
+                                                                        <span className="rounded-md bg-roast px-1.5 py-0.5 text-xs font-bold text-white">
+                                                                            {numeroDeMesa(
+                                                                                r.mesa_id,
+                                                                            )}
+                                                                        </span>
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <p className="truncate text-sm font-medium text-chocolate">
+                                                                                {
+                                                                                    r.cliente
+                                                                                }
+                                                                            </p>
+                                                                            <p className="truncate text-cocoa-soft">
+                                                                                {
+                                                                                    r.hora_inicio
+                                                                                }
+                                                                                {
+                                                                                    ' · '
+                                                                                }
+                                                                                S/{' '}
+                                                                                {Number(
+                                                                                    r.adelanto_pagado,
+                                                                                ).toFixed(
+                                                                                    2,
+                                                                                )}
+                                                                                {
+                                                                                    ' · '
+                                                                                }
+                                                                                {
+                                                                                    estado.label
+                                                                                }
+                                                                            </p>
+                                                                        </div>
+                                                                        {puedeDevolver ? (
+                                                                            <button
+                                                                                onClick={() =>
+                                                                                    devolverAdelantoEnCaja(
+                                                                                        r,
+                                                                                    )
+                                                                                }
+                                                                                className="shrink-0 rounded-lg border border-red-200 bg-white px-2 py-1 text-[11px] font-semibold text-red-600 transition hover:bg-red-50 active:scale-95"
+                                                                            >
+                                                                                Devolver
+                                                                            </button>
+                                                                        ) : (
+                                                                            <span className="shrink-0 text-[10px] text-cocoa-soft">
+                                                                                Solo
+                                                                                supervisor
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            },
+                                                        )}
+                                                    </div>
+                                                </section>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             ) : (

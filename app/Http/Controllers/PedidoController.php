@@ -6,6 +6,7 @@ use App\Events\MesaActualizada;
 use App\Events\PedidoActualizado;
 use App\Events\PedidoCreado;
 use App\Events\PedidoListo;
+use App\Events\ReservaActualizada;
 use App\Models\Caja;
 use App\Models\Delivery;
 use App\Models\Insumo;
@@ -260,7 +261,7 @@ class PedidoController extends Controller
             ]);
         }
 
-        $pedidos = DB::transaction(function () use ($mesa, $validated) {
+        [$pedidos, $reservaAtendida] = DB::transaction(function () use ($mesa, $validated) {
             $caja = Caja::query()
                 ->where('estado', 'Abierta')
                 ->lockForUpdate()
@@ -299,6 +300,16 @@ class PedidoController extends Controller
                 ]);
             }
 
+            // El adelanto de la reserva atendida baja al cajón como egreso:
+            // el total del pedido no cambia, pero el cliente pone total −
+            // adelanto en efectivo.
+            $reservaAplicada = ReservaService::aplicarAdelanto(
+                $mesa,
+                $caja,
+                auth()->user(),
+                $pedidosACobrar,
+            );
+
             $quedanPedidos = $pedidosActuales->filter(
                 function ($pedido) use ($idsEnviados) {
                     return ! $idsEnviados->contains($pedido->id);
@@ -312,17 +323,25 @@ class PedidoController extends Controller
                 $mesa->personas = null;
                 $mesa->pedido_listo = false;
                 $mesa->save();
+
+                // Si mientras tanto entró en ventana una reserva de esta mesa,
+                // la mesa no queda libre: se pinta con el próximo cliente.
+                ReservaService::aplicarReservaActiva($mesa);
             } else {
                 $mesa->pedido_listo = false;
                 $mesa->save();
             }
 
-            return $pedidosACobrar;
+            return [$pedidosACobrar, $reservaAplicada];
         });
 
         $pedidos->each(
             fn (Pedido $pedido) => broadcast(new PedidoActualizado($pedido))
         );
+
+        if ($reservaAtendida) {
+            ReservaActualizada::dispatch($reservaAtendida);
+        }
 
         broadcast(new MesaActualizada($mesa->refresh()));
 
@@ -390,8 +409,8 @@ class PedidoController extends Controller
                 ]);
             }
 
-            if ($mesaDePedido && $mesaDePedido->estado === 'reserva') {
-                ReservaService::atenderActiva($mesaDePedido);
+            if ($mesaDePedido) {
+                ReservaService::atenderActiva($mesaDePedido, $mesaDePedido->estado);
             }
         }
 
@@ -772,12 +791,29 @@ class PedidoController extends Controller
         if ($pedido->mesa_id) {
             $mesa = Mesa::find($pedido->mesa_id);
 
+            if ($mesa) {
+                // El adelanto de la reserva atendida baja como egreso: la
+                // venta se contabiliza completa, el cajón recibe menos.
+                $reservaAplicada = ReservaService::aplicarAdelanto(
+                    $mesa,
+                    $caja,
+                    $request->user(),
+                    [$pedido],
+                );
+
+                if ($reservaAplicada) {
+                    ReservaActualizada::dispatch($reservaAplicada);
+                }
+            }
+
             if ($mesa && $mesa->estado === 'ocupada') {
                 $mesa->estado = 'libre';
                 $mesa->user_id = null;
                 $mesa->cliente = null;
                 $mesa->personas = null;
                 $mesa->save();
+
+                ReservaService::aplicarReservaActiva($mesa);
 
                 broadcast(new MesaActualizada($mesa));
             }
@@ -1055,6 +1091,8 @@ class PedidoController extends Controller
                 $mesa->personas = null;
                 $mesa->pedido_listo = false;
                 $mesa->save();
+
+                ReservaService::aplicarReservaActiva($mesa);
 
                 $mesaActualizada = $mesa;
             } else {

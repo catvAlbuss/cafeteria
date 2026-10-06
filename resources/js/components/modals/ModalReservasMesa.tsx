@@ -29,8 +29,9 @@ export interface Reserva {
     telefono?: string | null;
     personas: number;
     adelanto_pagado: number | string;
+    adelanto_estado?: string;
     notas?: string | null;
-    estado: 'confirmada' | 'atendida' | 'cancelada' | 'expirada';
+    estado: 'confirmada' | 'atendida' | 'cancelada' | 'no_presentado';
 }
 
 /**
@@ -92,14 +93,14 @@ const ESTADO_CHIP: Record<Reserva['estado'], string> = {
         'bg-green-500/15 text-green-600 dark:text-green-400 border-green-300 dark:border-green-500/40',
     cancelada:
         'bg-red-500/10 text-red-500 dark:text-red-400 border-red-300 dark:border-red-500/40',
-    expirada: 'bg-cocoa-soft/10 text-cocoa-soft border-cocoa-soft/40',
+    no_presentado: 'bg-cocoa-soft/10 text-cocoa-soft border-cocoa-soft/40',
 };
 
 const ESTADO_LABEL: Record<Reserva['estado'], string> = {
     confirmada: 'Confirmada',
     atendida: 'Atendida',
     cancelada: 'Cancelada',
-    expirada: 'Expirada',
+    no_presentado: 'No presentado',
 };
 
 // ============================================================
@@ -369,9 +370,9 @@ export default function ModalReservasMesa({
                                     <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
                                         <Wallet className="h-4 w-4" />
                                         Adelanto S/
-                                        {Number(
-                                            activa.adelanto_pagado,
-                                        ).toFixed(2)}
+                                        {Number(activa.adelanto_pagado).toFixed(
+                                            2,
+                                        )}
                                     </span>
                                 )}
                             </p>
@@ -443,7 +444,6 @@ export default function ModalReservasMesa({
                                     {r.personas}{' '}
                                     {r.personas === 1 ? 'persona' : 'personas'}
                                     {r.telefono ? ` · ${r.telefono}` : ''}
-
                                     {Number(r.adelanto_pagado ?? 0) > 0 && (
                                         <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                                             {' '}
@@ -575,11 +575,10 @@ export default function ModalReservasMesa({
                                             className={`${inputBase} pl-9 font-semibold`}
                                         />
                                     </div>
-
                                     <span className="mt-1 block text-[11px] font-normal text-cocoa-soft">
-                                        Mínimo S/{' '}
-                                        {ADELANTO_MINIMO.toFixed(2)} · se caja
-                                        ahora y se descuenta al cobrar la mesa.
+                                        Mínimo S/ {ADELANTO_MINIMO.toFixed(2)} ·
+                                        se caja ahora y se descuenta al cobrar
+                                        la mesa.
                                     </span>
                                 </label>
                             </div>

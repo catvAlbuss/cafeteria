@@ -17,7 +17,15 @@ return [
 
     /*
     | Adelanto mínimo (S/) que se exige al crear una reserva. Se caja en el
-    | momento como un ingreso y se descuenta de la cuenta al cobrar la mesa.
+    | momento como un ingreso; al cobrar la mesa se emite un egreso de ese
+    | monto (el total de la factura no cambia).
     */
     'adelanto_minimo' => (float) env('RESERVAS_ADELANTO_MINIMO', 20),
+
+    /*
+    | Minutos que el cliente puede llegar tarde a su hora_fin antes de que la
+    | reserva pase a "no presentado". Dentro de ese plazo conserva su mesa y
+    | su adelanto sigue como "pagado"; pasado pasa a "retenido" y caja decide.
+    */
+    'tolerancia_minutos' => (int) env('RESERVAS_TOLERANCIA_MINUTOS', 10),
 ];

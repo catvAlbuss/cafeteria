@@ -149,6 +149,17 @@ Route::middleware(['auth'])->group(function () {
     // RESERVAS
     Route::post('/mesas/{mesa}/reservas', [ReservaController::class, 'store'])->middleware('cash.session')->name('mesas.reservas.store');
     Route::patch('/mesas/{mesa}/reservas/cancelar', [ReservaController::class, 'cancelar'])->middleware('cash.session')->name('mesas.reservas.cancelar');
+    // Devolver plata de caja: solo Supervisor para arriba.
+    Route::post('/reservas/{reserva}/devolver', [ReservaController::class, 'devolver'])
+        ->middleware(['cash.session', 'can:autorizar cancelaciones'])
+        ->name('reservas.devolver');
+    // Caja confirma la llegada del cliente o lo da por ausente.
+    Route::post('/reservas/{reserva}/llegada', [ReservaController::class, 'llegada'])
+        ->middleware(['cash.session', 'can:ver caja'])
+        ->name('reservas.llegada');
+    Route::post('/reservas/{reserva}/no-llego', [ReservaController::class, 'noLlego'])
+        ->middleware(['cash.session', 'can:ver caja'])
+        ->name('reservas.no-llego');
 
     // PEDIDOS
     Route::post('/pedidos/{pedido}/agregar-productos', [PedidoController::class, 'agregarProductos']);

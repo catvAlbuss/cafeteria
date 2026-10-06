@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ReservaService;
 use App\Traits\BelongsToTeam;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -18,7 +19,19 @@ class Reserva extends Model
 
     public const ESTADO_CANCELADA = 'cancelada';
 
-    public const ESTADO_EXPIRADA = 'expirada';
+    public const ESTADO_NO_PRESENTADO = 'no_presentado';
+
+    public const ADELANTO_SIN_ADELANTO = 'sin_adelanto';
+
+    public const ADELANTO_PAGADO = 'pagado';
+
+    public const ADELANTO_APLICADO_PARCIAL = 'aplicado_parcial';
+
+    public const ADELANTO_APLICADO_TOTAL = 'aplicado_total';
+
+    public const ADELANTO_DEVUELTO = 'devuelto';
+
+    public const ADELANTO_RETENIDO = 'retenido';
 
     protected $fillable = [
         'team_id',
@@ -30,7 +43,12 @@ class Reserva extends Model
         'telefono',
         'personas',
         'adelanto_pagado',
-        'adelanto_metodo',
+        'adelanto_aplicado',
+        'adelanto_pagado_at',
+        'adelanto_metodo_pago',
+        'adelanto_caja_id',
+        'adelanto_pagado_por',
+        'adelanto_estado',
         'notas',
         'estado',
         'fecha_cancelacion',
@@ -44,6 +62,8 @@ class Reserva extends Model
      */
     protected $casts = [
         'adelanto_pagado' => 'decimal:2',
+        'adelanto_aplicado' => 'decimal:2',
+        'adelanto_pagado_at' => 'datetime',
     ];
 
     public function mesa(): BelongsTo
@@ -57,26 +77,38 @@ class Reserva extends Model
     }
 
     /**
-     * Marcar como expiradas todas las reservas confirmadas cuya hora_fin ya
-     * pasó (el cliente nunca llegó). Es el "chequeo lazy" de expiración.
+     * Marcar como no presentadas todas las reservas confirmadas cuya hora_fin
+     * ya pasó, más la tolerancia de retraso (`reservas.tolerancia_minutos`).
+     *
+     * El dinero no se mueve: el adelanto pasa a "retenido" para que caja sepa
+     * que tiene S/ 20 esperando una decisión (devolverlo o no). No se emite
+     * ningún egreso automáticamente.
      */
     public static function expirarVencidas(): int
     {
         $ahora = now();
+        $tolerancia = (int) config('reservas.tolerancia_minutos', 0);
 
         $vencidas = static::query()
             ->where('estado', self::ESTADO_CONFIRMADA)
-            ->where(function ($q) use ($ahora) {
-                $q->whereDate('fecha', '<', $ahora->toDateString())
-                    ->orWhere(function ($q2) use ($ahora) {
-                        $q2->whereDate('fecha', '=', $ahora->toDateString())
-                            ->whereTime('hora_fin', '<=', $ahora->format('H:i:s'));
-                    });
+            ->where('fecha', '<=', $ahora->toDateString())
+            ->get()
+            ->filter(function (self $reserva) use ($ahora, $tolerancia) {
+                $fin = Carbon::parse("{$reserva->fecha} {$reserva->hora_fin}");
+
+                return $fin->addMinutes($tolerancia)->lte($ahora);
             })
-            ->get();
+            ->values();
 
         foreach ($vencidas as $reserva) {
-            $reserva->update(['estado' => self::ESTADO_EXPIRADA]);
+            $datos = ['estado' => self::ESTADO_NO_PRESENTADO];
+
+            if ((float) $reserva->adelanto_pagado > 0
+                && $reserva->adelanto_estado === self::ADELANTO_PAGADO) {
+                $datos['adelanto_estado'] = self::ADELANTO_RETENIDO;
+            }
+
+            $reserva->update($datos);
         }
 
         return $vencidas->count();
@@ -99,6 +131,7 @@ class Reserva extends Model
             ->whereTime('hora_fin', '>', now()->format('H:i:s'))
             ->whereTime('hora_inicio', '<=', now()->addMinutes($margenInicio)->format('H:i:s'))
             ->orderBy('hora_inicio')
+            ->orderBy('hora_fin')
             ->first();
     }
 
@@ -107,48 +140,23 @@ class Reserva extends Model
      * - Mesas en "reserva" sin reserva activa se devuelven a "libre".
      * - Mesas "libres" cuya reserva ya entró en la ventana pasan a "reserva".
      *
-     * @return array<int, Mesa> mesas liberadas
+     * @return array<int, Mesa> mesas cuyo estado cambió
      */
     public static function sincronizarMesasEnReserva(): array
     {
-        $liberadas = [];
+        $cambiadas = [];
 
-        foreach (Mesa::query()->where('estado', 'reserva')->get() as $mesa) {
-            $activa = self::activaDeMesa($mesa->id);
+        $mesas = Mesa::query()
+            ->whereIn('estado', ['reserva', 'libre'])
+            ->get();
 
-            if ($activa) {
-                $mesa->update([
-                    'cliente' => $activa->cliente,
-                    'personas' => $activa->personas,
-                ]);
-
-                continue;
+        foreach ($mesas as $mesa) {
+            if (ReservaService::aplicarReservaActiva($mesa)) {
+                $cambiadas[] = $mesa;
             }
-
-            $mesa->update([
-                'estado' => 'libre',
-                'cliente' => null,
-                'personas' => null,
-            ]);
-
-            $liberadas[] = $mesa;
         }
 
-        foreach (Mesa::query()->where('estado', 'libre')->get() as $mesa) {
-            $activa = self::activaDeMesa($mesa->id);
-
-            if (! $activa) {
-                continue;
-            }
-
-            $mesa->update([
-                'estado' => 'reserva',
-                'cliente' => $activa->cliente,
-                'personas' => $activa->personas,
-            ]);
-        }
-
-        return $liberadas;
+        return $cambiadas;
     }
 
     /**

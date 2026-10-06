@@ -19,55 +19,6 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
-function abrirCajaReservas(User $user): void
-{
-    Caja::query()->create([
-        'team_id' => $user->current_team_id,
-        'user_id' => $user->id,
-        'caja' => 'Caja Principal',
-        'turno' => 'Todo el día',
-        'monto_inicial' => 100,
-        'fecha_apertura' => now(),
-        'estado' => 'Abierta',
-    ]);
-}
-
-function crearMesaReservas(User $user, string $numero = '301'): Mesa
-{
-    return Mesa::query()->create([
-        'team_id' => $user->current_team_id,
-        'numero' => $numero,
-        'capacidad' => 4,
-        'sillas' => 4,
-        'estado' => 'libre',
-    ]);
-}
-
-function crearReservaHoy(
-    User $user,
-    Mesa $mesa,
-    string $inicio,
-    string $fin,
-    string $estado = Reserva::ESTADO_CONFIRMADA,
-    string $cliente = 'Cliente reserva',
-): Reserva {
-    return Reserva::query()->create([
-        'team_id' => $user->current_team_id,
-        'mesa_id' => $mesa->id,
-        'fecha' => now()->toDateString(),
-        'hora_inicio' => $inicio,
-        'hora_fin' => $fin,
-        'cliente' => $cliente,
-        'personas' => 3,
-        'estado' => $estado,
-    ]);
-}
-
-function horaFutura(int $minutos): string
-{
-    return now()->addMinutes($minutos)->format('H:i');
-}
-
 test('una reserva dentro de la ventana deja la mesa en estado reserva', function () {
     $admin = User::query()->where('usuario', 'admin')->firstOrFail();
     $mesa = crearMesaReservas($admin);
@@ -324,7 +275,7 @@ test('las reservas vencidas se expiran de forma lazy y liberan la mesa', functio
 
     $this->actingAs($admin)->get(route('mesas.index'))->assertOk();
 
-    expect($reserva->fresh()->estado)->toBe(Reserva::ESTADO_EXPIRADA)
+    expect($reserva->fresh()->estado)->toBe(Reserva::ESTADO_NO_PRESENTADO)
         ->and($mesa->fresh()->estado)->toBe('libre')
         ->and($mesa->fresh()->cliente)->toBeNull();
 });
@@ -388,8 +339,9 @@ test('sin adelanto tampoco se reserva', function () {
     expect(Reserva::query()->where('mesa_id', $mesa->id)->exists())->toBeFalse();
 });
 
-test('el adelanto mínimo de S/ 20 se caja como ingreso', function () {
+test('el adelanto mínimo de S/ 20 entra al arqueo sin registrar movimiento de caja', function () {
     $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+    $caja = Caja::query()->where('estado', 'Abierta')->firstOrFail();
     $mesa = crearMesaReservas($admin);
 
     $this->actingAs($admin)->post(route('mesas.reservas.store', $mesa), [
@@ -404,16 +356,25 @@ test('el adelanto mínimo de S/ 20 se caja como ingreso', function () {
     $reserva = Reserva::query()->where('mesa_id', $mesa->id)->firstOrFail();
 
     expect((float) $reserva->adelanto_pagado)->toBe(20.0)
-        ->and($reserva->adelanto_metodo)->toBe('efectivo');
+        ->and($reserva->adelanto_metodo_pago)->toBe('efectivo');
 
-    $movimiento = MovimientoCaja::query()
-        ->where('concepto', 'like', '%Con adelanto%')
-        ->firstOrFail();
+    // El adelanto es temporal y puede devolverse: no deja asiento en
+    // movimientos de caja. Se contabiliza en su propia línea del arqueo.
+    expect(MovimientoCaja::query()->count())->toBe(0);
 
-    expect($movimiento->tipo)->toBe('ingreso')
-        ->and((float) $movimiento->monto)->toBe(20.0)
-        ->and($movimiento->user_id)->toBe($admin->id)
-        ->and($movimiento->team_id)->toBe($admin->current_team_id);
+    // Deja constancia de quién recibió el dinero y en qué jornada.
+    expect($reserva->adelanto_estado)->toBe(Reserva::ADELANTO_PAGADO)
+        ->and((float) $reserva->adelanto_aplicado)->toBe(0.0)
+        ->and($reserva->adelanto_caja_id)->toBe($caja->id)
+        ->and($reserva->adelanto_pagado_por)->toBe($admin->id)
+        ->and($reserva->adelanto_pagado_at)->not->toBeNull();
+
+    $props = $this->actingAs($admin)->get(route('contador.index'))
+        ->assertOk()->viewData('page')['props'];
+
+    expect((float) $props['resumen']['adelantos_en_caja'])->toBe(20.0)
+        ->and((float) $props['resumen']['ingresos_aportes'])->toBe(0.0)
+        ->and((float) $props['resumen']['efectivo_esperado'])->toBe(120.0);
 });
 
 test('se admite un adelanto mayor y con otro método de pago', function () {
@@ -427,17 +388,22 @@ test('se admite un adelanto mayor y con otro método de pago', function () {
         'hora_fin' => horaFutura(65),
         'personas' => 4,
         'adelanto' => 75.5,
-        'adelanto_metodo' => 'yape',
+        'adelanto_metodo_pago' => 'yape',
     ])->assertSessionHasNoErrors();
 
     $reserva = Reserva::query()->where('mesa_id', $mesa->id)->firstOrFail();
 
     expect((float) $reserva->adelanto_pagado)->toBe(75.5)
-        ->and($reserva->adelanto_metodo)->toBe('yape');
+        ->and($reserva->adelanto_metodo_pago)->toBe('yape')
+        ->and(MovimientoCaja::query()->count())->toBe(0);
 
-    expect(
-        (float) MovimientoCaja::query()->where('concepto', 'like', '%Adelanto grande%')->firstOrFail()->monto
-    )->toBe(75.5);
+    // Un adelanto en Yape no está en el cajón, así que no toca el efectivo.
+    $props = $this->actingAs($admin)->get(route('contador.index'))
+        ->assertOk()->viewData('page')['props'];
+
+    expect((float) $props['resumen']['adelantos_en_caja'])->toBe(75.5)
+        ->and((float) $props['resumen']['adelantos_en_caja_efectivo'])->toBe(0.0)
+        ->and((float) $props['resumen']['efectivo_esperado'])->toBe(100.0);
 });
 
 test('el método de pago del adelanto no puede ser cualquiera', function () {
@@ -451,8 +417,8 @@ test('el método de pago del adelanto no puede ser cualquiera', function () {
         'hora_fin' => horaFutura(65),
         'personas' => 2,
         'adelanto' => 20,
-        'adelanto_metodo' => 'bitcoin',
-    ])->assertSessionHasErrors('adelanto_metodo');
+        'adelanto_metodo_pago' => 'bitcoin',
+    ])->assertSessionHasErrors('adelanto_metodo_pago');
 
     expect(Reserva::query()->where('mesa_id', $mesa->id)->exists())->toBeFalse();
 });
@@ -473,5 +439,5 @@ test('sin caja abierta la reserva y su adelanto no se crean', function () {
     ])->assertRedirect();
 
     expect(Reserva::query()->where('mesa_id', $mesa->id)->exists())->toBeFalse()
-        ->and(MovimientoCaja::query()->where('concepto', 'like', '%Sin caja%')->exists())->toBeFalse();
+        ->and(MovimientoCaja::query()->exists())->toBeFalse();
 });
