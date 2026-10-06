@@ -7,6 +7,7 @@ use App\Events\PedidoActualizado;
 use App\Events\PedidoCreado;
 use App\Events\PedidoListo;
 use App\Models\Caja;
+use App\Models\ConfiguracionFacturacion;
 use App\Models\Delivery;
 use App\Models\Insumo;
 use App\Models\Mesa;
@@ -31,6 +32,7 @@ class PedidoController extends Controller
 
     public function index(Request $request)
     {
+        $teamId = $request->user()->current_team_id;
         $mesaNumero = $request->query('mesa');
 
         if ($mesaNumero) {
@@ -41,6 +43,7 @@ class PedidoController extends Controller
 
         $mesaInfo = $mesaNumero
             ? Mesa::with('meseroUser')
+                ->where('team_id', $teamId)
                 ->where('numero', $mesaNumero)
                 ->first()
             : null;
@@ -50,10 +53,11 @@ class PedidoController extends Controller
             $mesaInfo = null;
         }
 
-        $platos = Plato::all();
+        $platos = Plato::where('team_id', $teamId)->get();
 
         $pedidosActivos = $mesaInfo
-            ? Pedido::where('mesa_id', $mesaInfo->id)
+            ? Pedido::where('team_id', $teamId)
+                ->where('mesa_id', $mesaInfo->id)
                 ->whereNotIn('estado', ['pagado', 'cancelado'])
                 ->limit(50)
                 ->get()
@@ -62,6 +66,7 @@ class PedidoController extends Controller
             : collect();
 
         $pedidos = Pedido::with('mesa')
+            ->where('team_id', $teamId)
             ->whereNull('delivery_id')
             ->limit(50)
             ->get()
@@ -70,7 +75,7 @@ class PedidoController extends Controller
 
         return Inertia::render('dinero/ventas', [
             'platos' => $platos,
-            'mesas' => Mesa::all(),
+            'mesas' => Mesa::where('team_id', $teamId)->get(),
             'mesaInfo' => $mesaInfo,
             'pedidos' => $pedidos,
             'pedidosActivos' => $pedidosActivos,
@@ -238,6 +243,9 @@ class PedidoController extends Controller
 
     public function cobrarMesa(Request $request, Mesa $mesa)
     {
+        // ✅ Validar que la mesa pertenece al team actual
+        abort_if($mesa->team_id !== $request->user()->current_team_id, 403);
+
         $validated = $request->validate([
             'metodo_pago' => 'required|in:efectivo,tarjeta,yape',
             'pedido_ids' => 'required|array|min:1',
@@ -260,13 +268,18 @@ class PedidoController extends Controller
             ]);
         }
 
-        $pedidos = DB::transaction(function () use ($mesa, $validated) {
+        $teamId = $request->user()->current_team_id;
+
+        $pedidos = DB::transaction(function () use ($mesa, $validated, $teamId) {
+            // ✅ Caja filtrada por team_id
             $caja = Caja::query()
+                ->where('team_id', $teamId)
                 ->where('estado', 'Abierta')
                 ->lockForUpdate()
                 ->firstOrFail();
 
             $pedidosActuales = Pedido::query()
+                ->where('team_id', $teamId)
                 ->where('mesa_id', $mesa->id)
                 ->whereNotIn('estado', ['pagado', 'cancelado'])
                 ->lockForUpdate()
@@ -329,9 +342,12 @@ class PedidoController extends Controller
             ->with('success', 'Pedido(s) cobrado(s) correctamente');
     }
 
-    public function caja()
+    public function caja(Request $request)
     {
+        $teamId = $request->user()->current_team_id;
+
         $pedidos = Pedido::with('mesa')
+            ->where('team_id', $teamId)
             ->whereNull('delivery_id')
             ->where('estado', 'listo')
             ->orderBy('created_at', 'asc')
@@ -363,8 +379,10 @@ class PedidoController extends Controller
             'estado' => 'nullable|string|in:pendiente,preparando,listo,entregado,pagado,cancelado',
             'area' => 'nullable|string|in:cocina,bar,horno,postres',
             'observaciones' => 'nullable|string',
-            'user_id' => 'nullable|integer|exists:users,id',    
+            'user_id' => 'nullable|integer|exists:users,id',
         ]);
+
+        $teamId = auth()->user()->current_team_id;
 
         if (
             ! empty($validated['user_id'])
@@ -380,7 +398,10 @@ class PedidoController extends Controller
         }
 
         if (! empty($validated['mesa_id'])) {
-            $mesaDePedido = Mesa::query()->find($validated['mesa_id']);
+            // ✅ Mesa filtrada por team_id
+            $mesaDePedido = Mesa::query()
+                ->where('team_id', $teamId)
+                ->find($validated['mesa_id']);
 
             if ($mesaDePedido && ! $mesaDePedido->activa) {
                 return redirect()->back()->withErrors([
@@ -396,13 +417,14 @@ class PedidoController extends Controller
         $estado = $validated['estado'] ?? 'pendiente';
         $userId = $validated['user_id'] ?? auth()->id();
         [$orders, $updatedTable] = DB::transaction(
-            function () use ($validated, $estado, $userId) {
+            function () use ($validated, $estado, $userId, $teamId) {
                 $orders = collect($validated['productos'])
                     ->map(
                         function (array $producto) use (
                             $validated,
                             $estado,
-                            $userId
+                            $userId,
+                            $teamId
                         ) {
                             $area = $this->productionAreaClassifier
                                 ->detect($producto, 'cocina');
@@ -448,7 +470,7 @@ class PedidoController extends Controller
                                 'observaciones' => $validated['observaciones'] ?? null,
                                 'hora_pedido' => now(),
                                 'user_id' => $userId,
-                                'team_id' => auth()->user()->current_team_id,
+                                'team_id' => $teamId,
                             ]);
                         }
                     )
@@ -460,7 +482,9 @@ class PedidoController extends Controller
                     $estado === 'pendiente'
                     && ! empty($validated['mesa_id'])
                 ) {
-                    $mesa = Mesa::query()->find($validated['mesa_id']);
+                    $mesa = Mesa::query()
+                        ->where('team_id', $teamId)
+                        ->find($validated['mesa_id']);
 
                     if ($mesa && $mesa->estado !== 'ocupada') {
                         $mesa->estado = 'ocupada';
@@ -494,6 +518,9 @@ class PedidoController extends Controller
         Request $request,
         Pedido $pedido
     ): RedirectResponse {
+        // ✅ Validar que el pedido pertenece al team actual
+        abort_if($pedido->team_id !== $request->user()->current_team_id, 403);
+
         if ($pedido->estado !== 'preparando') {
             return redirect()
                 ->back()
@@ -559,8 +586,10 @@ class PedidoController extends Controller
             );
     }
 
-    public function show(Pedido $pedido): RedirectResponse
+    public function show(Request $request, Pedido $pedido): RedirectResponse
     {
+        abort_if($pedido->team_id !== $request->user()->current_team_id, 403);
+
         $mesaNumero = $pedido->mesa()->value('numero');
 
         return to_route(
@@ -571,6 +600,8 @@ class PedidoController extends Controller
 
     public function update(Request $request, Pedido $pedido)
     {
+        abort_if($pedido->team_id !== $request->user()->current_team_id, 403);
+
         if ($request->has('productos')) {
             $request->validate([
                 'productos' => 'required|array|min:1',
@@ -645,8 +676,10 @@ class PedidoController extends Controller
             ->with('error', 'No se realizaron cambios');
     }
 
-    public function cancelar(Pedido $pedido)
+    public function cancelar(Request $request, Pedido $pedido)
     {
+        abort_if($pedido->team_id !== $request->user()->current_team_id, 403);
+
         if ($pedido->estado !== 'pendiente') {
             return redirect()
                 ->back()
@@ -664,9 +697,11 @@ class PedidoController extends Controller
             ->with('success', 'Pedido cancelado');
     }
 
-    public function marcarListo($id)
+    public function marcarListo(Request $request, $id)
     {
-        $pedido = Pedido::findOrFail($id);
+        $teamId = $request->user()->current_team_id;
+
+        $pedido = Pedido::where('team_id', $teamId)->findOrFail($id);
         $pedido->estado = 'listo';
 
         if ($pedido->tipo === 'delivery' && $pedido->delivery_id) {
@@ -701,9 +736,11 @@ class PedidoController extends Controller
             ->with('success', 'Pedido marcado como listo');
     }
 
-    public function enviarACocina($id)
+    public function enviarACocina(Request $request, $id)
     {
-        $pedido = Pedido::findOrFail($id);
+        $teamId = $request->user()->current_team_id;
+
+        $pedido = Pedido::where('team_id', $teamId)->findOrFail($id);
 
         if (
             $pedido->tipo === 'delivery'
@@ -728,9 +765,12 @@ class PedidoController extends Controller
             );
     }
 
-    public function pendientes()
+    public function pendientes(Request $request)
     {
+        $teamId = $request->user()->current_team_id;
+
         $pedidos = Pedido::with('mesa')
+            ->where('team_id', $teamId)
             ->whereNull('delivery_id')
             ->whereIn('estado', ['pendiente', 'preparando'])
             ->orderBy('created_at', 'asc')
@@ -739,9 +779,12 @@ class PedidoController extends Controller
         return response()->json($pedidos);
     }
 
-    public function listosParaCobrar()
+    public function listosParaCobrar(Request $request)
     {
+        $teamId = $request->user()->current_team_id;
+
         $pedidos = Pedido::with('mesa')
+            ->where('team_id', $teamId)
             ->whereNull('delivery_id')
             ->where('estado', 'listo')
             ->orderBy('created_at', 'asc')
@@ -752,12 +795,18 @@ class PedidoController extends Controller
 
     public function cobrar(Request $request, Pedido $pedido)
     {
+        abort_if($pedido->team_id !== $request->user()->current_team_id, 403);
+
         $validated = $request->validate([
             'metodo_pago' => 'required|in:efectivo,tarjeta,yape',
             'monto_recibido' => 'nullable|numeric|min:0',
         ]);
 
+        $teamId = $request->user()->current_team_id;
+
+        // ✅ Caja filtrada por team_id
         $caja = Caja::query()
+            ->where('team_id', $teamId)
             ->where('estado', 'Abierta')
             ->firstOrFail();
 
@@ -787,8 +836,10 @@ class PedidoController extends Controller
             ->with('success', 'Pedido cobrado correctamente');
     }
 
-    public function destroy(Pedido $pedido)
+    public function destroy(Request $request, Pedido $pedido)
     {
+        abort_if($pedido->team_id !== $request->user()->current_team_id, 403);
+
         $pedido->delete();
 
         return redirect()
@@ -796,9 +847,11 @@ class PedidoController extends Controller
             ->with('success', 'Pedido eliminado correctamente');
     }
 
-    public function entregarTicket($id)
+    public function entregarTicket(Request $request, $id)
     {
-        $pedido = Pedido::findOrFail($id);
+        $teamId = $request->user()->current_team_id;
+
+        $pedido = Pedido::where('team_id', $teamId)->findOrFail($id);
 
         if ($pedido->estado !== 'listo') {
             return redirect()
@@ -821,6 +874,7 @@ class PedidoController extends Controller
                 'mesa_id',
                 $pedido->mesa_id
             )
+                ->where('team_id', $teamId)
                 ->whereNotIn(
                     'estado',
                     ['entregado', 'pagado', 'cancelado']
@@ -908,13 +962,25 @@ class PedidoController extends Controller
             'authorization_pin' => 'nullable|string|size:4',
         ]);
 
-        $pedidos = Pedido::whereIn('id', $validated['pedido_ids'])->get();
+        $teamId = auth()->user()->current_team_id;
+
+        //  Filtrar pedidos por team_id
+        $pedidos = Pedido::whereIn('id', $validated['pedido_ids'])
+            ->where('team_id', $teamId)
+            ->get();
 
         if ($pedidos->isEmpty()) {
             return response()->json([
                 'success' => false,
                 'error' => 'No se encontraron pedidos para facturar.',
             ], 404);
+        }
+
+        if ($pedidos->count() !== count($validated['pedido_ids'])) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Uno o más pedidos no pertenecen a esta sede.',
+            ], 403);
         }
 
         if (
@@ -986,7 +1052,11 @@ class PedidoController extends Controller
             }
         }
 
-        $serie = $validated['tipo_documento'] === '01' ? 'F001' : 'B001';
+        //  Leer serie desde config de la empresa
+        $config = ConfiguracionFacturacion::where('team_id', $teamId)->first();
+        $serie = $validated['tipo_documento'] === '01'
+            ? ($config?->serie_factura ?? 'F001')
+            : ($config?->serie_boleta ?? 'B001');
 
         $payload = [
             'serie' => $serie,
@@ -1047,8 +1117,19 @@ class PedidoController extends Controller
             DB::beginTransaction();
 
             if (! empty($validated['mesa_id'])) {
-                $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
-                $mesa = Mesa::where('id', $validated['mesa_id'])->lockForUpdate()->firstOrFail();
+                //  Caja filtrada por team_id
+                $caja = Caja::query()
+                    ->where('team_id', $teamId)
+                    ->where('estado', 'Abierta')
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                //  Mesa filtrada por team_id
+                $mesa = Mesa::where('team_id', $teamId)
+                    ->where('id', $validated['mesa_id'])
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
                 $mesa->estado = 'libre';
                 $mesa->user_id = null;
                 $mesa->cliente = null;
@@ -1058,7 +1139,11 @@ class PedidoController extends Controller
 
                 broadcast(new MesaActualizada($mesa));
             } else {
-                $caja = Caja::query()->where('estado', 'Abierta')->firstOrFail();
+                // Caja filtrada por team_id
+                $caja = Caja::query()
+                    ->where('team_id', $teamId)
+                    ->where('estado', 'Abierta')
+                    ->firstOrFail();
             }
 
             $ventaGrupo = ! empty($validated['mesa_id'])
@@ -1085,7 +1170,7 @@ class PedidoController extends Controller
             }
 
             $this->clienteService->sincronizarDesdeVenta(
-                (int) auth()->user()->current_team_id,
+                (int) $teamId,
                 $validated['tipo_documento'],
                 $validated['documento'],
                 $validated['nombre'] ?? null,
@@ -1136,4 +1221,4 @@ class PedidoController extends Controller
             'telefono' => $pedido->telefono,
         ]);
     }
-}   
+}

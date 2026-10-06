@@ -8,6 +8,10 @@ import {
     ThermometerSun,
     Users,
     X,
+    Banknote,
+    CreditCard,
+    Smartphone,
+    Wallet,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Swal from 'sweetalert2';
@@ -23,12 +27,17 @@ export interface Reserva {
     mesa_id: number;
     fecha: string;
     hora_inicio: string;
-    hora_fin: string;
+    hora_fin: string | null;
+    tolerancia_minutos?: number;
+    hora_limite_llegada?: string | null;
     cliente: string;
     telefono?: string | null;
     personas: number;
     notas?: string | null;
     estado: 'confirmada' | 'atendida' | 'cancelada' | 'expirada';
+    adelanto_monto?: number | string | null;
+    adelanto_metodo_pago?: 'efectivo' | 'tarjeta' | 'yape' | null;
+    adelanto_estado?: 'pendiente' | 'pagado' | 'aplicado' | 'perdido' | null;
 }
 
 interface ModalReservasMesaProps {
@@ -77,6 +86,35 @@ const sumarMinutos = (hora: string, minutos: number): string => {
     return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 };
 
+const formatearHoraAmigable = (hora: string): string => {
+    if (!hora || !hora.includes(':')) {
+        return '';
+    }
+
+    const [hh, mm] = hora.split(':').map(Number);
+
+    if (isNaN(hh) || isNaN(mm)) {
+        return '';
+    }
+
+    // Determinar AM/PM
+    const esPM = hh >= 12;
+    const hora12 = hh === 0 ? 12 : hh > 12 ? hh - 12 : hh;
+    const periodo = esPM ? 'PM' : 'AM';
+
+    // Determinar momento del día
+    let momento = '';
+    if (hh >= 5 && hh < 12) {
+        momento = 'mañana';
+    } else if (hh >= 12 && hh < 18) {
+        momento = 'tarde';
+    } else {
+        momento = 'noche';
+    }
+
+    return `${hora12}:${String(mm).padStart(2, '0')} ${periodo} (${momento})`;
+};
+
 const ESTADO_CHIP: Record<Reserva['estado'], string> = {
     confirmada:
         'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-500/40',
@@ -92,6 +130,41 @@ const ESTADO_LABEL: Record<Reserva['estado'], string> = {
     atendida: 'Atendida',
     cancelada: 'Cancelada',
     expirada: 'Expirada',
+};
+
+// Chip del adelanto según estado
+const getAdelantoChip = (
+    estado: string | null | undefined,
+    monto: number | string | null | undefined,
+) => {
+    if (!monto || Number(monto) <= 0) {
+        return null;
+    }
+
+    const montoNum = Number(monto);
+
+    switch (estado) {
+        case 'pagado':
+            return {
+                label: `💵 S/ ${montoNum.toFixed(2)}`,
+                className:
+                    'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/40',
+            };
+        case 'aplicado':
+            return {
+                label: `✅ S/ ${montoNum.toFixed(2)}`,
+                className:
+                    'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-500/40',
+            };
+        case 'perdido':
+            return {
+                label: `❌ S/ ${montoNum.toFixed(2)}`,
+                className:
+                    'bg-red-500/15 text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/40',
+            };
+        default:
+            return null;
+    }
 };
 
 // ============================================================
@@ -112,7 +185,12 @@ export default function ModalReservasMesa({
     const [fecha, setFecha] = useState(formatearFechaHoy);
     const [horaInicio, setHoraInicio] = useState('');
     const [horaFin, setHoraFin] = useState('');
+    const [tolerancia, setTolerancia] = useState('20');
     const [personas, setPersonas] = useState('');
+    const [adelantoMonto, setAdelantoMonto] = useState('20');
+    const [adelantoMetodoPago, setAdelantoMetodoPago] = useState<
+        'efectivo' | 'tarjeta' | 'yape'
+    >('efectivo');
     const [creando, setCreando] = useState(false);
     const [liberando, setLiberando] = useState(false);
 
@@ -120,19 +198,14 @@ export default function ModalReservasMesa({
         flash?: { success?: string; error?: string };
     }>().props;
 
-    // Evita reintentar la misma alerta de éxito al reabrir el modal.
     const flashVistoRef = useRef<string | undefined>(undefined);
 
-    // Al abrir el modal se marca el flash actual como "ya visto", evitando que
-    // una alerta de una acción anterior vuelva a saltar solo por reabrir.
     useEffect(() => {
         if (isOpen) {
             flashVistoRef.current = flash?.success;
         }
     }, [isOpen]);
 
-    // Solo se muestra la alerta cuando llega un flash NUEVO mientras el modal
-    // está abierto (p. ej. tras crear/liberar dentro del propio modal).
     useEffect(() => {
         if (
             !isOpen ||
@@ -158,10 +231,13 @@ export default function ModalReservasMesa({
     const limiteInicio = sumarMinutos(ahora, margenInicioMinutos);
 
     // Reserva activa: dentro de la ventana de anticipación y aún no terminó.
+    // Usa hora_limite_llegada si existe, si no, hora_fin.
     const activa =
-        activas.find(
-            (r) => r.hora_fin > ahora && r.hora_inicio <= limiteInicio,
-        ) ?? null;
+        activas.find((r) => {
+            const horaTope = r.hora_limite_llegada || r.hora_fin || '23:59';
+
+            return horaTope > ahora && r.hora_inicio <= limiteInicio;
+        }) ?? null;
 
     const reservasPasadas = reservas
         .filter((r) => r.id !== activa?.id)
@@ -172,6 +248,8 @@ export default function ModalReservasMesa({
 
     const crearReserva = () => {
         const personasNum = Number.parseInt(personas, 10);
+        const adelantoNum = parseFloat(adelantoMonto);
+        const toleranciaNum = Number.parseInt(tolerancia, 10);
 
         if (!cliente.trim()) {
             swalError('Cliente requerido', 'Ingresa el nombre de la reserva.');
@@ -179,16 +257,13 @@ export default function ModalReservasMesa({
             return;
         }
 
-        if (!horaInicio || !horaFin) {
-            swalError(
-                'Horario requerido',
-                'Indica la hora de inicio y fin de la reserva.',
-            );
+        if (!horaInicio) {
+            swalError('Hora requerida', 'Indica la hora de inicio.');
 
             return;
         }
 
-        if (horaInicio >= horaFin) {
+        if (horaFin && horaInicio >= horaFin) {
             swalError(
                 'Horario inválido',
                 'La hora de fin debe ser posterior a la hora de inicio.',
@@ -203,6 +278,24 @@ export default function ModalReservasMesa({
             return;
         }
 
+        if (!Number.isInteger(toleranciaNum) || toleranciaNum < 5) {
+            swalError(
+                'Tolerancia inválida',
+                'La tolerancia debe ser de al menos 5 minutos.',
+            );
+
+            return;
+        }
+
+        if (isNaN(adelantoNum) || adelantoNum < 20) {
+            swalError(
+                'Adelanto inválido',
+                'El adelanto mínimo es de S/ 20.00',
+            );
+
+            return;
+        }
+
         const confirmar = () => {
             setCreando(true);
 
@@ -213,8 +306,11 @@ export default function ModalReservasMesa({
                     telefono: telefono.trim() || null,
                     fecha,
                     hora_inicio: horaInicio,
-                    hora_fin: horaFin,
+                    hora_fin: horaFin || null,
+                    tolerancia_minutos: toleranciaNum,
                     personas: personasNum,
+                    adelanto_monto: adelantoNum,
+                    adelanto_metodo_pago: adelantoMetodoPago,
                 },
                 {
                     preserveScroll: true,
@@ -227,6 +323,9 @@ export default function ModalReservasMesa({
                         setHoraInicio('');
                         setHoraFin('');
                         setPersonas('');
+                        setAdelantoMonto('20');
+                        setAdelantoMetodoPago('efectivo');
+                        setTolerancia('20');
                     },
                     onError: (errors) => {
                         setCreando(false);
@@ -259,9 +358,19 @@ export default function ModalReservasMesa({
     };
 
     const liberarReserva = () => {
+        const reservaActiva = activa;
+        const tieneAdelanto =
+            reservaActiva &&
+            Number(reservaActiva.adelanto_monto) > 0 &&
+            reservaActiva.adelanto_estado === 'pagado';
+
+        const mensajeAdvertencia = tieneAdelanto
+            ? `<br><br><b style="color: #dc2626;">⚠️ El adelanto de S/ ${Number(reservaActiva.adelanto_monto).toFixed(2)} se perderá y NO será reembolsado.</b>`
+            : '';
+
         Swal.fire({
             title: '¿Liberar la reserva?',
-            text: 'La reserva quedará como CANCELADA en el historial (no se borra).',
+            html: `La reserva quedará como CANCELADA en el historial.${mensajeAdvertencia}`,
             input: 'text',
             inputLabel: 'Motivo (opcional)',
             inputPlaceholder: 'Ej: El cliente no llegó',
@@ -329,10 +438,13 @@ export default function ModalReservasMesa({
                                 {activa.cliente}
                             </p>
 
-                            <p className="mt-1 flex items-center gap-3 text-sm text-cocoa">
+                            <p className="mt-1 flex flex-wrap items-center gap-3 text-sm text-cocoa">
                                 <span className="inline-flex items-center gap-1.5">
                                     <Clock className="h-4 w-4" />
-                                    {activa.hora_inicio} – {activa.hora_fin}
+                                    {activa.hora_inicio}
+                                    {activa.hora_fin
+                                        ? ` – ${activa.hora_fin}`
+                                        : ' (sin límite)'}
                                 </span>
 
                                 <span className="inline-flex items-center gap-1.5">
@@ -343,6 +455,29 @@ export default function ModalReservasMesa({
                                         : 'personas'}
                                 </span>
                             </p>
+
+                            {/* Chip del adelanto */}
+                            {(() => {
+                                const chip = getAdelantoChip(
+                                    activa.adelanto_estado,
+                                    activa.adelanto_monto,
+                                );
+
+                                if (!chip) {
+                                    return null;
+                                }
+
+                                return (
+                                    <div className="mt-2">
+                                        <span
+                                            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${chip.className}`}
+                                        >
+                                            <Wallet className="h-3 w-3" />
+                                            {chip.label}
+                                        </span>
+                                    </div>
+                                );
+                            })()}
 
                             <div className="mt-4 flex flex-wrap gap-2">
                                 <button
@@ -387,33 +522,55 @@ export default function ModalReservasMesa({
                             </p>
                         )}
 
-                        {reservasPasadas.map((r) => (
-                            <div
-                                key={r.id}
-                                className={`rounded-lg border border-wheat bg-cream-soft/40 px-4 py-3 ${r.estado !== 'confirmada' ? 'opacity-70' : ''}`}
-                            >
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <p className="font-semibold text-chocolate">
-                                        {r.hora_inicio} – {r.hora_fin}{' '}
-                                        <span className="ml-1 font-normal text-cocoa">
-                                            · {r.cliente}
-                                        </span>
+                        {reservasPasadas.map((r) => {
+                            const chipAdelanto = getAdelantoChip(
+                                r.adelanto_estado,
+                                r.adelanto_monto,
+                            );
+
+                            return (
+                                <div
+                                    key={r.id}
+                                    className={`rounded-lg border border-wheat bg-cream-soft/40 px-4 py-3 ${r.estado !== 'confirmada' ? 'opacity-70' : ''}`}
+                                >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <p className="font-semibold text-chocolate">
+                                            {r.hora_inicio}
+                                            {r.hora_fin
+                                                ? ` – ${r.hora_fin}`
+                                                : ''}{' '}
+                                            <span className="ml-1 font-normal text-cocoa">
+                                                · {r.cliente}
+                                            </span>
+                                        </p>
+
+                                        <div className="flex items-center gap-1.5">
+                                            {chipAdelanto && (
+                                                <span
+                                                    className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${chipAdelanto.className}`}
+                                                >
+                                                    {chipAdelanto.label}
+                                                </span>
+                                            )}
+
+                                            <span
+                                                className={`rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ${ESTADO_CHIP[r.estado]}`}
+                                            >
+                                                {ESTADO_LABEL[r.estado]}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <p className="mt-1 text-xs text-cocoa-soft">
+                                        {r.personas}{' '}
+                                        {r.personas === 1
+                                            ? 'persona'
+                                            : 'personas'}
+                                        {r.telefono ? ` · ${r.telefono}` : ''}
                                     </p>
-
-                                    <span
-                                        className={`rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ${ESTADO_CHIP[r.estado]}`}
-                                    >
-                                        {ESTADO_LABEL[r.estado]}
-                                    </span>
                                 </div>
-
-                                <p className="mt-1 text-xs text-cocoa-soft">
-                                    {r.personas}{' '}
-                                    {r.personas === 1 ? 'persona' : 'personas'}
-                                    {r.telefono ? ` · ${r.telefono}` : ''}
-                                </p>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* Nueva reserva */}
@@ -485,40 +642,142 @@ export default function ModalReservasMesa({
                                         value={horaInicio}
                                         onChange={(e) => {
                                             setHoraInicio(e.target.value);
-
-                                            // Hora fin por defecto: +30 min.
-                                            if (!horaFin) {
-                                                setHoraFin(
-                                                    sumarMinutos(
-                                                        e.target.value,
-                                                        30,
-                                                    ),
-                                                );
-                                            }
+                                            // ✅ YA NO se auto-completa la hora fin
                                         }}
                                         className={`mt-1 ${inputBase}`}
                                     />
+                                    {horaInicio && (
+                                        <p className="mt-0.5 text-[11px] font-normal text-cocoa-soft">
+                                            {formatearHoraAmigable(horaInicio)}
+                                        </p>
+                                    )}
                                 </label>
 
                                 <label className="block text-sm font-semibold text-chocolate">
-                                    Hora fin
+                                    Hora fin (opcional)
                                     <input
                                         type="time"
                                         value={horaFin}
                                         onChange={(e) =>
                                             setHoraFin(e.target.value)
                                         }
+                                        placeholder="Sin límite"
+                                        className={`mt-1 ${inputBase}`}
+                                    />
+                                    {horaFin ? (
+                                        <p className="mt-0.5 text-[11px] font-normal text-cocoa-soft">
+                                            {formatearHoraAmigable(horaFin)}
+                                        </p>
+                                    ) : (
+                                        <p className="mt-0.5 text-[11px] font-normal text-cocoa-soft">
+                                            Sin límite de hora
+                                        </p>
+                                    )}
+                                </label>
+                                <label className="block text-sm font-semibold text-chocolate">
+                                    Tolerancia (min)
+                                    <input
+                                        type="number"
+                                        min="5"
+                                        max="120"
+                                        value={tolerancia}
+                                        onChange={(e) =>
+                                            setTolerancia(e.target.value)
+                                        }
                                         className={`mt-1 ${inputBase}`}
                                     />
                                 </label>
+
+                                <div className="col-span-2 mt-2 border-t border-wheat pt-3">
+                                    <p className="mb-2 flex items-center gap-1.5 text-xs font-bold tracking-wide text-cocoa-soft uppercase">
+                                        <Wallet className="h-3.5 w-3.5" />
+                                        Adelanto de reserva
+                                    </p>
+
+                                    <label className="block text-sm font-semibold text-chocolate">
+                                        Monto (mínimo S/ 20)
+                                        <input
+                                            type="number"
+                                            min="20"
+                                            step="0.5"
+                                            value={adelantoMonto}
+                                            onChange={(e) => {
+                                               
+                                                setAdelantoMonto(e.target.value);
+                                            }}
+                                            className={`mt-1 ${inputBase}`}
+                                        />
+                                    </label>
+
+                                    <div className="mt-3">
+                                        <p className="mb-1.5 text-sm font-semibold text-chocolate">
+                                            Método de pago
+                                        </p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setAdelantoMetodoPago(
+                                                        'efectivo',
+                                                    )
+                                                }
+                                                className={`flex flex-col items-center gap-0.5 rounded-lg border py-2 text-xs font-medium transition ${adelantoMetodoPago ===
+                                                    'efectivo'
+                                                    ? 'border-gold bg-gold text-ink'
+                                                    : 'border-wheat bg-card text-cocoa hover:bg-cream-soft'
+                                                    }`}
+                                            >
+                                                <Banknote className="h-4 w-4" />
+                                                Efectivo
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setAdelantoMetodoPago(
+                                                        'tarjeta',
+                                                    )
+                                                }
+                                                className={`flex flex-col items-center gap-0.5 rounded-lg border py-2 text-xs font-medium transition ${adelantoMetodoPago ===
+                                                    'tarjeta'
+                                                    ? 'border-gold bg-gold text-ink'
+                                                    : 'border-wheat bg-card text-cocoa hover:bg-cream-soft'
+                                                    }`}
+                                            >
+                                                <CreditCard className="h-4 w-4" />
+                                                Tarjeta
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setAdelantoMetodoPago(
+                                                        'yape',
+                                                    )
+                                                }
+                                                className={`flex flex-col items-center gap-0.5 rounded-lg border py-2 text-xs font-medium transition ${adelantoMetodoPago ===
+                                                    'yape'
+                                                    ? 'border-gold bg-gold text-ink'
+                                                    : 'border-wheat bg-card text-cocoa hover:bg-cream-soft'
+                                                    }`}
+                                            >
+                                                <Smartphone className="h-4 w-4" />
+                                                Yape
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[11px] text-red-600 dark:bg-red-950/30 dark:text-red-400">
+                                        ⚠️ El adelanto no es reembolsable si el
+                                        cliente no se presenta dentro de la
+                                        tolerancia.
+                                    </p>
+                                </div>
                             </div>
 
                             <p className="mt-3 text-[11px] text-cocoa-soft">
                                 La mesa se marca como «Reserva» unos{' '}
                                 {margenInicioMinutos} min antes de que inicie la
-                                reserva; antes se puede usar con normalidad. No
-                                se permite otra reserva en el mismo rango de
-                                horario.
+                                reserva. Si el cliente no llega dentro de la
+                                tolerancia, la reserva expira automáticamente.
                             </p>
 
                             <div className="mt-3 flex justify-end">

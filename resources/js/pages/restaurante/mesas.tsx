@@ -136,11 +136,10 @@ function ModalPin({ isOpen, mesa, onClose, onConfirm }: ModalPinProps) {
                         {[0, 1, 2, 3].map((i) => (
                             <span
                                 key={i}
-                                className={`h-4 w-4 rounded-full border-2 ${
-                                    i < pin.length
-                                        ? 'border-gold bg-gold'
-                                        : 'border-cocoa-soft/40 dark:border-white/40'
-                                }`}
+                                className={`h-4 w-4 rounded-full border-2 ${i < pin.length
+                                    ? 'border-gold bg-gold'
+                                    : 'border-cocoa-soft/40 dark:border-white/40'
+                                    }`}
                             />
                         ))}
                     </div>
@@ -361,9 +360,9 @@ function SillaDraggable({
 
     const style = transform
         ? {
-              transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-              zIndex: 50,
-          }
+            transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+            zIndex: 50,
+        }
         : undefined;
 
     return (
@@ -378,13 +377,11 @@ function SillaDraggable({
                     ? 'Solo se pueden mover sillas entre mesas libres'
                     : 'Arrastra para mover esta silla a otra mesa'
             }
-            className={`touch-none rounded-md p-1 transition ${
-                isDragging ? 'scale-110 opacity-40' : 'opacity-100'
-            } ${
-                disabled
+            className={`touch-none rounded-md p-1 transition ${isDragging ? 'scale-110 opacity-40' : 'opacity-100'
+                } ${disabled
                     ? 'cursor-not-allowed'
                     : 'cursor-grab hover:scale-110 active:cursor-grabbing'
-            }`}
+                }`}
         >
             <Armchair className={`h-5 w-5 sm:h-4 sm:w-4 ${colorClass}`} />
         </button>
@@ -423,14 +420,12 @@ function PlanoMesa({
             </div>
 
             <div
-                className={`flex h-12 w-16 flex-col items-center justify-center rounded-xl border-2 ${
-                    getEstadoConfig(mesa.estado).border
-                } ${getEstadoConfig(mesa.estado).bg} shadow-inner dark:border`}
+                className={`flex h-12 w-16 flex-col items-center justify-center rounded-xl border-2 ${getEstadoConfig(mesa.estado).border
+                    } ${getEstadoConfig(mesa.estado).bg} shadow-inner dark:border`}
             >
                 <span
-                    className={`text-lg leading-tight font-extrabold ${
-                        getEstadoConfig(mesa.estado).text
-                    }`}
+                    className={`text-lg leading-tight font-extrabold ${getEstadoConfig(mesa.estado).text
+                        }`}
                 >
                     {mesa.sillas}
                 </span>
@@ -493,12 +488,12 @@ function MesaCard({
         mesa.estado === 'ocupada'
             ? 'text-orange-500 dark:text-orange-400'
             : mesa.estado === 'pendiente'
-              ? 'text-yellow-500 dark:text-yellow-400'
-              : mesa.estado === 'reserva'
-                ? 'text-blue-500 dark:text-blue-400'
-                : mesa.estado === 'listo_cobrar'
-                  ? 'text-purple-500 dark:text-purple-400'
-                  : 'text-green-500 dark:text-green-400';
+                ? 'text-yellow-500 dark:text-yellow-400'
+                : mesa.estado === 'reserva'
+                    ? 'text-blue-500 dark:text-blue-400'
+                    : mesa.estado === 'listo_cobrar'
+                        ? 'text-purple-500 dark:text-purple-400'
+                        : 'text-green-500 dark:text-green-400';
 
     const dragDisabled = mesa.estado !== 'libre';
 
@@ -704,20 +699,19 @@ function MesaCard({
                                     onCambiarEstado(mesa.id, value);
                                 }}
                                 disabled={isDisabled}
-                                className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${
-                                    isActive
-                                        ? activeClass
-                                        : isDisabled
-                                          ? 'cursor-not-allowed border-wheat bg-sand text-cocoa-soft opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-cream-soft/60'
-                                          : idleClass
-                                }`}
+                                className={`flex h-8 items-center justify-center rounded-lg border transition active:scale-95 ${isActive
+                                    ? activeClass
+                                    : isDisabled
+                                        ? 'cursor-not-allowed border-wheat bg-sand text-cocoa-soft opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-cream-soft/60'
+                                        : idleClass
+                                    }`}
                                 title={
                                     isDisabled
                                         ? esCobrar
                                             ? 'La mesa está en Cobrar. Solo puedes proceder con el cobro.'
                                             : value === 'listo_cobrar'
-                                              ? 'Primero debes realizar un pedido y entregar todos los pedidos de la mesa.'
-                                              : 'Debes entregar todos los pedidos primero'
+                                                ? 'Primero debes realizar un pedido y entregar todos los pedidos de la mesa.'
+                                                : 'Debes entregar todos los pedidos primero'
                                         : `Cambiar a ${label}`
                                 }
                             >
@@ -733,9 +727,8 @@ function MesaCard({
     return (
         <div
             ref={setNodeRef}
-            className={`group relative flex h-full flex-col rounded-xl border-2 ${config.border} ${config.bg} p-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:border ${
-                isOver ? 'scale-[1.02] ring-4 ring-gold' : ''
-            }`}
+            className={`group relative flex h-full flex-col rounded-xl border-2 ${config.border} ${config.bg} p-2 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:border ${isOver ? 'scale-[1.02] ring-4 ring-gold' : ''
+                }`}
         >
             {(() => {
                 const ticketsListos = pedidos.filter(
@@ -897,8 +890,10 @@ export default function MesasDistribucion() {
     const [ticketsDeMesa, setTicketsDeMesa] = useState<any[]>([]);
 
     const [pedidosLista, setPedidosLista] = useState<any[]>(() =>
+
         toArray<any>(pedidosIniciales),
     );
+    const [adelantoCobro, setAdelantoCobro] = useState<number>(0);
 
     const cambiarEstado = (id: number, nuevoEstado: string) => {
         const mesa = mesas.find((m) => m.id === id);
@@ -969,9 +964,9 @@ export default function MesasDistribucion() {
             prev.map((m) =>
                 m.id === id
                     ? {
-                          ...m,
-                          estado: nuevoEstado as Mesa['estado'],
-                      }
+                        ...m,
+                        estado: nuevoEstado as Mesa['estado'],
+                    }
                     : m,
             ),
         );
@@ -1006,6 +1001,18 @@ export default function MesasDistribucion() {
             return;
         }
 
+        const reservaConAdelanto = reservasLista.find(
+            (r) =>
+                r.mesa_id === mesa.id &&
+                r.adelanto_estado === 'aplicado' &&
+                Number(r.adelanto_monto) > 0,
+        );
+
+        const adelantoMonto = reservaConAdelanto
+            ? Number(reservaConAdelanto.adelanto_monto)
+            : 0;
+
+        setAdelantoCobro(adelantoMonto);
         setPedidoCobro(pedidosDeLaMesa);
         setMesaCobro(mesa);
         setModalCobroAbierto(true);
@@ -1191,9 +1198,9 @@ export default function MesasDistribucion() {
                         prev.map((m) =>
                             m.id === mesa.id
                                 ? {
-                                      ...m,
-                                      estado: 'ocupada',
-                                  }
+                                    ...m,
+                                    estado: 'ocupada',
+                                }
                                 : m,
                         ),
                     );
@@ -1263,9 +1270,9 @@ export default function MesasDistribucion() {
                 prev.map((m) =>
                     m.id === mesa.id
                         ? {
-                              ...m,
-                              estado: 'listo_cobrar',
-                          }
+                            ...m,
+                            estado: 'listo_cobrar',
+                        }
                         : m,
                 ),
             );
@@ -1338,9 +1345,8 @@ export default function MesasDistribucion() {
 
         Swal.fire({
             title: '¿Entregar pedido?',
-            text: `¿Confirmas que el pedido #${
-                ticket.numero || ticketId
-            } ha sido entregado a la mesa?`,
+            text: `¿Confirmas que el pedido #${ticket.numero || ticketId
+                } ha sido entregado a la mesa?`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Sí, entregar',
@@ -1355,9 +1361,9 @@ export default function MesasDistribucion() {
             const nuevosTickets = ticketsDeMesa.map((t) =>
                 t.id === ticketId
                     ? {
-                          ...t,
-                          estado: 'entregado',
-                      }
+                        ...t,
+                        estado: 'entregado',
+                    }
                     : t,
             );
 
@@ -1367,9 +1373,9 @@ export default function MesasDistribucion() {
                 prev.map((p) =>
                     p.id === ticketId
                         ? {
-                              ...p,
-                              estado: 'entregado',
-                          }
+                            ...p,
+                            estado: 'entregado',
+                        }
                         : p,
                 ),
             );
@@ -1415,9 +1421,9 @@ export default function MesasDistribucion() {
                                     prev.map((m) =>
                                         m.id === mesaSeleccionada.id
                                             ? {
-                                                  ...m,
-                                                  estado: 'listo_cobrar',
-                                              }
+                                                ...m,
+                                                estado: 'listo_cobrar',
+                                            }
                                             : m,
                                     ),
                                 );
@@ -1436,9 +1442,9 @@ export default function MesasDistribucion() {
                             prev.map((t) =>
                                 t.id === ticketId
                                     ? {
-                                          ...t,
-                                          estado: 'listo',
-                                      }
+                                        ...t,
+                                        estado: 'listo',
+                                    }
                                     : t,
                             ),
                         );
@@ -1447,9 +1453,9 @@ export default function MesasDistribucion() {
                             prev.map((p) =>
                                 p.id === ticketId
                                     ? {
-                                          ...p,
-                                          estado: 'listo',
-                                      }
+                                        ...p,
+                                        estado: 'listo',
+                                    }
                                     : p,
                             ),
                         );
@@ -1457,7 +1463,7 @@ export default function MesasDistribucion() {
                         swalError(
                             'Error',
                             errorsToText(errors) ||
-                                'No se pudo entregar el pedido',
+                            'No se pudo entregar el pedido',
                         );
                     },
                 },
@@ -1716,12 +1722,17 @@ export default function MesasDistribucion() {
                     isOpen={modalCobroAbierto}
                     mesa={mesaCobro}
                     pedido={pedidoCobro}
-                    onClose={() => setModalCobroAbierto(false)}
+                    adelanto={adelantoCobro}
+                    onClose={() => {
+                        setModalCobroAbierto(false);
+                        setAdelantoCobro(0);
+                    }}
                     onSuccess={() => {
                         setModalCobroAbierto(false);
+                        setAdelantoCobro(0);
 
                         router.reload({
-                            only: ['mesas', 'pedidos'],
+                            only: ['mesas', 'pedidos', 'reservas'],
                             preserveUrl: true,
                         });
                     }}

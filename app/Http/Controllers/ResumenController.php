@@ -17,26 +17,44 @@ class ResumenController extends Controller
 
     public function __construct()
     {
+        // Respaldo global (fallback)
         $this->see = new See;
         $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
         $this->see->setService(env('SUNAT_URL'));
     }
 
-    /**
-     * Genera y envía el Resumen Diario de Boletas a SUNAT.
-     */
     public function enviar(Request $request)
     {
         try {
-            // 1. Validar la fecha
             $request->validate([
                 'fecha' => 'required|date',
             ]);
 
             $fecha = $request->input('fecha');
+            $teamId = auth()->user()->current_team_id;
 
-            // 2. Obtener las boletas del día que no hayan sido resumidas
-            $boletas = Factura::where('serie', 'LIKE', 'B%')
+            // ✅ Leer configuración de la BD de ESTA empresa
+            $config = \App\Models\ConfiguracionFacturacion::where('team_id', $teamId)->first();
+
+            // ✅ Sobrescribir See con la config de la empresa
+            if ($config) {
+                if ($config->certificado_path) {
+                    $certPath = storage_path('app/certificates/'.$config->certificado_path);
+                    if (file_exists($certPath)) {
+                        $this->see->setCertificate(file_get_contents($certPath));
+                    }
+                }
+                if ($config->sol_usuario && $config->sol_clave) {
+                    $this->see->setClaveSOL($config->ruc, $config->sol_usuario, $config->sol_clave);
+                }
+                if ($config->sunat_url) {
+                    $this->see->setService($config->sunat_url);
+                }
+            }
+
+            // ✅ Filtrar boletas por team_id
+            $boletas = Factura::where('team_id', $teamId)
+                ->where('serie', 'LIKE', 'B%')
                 ->whereDate('fecha_emitido', $fecha)
                 ->whereNull('resumen_id')
                 ->get();
@@ -48,29 +66,36 @@ class ResumenController extends Controller
                 ], 404);
             }
 
-            // 3. Configurar empresa emisora
+            // ✅ Datos de la empresa desde config o fallback
+            $ruc = $config?->ruc ?? env('GREENTER_RUC');
+            $razonSocial = $config?->razon_social ?? 'SEVEN HEART SOCIEDAD ANONIMA CERRADA';
+            $nombreComercial = $config?->nombre_comercial ?? 'DOLCE CAFFE';
+            $ubigeo = $config?->ubigeo ?? '100101';
+            $departamento = $config?->departamento ?? 'HUANUCO';
+            $provincia = $config?->provincia ?? 'HUANUCO';
+            $distrito = $config?->distrito ?? 'HUANUCO';
+            $direccion = $config?->direccion ?? 'DIRECCION REAL';
+
             $company = new Company;
-            $company->setRuc(env('GREENTER_RUC'))
-                ->setRazonSocial('SEVEN HEART SOCIEDAD ANONIMA CERRADA')
-                ->setNombreComercial('DOLCE CAFFE')
+            $company->setRuc($ruc)
+                ->setRazonSocial($razonSocial)
+                ->setNombreComercial($nombreComercial)
                 ->setAddress((new Address)
-                    ->setUbigueo('100101')
-                    ->setDepartamento('HUANUCO')
-                    ->setProvincia('HUANUCO')
-                    ->setDistrito('HUANUCO')
+                    ->setUbigueo($ubigeo)
+                    ->setDepartamento($departamento)
+                    ->setProvincia($provincia)
+                    ->setDistrito($distrito)
                     ->setUrbanizacion('-')
-                    ->setDireccion('DIRECCION REAL')
+                    ->setDireccion($direccion)
                     ->setCodLocal('0000'));
 
-            // 4. Crear el Resumen
             $resumen = (new Summary)
-                ->setCorrelativo($this->nuevoCorrelativoResumen())
+                ->setCorrelativo($this->nuevoCorrelativoResumen($teamId)) // ✅ Pasar teamId
                 ->setFecGeneracion(new \DateTime($fecha))
                 ->setFecResumen(new \DateTime($fecha))
                 ->setMoneda('PEN')
                 ->setCompany($company);
 
-            // 5. Agregar cada boleta al resumen
             $details = [];
             foreach ($boletas as $boleta) {
                 $detail = (new SummaryDetail)
@@ -88,7 +113,6 @@ class ResumenController extends Controller
 
             $resumen->setDetails($details);
 
-            // 6. Enviar a SUNAT (Paso 1: obtener ticket)
             $result = $this->see->send($resumen);
 
             if (! $result->isSuccess()) {
@@ -101,20 +125,17 @@ class ResumenController extends Controller
             $ticket = $result->getTicket();
             $filename = $resumen->getName();
 
-            // 7. Guardar el ticket en las boletas
             foreach ($boletas as $boleta) {
                 $boleta->resumen_ticket = $ticket;
                 $boleta->save();
             }
 
-            // 8. Guardar el XML
             Storage::makeDirectory('resumenes');
             Storage::put(
                 "resumenes/{$filename}.xml",
                 $this->see->getFactory()->getLastXml()
             );
 
-            // 9. Consultar el CDR con el ticket (Paso 2)
             $cdrResult = $this->see->getStatus($ticket);
 
             if (! $cdrResult->isSuccess()) {
@@ -126,14 +147,12 @@ class ResumenController extends Controller
                 ], 500);
             }
 
-            // 10. Guardar el CDR
             Storage::makeDirectory('resumenes/cdr');
             Storage::put(
                 "resumenes/cdr/{$filename}.zip",
                 $cdrResult->getCdrZip()
             );
 
-            // 11. Marcar las boletas como resumidas
             foreach ($boletas as $boleta) {
                 $boleta->resumen_id = $filename;
                 $boleta->save();
@@ -161,10 +180,6 @@ class ResumenController extends Controller
         }
     }
 
-    /**
-     * Consulta el CDR de un resumen ya enviado, usando el ticket.
-     * Se usa cuando SUNAT devuelve el error 0200 (servidor no activo).
-     */
     public function consultarCdr(Request $request)
     {
         $request->validate([
@@ -174,8 +189,26 @@ class ResumenController extends Controller
 
         $ticket = $request->input('ticket');
         $filename = $request->input('filename');
+        $teamId = auth()->user()->current_team_id;
 
         try {
+            // ✅ Sobrescribir See con config de la empresa
+            $config = \App\Models\ConfiguracionFacturacion::where('team_id', $teamId)->first();
+            if ($config) {
+                if ($config->certificado_path) {
+                    $certPath = storage_path('app/certificates/'.$config->certificado_path);
+                    if (file_exists($certPath)) {
+                        $this->see->setCertificate(file_get_contents($certPath));
+                    }
+                }
+                if ($config->sol_usuario && $config->sol_clave) {
+                    $this->see->setClaveSOL($config->ruc, $config->sol_usuario, $config->sol_clave);
+                }
+                if ($config->sunat_url) {
+                    $this->see->setService($config->sunat_url);
+                }
+            }
+
             $cdrResult = $this->see->getStatus($ticket);
 
             if (! $cdrResult->isSuccess()) {
@@ -186,15 +219,15 @@ class ResumenController extends Controller
                 ], 500);
             }
 
-            // Guardar el CDR
             Storage::makeDirectory('resumenes/cdr');
             Storage::put(
                 "resumenes/cdr/{$filename}.zip",
                 $cdrResult->getCdrZip()
             );
 
-            // Marcar las boletas como resumidas
-            Factura::where('resumen_ticket', $ticket)
+            // ✅ Filtrar por team_id
+            Factura::where('team_id', $teamId)
+                ->where('resumen_ticket', $ticket)
                 ->update(['resumen_id' => $filename]);
 
             $cdr = $cdrResult->getCdrResponse();
@@ -218,12 +251,11 @@ class ResumenController extends Controller
         }
     }
 
-    /**
-     * Genera un nuevo correlativo para el resumen.
-     */
-    private function nuevoCorrelativoResumen()
+    // ✅ Ahora recibe $teamId
+    private function nuevoCorrelativoResumen($teamId)
     {
-        $ultimoResumen = Factura::whereNotNull('resumen_id')
+        $ultimoResumen = Factura::where('team_id', $teamId)
+            ->whereNotNull('resumen_id')
             ->orderBy('idfactura', 'desc')
             ->first();
 
@@ -237,29 +269,21 @@ class ResumenController extends Controller
         return (string) ($ultimoCorrelativo + 1);
     }
 
-    /**
-     * Descarga el XML del resumen.
-     */
     public function downloadXml($filename)
     {
         $path = "resumenes/{$filename}.xml";
         if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'XML no encontrado'], 404);
         }
-
         return Storage::download($path);
     }
 
-    /**
-     * Descarga el CDR del resumen.
-     */
     public function downloadCdr($filename)
     {
         $path = "resumenes/cdr/{$filename}.zip";
         if (! Storage::exists($path)) {
             return response()->json(['success' => false, 'error' => 'CDR no encontrado'], 404);
         }
-
         return Storage::download($path);
     }
 }

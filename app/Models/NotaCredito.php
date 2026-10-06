@@ -10,6 +10,7 @@ class NotaCredito extends Model
     protected $table = 'notas_credito';
 
     protected $fillable = [
+        'team_id',
         'factura_id',
         'serie',
         'correlativo',

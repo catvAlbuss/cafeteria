@@ -7,6 +7,7 @@ import {
     Smartphone,
     Printer,
     KeyRound,
+    Wallet,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
@@ -41,6 +42,7 @@ interface ModalCobroProps {
     isOpen: boolean;
     mesa: Mesa | null;
     pedido?: Pedido[];
+    adelanto?: number; // <-- NUEVO: monto del adelanto aplicado
     onClose: () => void;
     onSuccess: () => void;
 }
@@ -52,6 +54,7 @@ export default function ModalCobro({
     isOpen,
     mesa,
     pedido,
+    adelanto = 0, // <-- NUEVO
     onClose,
     onSuccess,
 }: ModalCobroProps) {
@@ -60,7 +63,6 @@ export default function ModalCobro({
     const [authorizationPin, setAuthorizationPin] = useState('');
     const [cargando, setCargando] = useState(false);
     const [exito, setExito] = useState(false);
-    const [comprobanteEmitido, setComprobanteEmitido] = useState<any>(null);
     const ticketRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -93,8 +95,14 @@ export default function ModalCobro({
         typeof p.productos === 'string' ? JSON.parse(p.productos) : p.productos,
     );
 
+    // 🎯 Adelanto aplicado (solo si existe)
+    const adelantoAplicado = Math.max(0, Number(adelanto) || 0);
+
+    // 🎯 Saldo a pagar = total - adelanto (nunca menor que 0)
+    const saldoAPagar = Math.max(0, total - adelantoAplicado);
+
     const montoRecibidoNum = parseFloat(montoRecibido) || 0;
-    const cambio = montoRecibidoNum - total;
+    const cambio = montoRecibidoNum - saldoAPagar;
 
     const handleCobrar = () => {
         setCargando(true);
@@ -144,7 +152,6 @@ export default function ModalCobro({
                                     padding: 8px 6px;
                                     background: white;
                                     border-radius: 8px;
-                                    ox-shadow: none;
                                     margin: 0 auto;
                                     }
                                     .text-center { text-align: center; }
@@ -160,103 +167,11 @@ export default function ModalCobro({
                                     .pt-1 { padding-top: 4px; }
                                     .pt-2 { padding-top: 8px; }
                                     .pt-3 { padding-top: 12px; }
-                                    .text-dark { color: #1a1a1a; }
-                                    .text-gray { color: #555; }
-                                    .text-muted { color: #777; }
                                     .text-sm { font-size: 11px; }
                                     .text-base { font-size: 13px; }
                                     .text-lg { font-size: 15px; }
                                     .text-xl { font-size: 18px; }
                                     .tracking-wide { letter-spacing: 1.5px; }
-                                    .shop-name { 
-                                        font-size: 18px; 
-                                        font-weight: 700;
-                                        color: #1a1a1a;
-                                        letter-spacing: 2px;
-                                    }
-                                    .shop-address {
-                                        font-size: 11px;
-                                        color: #444;
-                                        margin-top: 2px;
-                                    }
-                                    .shop-phone {
-                                        font-size: 11px;
-                                        color: #444;
-                                    }
-                                    .title {
-                                        font-size: 13px;
-                                        font-weight: 700;
-                                        color: #1a1a1a;
-                                        letter-spacing: 1.5px;
-                                    }
-                                    .date-time {
-                                        font-size: 11px;
-                                        color: #555;
-                                        margin-top: 2px;
-                                    }
-                                    .table-header {
-                                        font-size: 12px;
-                                        font-weight: 700;
-                                        color: #1a1a1a;
-                                        letter-spacing: 1px;
-                                    }
-                                    .product-row {
-                                        display: flex;
-                                        justify-content: space-between;
-                                        font-size: 13px;
-                                        padding: 2px 0;
-                                        color: #1a1a1a;
-                                    }
-                                    .product-name { flex: 1; color: #1a1a1a; }
-                                    .product-price {
-                                        font-weight: 600;
-                                        min-width: 60px;
-                                        text-align: right;
-                                        color: #1a1a1a;
-                                    }
-                                    .total-row {
-                                        display: flex;
-                                        justify-content: space-between;
-                                        font-size: 16px;
-                                        font-weight: 700;
-                                        color: #1a1a1a;
-                                        padding: 4px 0;
-                                    }
-                                    .payment-row {
-                                        display: flex;
-                                        justify-content: space-between;
-                                        font-size: 13px;
-                                        padding: 3px 0;
-                                        color: #1a1a1a;
-                                    }
-                                    .payment-label { color: #444; }
-                                    .payment-value { font-weight: 600; color: #1a1a1a; }
-                                    .payment-method-value {
-                                        color: #1a1a1a;
-                                        font-weight: 700;
-                                        text-transform: uppercase;
-                                    }
-                                    .footer-text {
-                                        font-size: 14px;
-                                        font-weight: 700;
-                                        color: #1a1a1a;
-                                        letter-spacing: 1.5px;
-                                    }
-                                    .footer-attended {
-                                        font-size: 11px;
-                                        color: #444;
-                                        margin-top: 3px;
-                                    }
-                                    .divider-dashed {
-                                        border: none;
-                                        border-bottom: 1.5px dashed #ccc;
-                                        margin: 6px 0;
-                                    }
-                                    .divider-dashed-thick {
-                                        border: none;
-                                        border-bottom: 2px dashed #ccc;
-                                        margin: 8px 0;
-                                    }
                                 </style>
                             </head>
                             <body>
@@ -317,7 +232,7 @@ export default function ModalCobro({
                         </div>
                         <div>
                             <p className="text-sm font-bold text-chocolate">
-                                DOLCE CAFEE
+                                DOLCE CAFE
                             </p>
                             <p className="text-[10px] text-cocoa-soft">
                                 Mesa #{mesa.numero}
@@ -337,13 +252,13 @@ export default function ModalCobro({
 
                 {!exito ? (
                     <div className="flex-1 space-y-3 overflow-y-auto p-4">
-{/* ===== TICKET ===== */}
-                            <div
-                                ref={ticketRef}
-                                className="rounded-xl border border-black/10 bg-white p-4"
-                                id="ticket-print"
-                            >
-                            {/* SHOP NAME - SIN IMAGEN */}
+                        {/* ===== TICKET ===== */}
+                        <div
+                            ref={ticketRef}
+                            className="rounded-xl border border-black/10 bg-white p-4"
+                            id="ticket-print"
+                        >
+                            {/* SHOP NAME */}
                             <div
                                 className="mb-1 pb-1 text-center"
                                 style={{ borderBottom: '1.5px dashed #ccc' }}
@@ -479,7 +394,8 @@ export default function ModalCobro({
                                     </p>
                                 )}
                             </div>
-                            {/* TOTAL */}
+
+                            {/* TOTALES */}
                             <div
                                 className="mb-1 pt-1"
                                 style={{ borderTop: '2px dashed #ccc' }}
@@ -545,14 +461,60 @@ export default function ModalCobro({
                                 </div>
                             </div>
 
-                            {/* PAGO Y CAMBIO - SOLO SI ES EFECTIVO */}
+                            {/* ✅ ADELANTO APLICADO */}
+                            {adelantoAplicado > 0 && (
+                                <div
+                                    className="mb-1 pt-1"
+                                    style={{ borderTop: '1.5px dashed #ccc' }}
+                                >
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            fontSize: '13px',
+                                            padding: '1px 0',
+                                            color: '#000000',
+                                        }}
+                                    >
+                                        <span style={{ color: '#333333' }}>
+                                            Adelanto reserva
+                                        </span>
+                                        <span
+                                            style={{
+                                                fontWeight: 600,
+                                                color: '#000000',
+                                            }}
+                                        >
+                                            -{adelantoAplicado.toFixed(2)}
+                                        </span>
+                                    </div>
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            fontSize: '16px',
+                                            fontWeight: 700,
+                                            color: '#000000',
+                                            padding: '2px 0',
+                                            borderTop: '1px solid #ddd',
+                                        }}
+                                    >
+                                        <span style={{ color: '#000000' }}>
+                                            SALDO A PAGAR
+                                        </span>
+                                        <span style={{ color: '#000000' }}>
+                                            {saldoAPagar.toFixed(2)}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* PAGO Y CAMBIO */}
                             {metodoPago === 'efectivo' &&
                                 montoRecibidoNum > 0 && (
                                     <div
                                         className="mb-1 pt-1"
-                                        style={{
-                                            borderTop: '1.5px dashed #ccc',
-                                        }}
+                                        style={{ borderTop: '1.5px dashed #ccc' }}
                                     >
                                         <div
                                             style={{
@@ -627,6 +589,7 @@ export default function ModalCobro({
                                     </span>
                                 </div>
                             </div>
+
                             {/* FOOTER */}
                             <div
                                 className="pt-1 text-center"
@@ -654,6 +617,20 @@ export default function ModalCobro({
                                 </p>
                             </div>
                         </div>
+
+                        {/* ===== ADELANTO INFORMATIVO (si existe) ===== */}
+                        {adelantoAplicado > 0 && (
+                            <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-700/40 dark:bg-emerald-950/40">
+                                <Wallet className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                <p className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                                    Adelanto aplicado:{' '}
+                                    <strong>
+                                        S/ {adelantoAplicado.toFixed(2)}
+                                    </strong>{' '}
+                                    · Saldo: S/ {saldoAPagar.toFixed(2)}
+                                </p>
+                            </div>
+                        )}
 
                         {/* ===== MÉTODO DE PAGO ===== */}
                         <div className="grid flex-shrink-0 grid-cols-3 gap-2">
@@ -727,7 +704,8 @@ export default function ModalCobro({
                                     )}
                                 {montoRecibidoNum > 0 && cambio < 0 && (
                                     <p className="mt-1 text-xs text-red-500">
-                                        El monto recibido es menor al total
+                                        El monto recibido es menor al saldo (
+                                        S/ {saldoAPagar.toFixed(2)})
                                     </p>
                                 )}
                             </div>
@@ -766,12 +744,12 @@ export default function ModalCobro({
                                 cargando ||
                                 authorizationPin.length !== 4 ||
                                 (metodoPago === 'efectivo' &&
-                                    montoRecibidoNum < total)
+                                    montoRecibidoNum < saldoAPagar)
                             }
                             className={`flex w-full flex-shrink-0 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
                                 cargando ||
                                 (metodoPago === 'efectivo' &&
-                                    montoRecibidoNum < total)
+                                    montoRecibidoNum < saldoAPagar)
                                     ? 'cursor-not-allowed bg-wheat'
                                     : 'bg-roast text-white hover:bg-ink'
                             }`}
@@ -803,11 +781,14 @@ export default function ModalCobro({
                         <div className="mt-4 rounded-xl bg-cream-soft p-4">
                             <p className="text-sm text-cocoa">Total cobrado</p>
                             <p className="text-2xl font-bold text-gold">
-                                S/ {total.toFixed(2)}
+                                S/ {saldoAPagar.toFixed(2)}
                             </p>
-                            <p className="mt-1 text-xs text-cocoa-soft">
-                                Comprobante impreso
-                            </p>
+                            {adelantoAplicado > 0 && (
+                                <p className="mt-1 text-xs text-cocoa-soft">
+                                    (Total S/ {total.toFixed(2)} - Adelanto S/{' '}
+                                    {adelantoAplicado.toFixed(2)})
+                                </p>
+                            )}
                         </div>
                         <button
                             onClick={() => {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Factura;
 use App\Models\NotaCredito;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Greenter\Model\Client\Client;
 use Greenter\Model\Company\Address;
 use Greenter\Model\Company\Company;
@@ -19,6 +20,7 @@ class NotaCreditoController extends Controller
 
     public function __construct()
     {
+        // Respaldo global (fallback)
         $this->see = new See;
         $this->see->setCertificate(file_get_contents(storage_path('app/certificates/certificate.pem')));
         $this->see->setService(env('SUNAT_URL'));
@@ -36,10 +38,32 @@ class NotaCreditoController extends Controller
         ]);
 
         try {
-            // 1. Obtener la factura original
-            $factura = Factura::findOrFail($request->input('factura_id'));
+            // ✅ 1. Leer configuración de la BD de ESTA empresa
+            $teamId = auth()->user()->current_team_id;
+            $config = \App\Models\ConfiguracionFacturacion::where('team_id', $teamId)->first();
 
-            // 2. Verificar que la factura no tenga ya una nota de crédito
+            // ✅ 2. Sobrescribir See con la config de la empresa
+            if ($config) {
+                if ($config->certificado_path) {
+                    $certPath = storage_path('app/certificates/'.$config->certificado_path);
+                    if (file_exists($certPath)) {
+                        $this->see->setCertificate(file_get_contents($certPath));
+                    }
+                }
+                if ($config->sol_usuario && $config->sol_clave) {
+                    $this->see->setClaveSOL($config->ruc, $config->sol_usuario, $config->sol_clave);
+                }
+                if ($config->sunat_url) {
+                    $this->see->setService($config->sunat_url);
+                }
+            }
+
+            // ✅ 3. Verificar que la factura pertenece a ESTA empresa
+            $factura = Factura::where('idfactura', $request->input('factura_id'))
+                ->where('team_id', $teamId)
+                ->firstOrFail();
+
+            // 4. Verificar que la factura no tenga ya una nota de crédito
             $notaExistente = NotaCredito::where('factura_id', $factura->idfactura)
                 ->where('estado_sunat', 'aceptado')
                 ->first();
@@ -51,21 +75,35 @@ class NotaCreditoController extends Controller
                 ], 422);
             }
 
-            // 3. Configurar empresa emisora
+            // ✅ 5. Datos de empresa desde config o fallback
+            $ruc = $config?->ruc ?? env('GREENTER_RUC');
+            $razonSocial = $config?->razon_social ?? 'SEVEN HEART SOCIEDAD ANONIMA CERRADA';
+            $nombreComercial = $config?->nombre_comercial ?? 'DOLCE CAFFE';
+            $ubigeo = $config?->ubigeo ?? '100101';
+            $departamento = $config?->departamento ?? 'HUANUCO';
+            $provincia = $config?->provincia ?? 'HUANUCO';
+            $distrito = $config?->distrito ?? 'HUANUCO';
+            $direccion = $config?->direccion ?? 'DIRECCION REAL';
+
+            // ✅ Datos para el PDF
+            $telefonoEmpresa = $config?->telefono ?? '(+51) 953-992-277';
+            $emailEmpresa = $config?->email ?? 'facturacion@sevenheart.pe';
+            $logoPath = $config?->logo_path ? storage_path('app/public/'.$config->logo_path) : public_path('img/logoTiket.png');
+
             $company = new Company;
-            $company->setRuc(env('GREENTER_RUC'))
-                ->setRazonSocial('SEVEN HEART SOCIEDAD ANONIMA CERRADA')
-                ->setNombreComercial('DOLCE CAFFE')
+            $company->setRuc($ruc)
+                ->setRazonSocial($razonSocial)
+                ->setNombreComercial($nombreComercial)
                 ->setAddress((new Address)
-                    ->setUbigueo('100101')
-                    ->setDepartamento('HUANUCO')
-                    ->setProvincia('HUANUCO')
-                    ->setDistrito('HUANUCO')
+                    ->setUbigueo($ubigeo)
+                    ->setDepartamento($departamento)
+                    ->setProvincia($provincia)
+                    ->setDistrito($distrito)
                     ->setUrbanizacion('-')
-                    ->setDireccion('DIRECCION REAL')
+                    ->setDireccion($direccion)
                     ->setCodLocal('0000'));
 
-            // 4. Configurar cliente
+            // 6. Configurar cliente
             $client = new Client;
             if (substr($factura->serie, 0, 1) === 'F') {
                 $client->setTipoDoc('6')
@@ -77,11 +115,13 @@ class NotaCreditoController extends Controller
                     ->setRznSocial($factura->Cliente);
             }
 
-            // 5. Generar correlativo de la Nota de Crédito
+            // ✅ 7. Correlativo filtrado por team_id
             $tipoNota = substr($factura->serie, 0, 1) === 'F' ? 'FC01' : 'BC01';
-            $correlativo = (NotaCredito::where('serie', $tipoNota)->max('correlativo') ?? 0) + 1;
+            $correlativo = (NotaCredito::where('team_id', $teamId)
+                            ->where('serie', $tipoNota)
+                            ->max('correlativo') ?? 0) + 1;
 
-            // 6. Crear la Nota de Crédito
+            // 8. Crear la Nota de Crédito
             $note = (new Note)
                 ->setUblVersion('2.1')
                 ->setTipoDoc('07')
@@ -100,7 +140,7 @@ class NotaCreditoController extends Controller
                 ->setTotalImpuestos(round($factura->montototal - ($factura->montototal / 1.18), 2))
                 ->setMtoImpVenta($factura->montototal);
 
-            // 7. Detalle genérico
+            // 9. Detalle genérico
             $detail = (new SaleDetail)
                 ->setCodProducto('ANULACION')
                 ->setUnidad('NIU')
@@ -117,11 +157,12 @@ class NotaCreditoController extends Controller
 
             $note->setDetails([$detail]);
 
-            // 8. Enviar a SUNAT
+            // 10. Enviar a SUNAT
             $result = $this->see->send($note);
 
-            // 9. Guardar la Nota de Crédito
+            // ✅ 11. Guardar la Nota de Crédito CON team_id
             $notaCredito = new NotaCredito;
+            $notaCredito->team_id = $teamId; // ← NUEVO
             $notaCredito->factura_id = $factura->idfactura;
             $notaCredito->serie = $tipoNota;
             $notaCredito->correlativo = $correlativo;
@@ -153,7 +194,8 @@ class NotaCreditoController extends Controller
                 $notaCredito->documento = $filename.'.pdf';
                 $notaCredito->save();
 
-                $this->generatePdfFromXml($filename);
+                // ✅ Pasamos los datos de la empresa para el PDF
+                $this->generatePdfFromXml($filename, $telefonoEmpresa, $emailEmpresa, $logoPath);
 
                 $response = [
                     'success' => true,
@@ -194,7 +236,7 @@ class NotaCreditoController extends Controller
     /**
      * Genera el PDF de la Nota de Crédito desde el XML.
      */
-    private function generatePdfFromXml($filename)
+    private function generatePdfFromXml($filename, $telefono, $email, $logoPath)
     {
         try {
             $xmlPath = "notas_credito/{$filename}.xml";
@@ -215,9 +257,10 @@ class NotaCreditoController extends Controller
                 'company' => [
                     'name' => $xpath->evaluate('string(//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cbc:RegistrationName)'),
                     'address' => $xpath->evaluate('string(//cac:AccountingSupplierParty/cac:Party/cac:PartyLegalEntity/cac:RegistrationAddress/cac:AddressLine/cbc:Line)'),
-                    'phone' => '(+51) 953-992-277',
+                    'phone' => $telefono, // ✅ Dinámico
+                    'email' => $email,     // ✅ Dinámico
                     'ruc' => $xpath->evaluate('string(//cac:AccountingSupplierParty/cac:Party/cac:PartyIdentification/cbc:ID)'),
-                    'logo' => public_path('img/logoTiket.png'),
+                    'logo' => $logoPath,   // ✅ Dinámico
                 ],
                 'client' => [
                     'ruc' => $xpath->evaluate('string(//cac:AccountingCustomerParty/cac:Party/cac:PartyIdentification/cbc:ID)'),
@@ -255,9 +298,6 @@ class NotaCreditoController extends Controller
         }
     }
 
-    /**
-     * Descarga el XML de la Nota de Crédito.
-     */
     public function downloadXml($filename)
     {
         $path = "notas_credito/{$filename}.xml";
@@ -268,9 +308,6 @@ class NotaCreditoController extends Controller
         return Storage::download($path);
     }
 
-    /**
-     * Descarga el CDR de la Nota de Crédito.
-     */
     public function downloadCdr($filename)
     {
         $path = "notas_credito/cdr/{$filename}.zip";
@@ -281,9 +318,6 @@ class NotaCreditoController extends Controller
         return Storage::download($path);
     }
 
-    /**
-     * Descarga el PDF de la Nota de Crédito.
-     */
     public function downloadPdf($filename)
     {
         $path = "notas_credito/{$filename}.pdf";

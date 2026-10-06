@@ -20,12 +20,23 @@ class Reserva extends Model
 
     public const ESTADO_EXPIRADA = 'expirada';
 
+    // Estados del adelanto
+    public const ADELANTO_PENDIENTE = 'pendiente';
+
+    public const ADELANTO_PAGADO = 'pagado';
+
+    public const ADELANTO_APLICADO = 'aplicado';
+
+    public const ADELANTO_PERDIDO = 'perdido';
+
     protected $fillable = [
         'team_id',
         'mesa_id',
         'fecha',
         'hora_inicio',
         'hora_fin',
+        'tolerancia_minutos',
+        'hora_limite_llegada',
         'cliente',
         'telefono',
         'personas',
@@ -35,6 +46,20 @@ class Reserva extends Model
         'motivo_cancelacion',
         'cancelada_por',
         'hora_llegada',
+        // Adelanto
+        'adelanto_monto',
+        'adelanto_metodo_pago',
+        'adelanto_caja_id',
+        'adelanto_pagado_at',
+        'adelanto_estado',
+        'adelanto_aplicado_at',
+    ];
+
+    protected $casts = [
+        'adelanto_monto' => 'decimal:2',
+        'adelanto_pagado_at' => 'datetime',
+        'adelanto_aplicado_at' => 'datetime',
+        'tolerancia_minutos' => 'integer',
     ];
 
     public function mesa(): BelongsTo
@@ -47,9 +72,16 @@ class Reserva extends Model
         return $this->belongsTo(User::class, 'cancelada_por');
     }
 
+    public function cajaAdelanto(): BelongsTo
+    {
+        return $this->belongsTo(Caja::class, 'adelanto_caja_id');
+    }
+
     /**
-     * Marcar como expiradas todas las reservas confirmadas cuya hora_fin ya
-     * pasó (el cliente nunca llegó). Es el "chequeo lazy" de expiración.
+     * Marcar como expiradas todas las reservas confirmadas cuya hora límite
+     * de llegada ya pasó (el cliente nunca llegó).
+     *
+     * Si la reserva tenía un adelanto pagado, se marca como "perdido".
      */
     public static function expirarVencidas(): int
     {
@@ -61,13 +93,20 @@ class Reserva extends Model
                 $q->whereDate('fecha', '<', $ahora->toDateString())
                     ->orWhere(function ($q2) use ($ahora) {
                         $q2->whereDate('fecha', '=', $ahora->toDateString())
-                            ->whereTime('hora_fin', '<=', $ahora->format('H:i:s'));
+                            ->whereTime('hora_limite_llegada', '<=', $ahora->format('H:i:s'));
                     });
             })
             ->get();
 
         foreach ($vencidas as $reserva) {
-            $reserva->update(['estado' => self::ESTADO_EXPIRADA]);
+            // Si tiene adelanto pagado, se marca como perdido
+            $updateData = ['estado' => self::ESTADO_EXPIRADA];
+
+            if ($reserva->adelanto_estado === self::ADELANTO_PAGADO) {
+                $updateData['adelanto_estado'] = self::ADELANTO_PERDIDO;
+            }
+
+            $reserva->update($updateData);
         }
 
         return $vencidas->count();
@@ -75,9 +114,8 @@ class Reserva extends Model
 
     /**
      * Reserva confirmada de HOY que "bloquea" una mesa: la más próxima que
-     * aún no pasó su hora de fin y cuyo horario ya entró en la ventana de
-     * anticipación (hora_inicio - margen). Antes de esa ventana la mesa se
-     * usa con normalidad y la reserva aún no es activa.
+     * aún no pasó su hora límite de llegada y cuyo horario ya entró en la
+     * ventana de anticipación (hora_inicio - margen).
      */
     public static function activaDeMesa(int $mesaId): ?self
     {
@@ -87,18 +125,14 @@ class Reserva extends Model
             ->where('mesa_id', $mesaId)
             ->whereDate('fecha', now()->toDateString())
             ->where('estado', self::ESTADO_CONFIRMADA)
-            ->whereTime('hora_fin', '>', now()->format('H:i:s'))
+            ->whereTime('hora_limite_llegada', '>', now()->format('H:i:s'))
             ->whereTime('hora_inicio', '<=', now()->addMinutes($margenInicio)->format('H:i:s'))
             ->orderBy('hora_inicio')
             ->first();
     }
 
     /**
-     * Sincroniza las mesas según sus reservas activas del momento:
-     * - Mesas en "reserva" sin reserva activa se devuelven a "libre".
-     * - Mesas "libres" cuya reserva ya entró en la ventana pasan a "reserva".
-     *
-     * @return array<int, Mesa> mesas liberadas
+     * Sincroniza las mesas según sus reservas activas del momento.
      */
     public static function sincronizarMesasEnReserva(): array
     {
@@ -156,8 +190,39 @@ class Reserva extends Model
             ->values();
     }
 
-    public function horaFinCarbon(): Carbon
+    public function horaFinCarbon(): ?Carbon
     {
+        if (! $this->hora_fin) {
+            return null;
+        }
+
         return Carbon::createFromFormat('H:i', $this->hora_fin);
+    }
+
+    /**
+     * ¿La reserva tiene un adelanto aplicado (pagado y aún vigente)?
+     */
+    public function tieneAdelantoAplicable(): bool
+    {
+        return $this->adelanto_estado === self::ADELANTO_APLICADO
+            && (float) $this->adelanto_monto > 0;
+    }
+
+    /**
+     * ¿La reserva tiene un adelanto pendiente de pago?
+     */
+    public function tieneAdelantoPendiente(): bool
+    {
+        return $this->adelanto_estado === self::ADELANTO_PENDIENTE;
+    }
+
+    /**
+     * Calcula la hora límite de llegada (hora_inicio + tolerancia).
+     */
+    public static function calcularHoraLimite(string $horaInicio, int $toleranciaMinutos): string
+    {
+        return Carbon::createFromFormat('H:i', $horaInicio)
+            ->addMinutes($toleranciaMinutos)
+            ->format('H:i');
     }
 }
