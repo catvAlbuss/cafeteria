@@ -190,6 +190,136 @@ test('el cajero ve las reservas pero no puede devolver el dinero', function () {
     expect($reserva->fresh()->adelanto_estado)->toBe(Reserva::ADELANTO_DEVUELTO);
 });
 
+test('el adelanto de una reserva con cuenta por pagar no se devuelve', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+
+    abrirCajaReservas($admin);
+
+    [, $mesa, $reserva] = reservarAdelanto($admin, '510');
+
+    $mesa->update(['estado' => 'listo_cobrar', 'cliente' => 'Cliente reserva 510']);
+
+    Pedido::query()->create([
+        'team_id' => $admin->current_team_id,
+        'user_id' => $admin->id,
+        'mesa_id' => $mesa->id,
+        'numero' => Pedido::generarNumero(),
+        'cliente' => 'Cliente reserva 510',
+        'productos' => [],
+        'total' => 30,
+        'tipo' => 'salon',
+        'estado' => 'entregado',
+        'area' => 'cocina',
+    ]);
+
+    $this->actingAs($admin)->post(route('reservas.devolver', $reserva))
+        ->assertSessionHasErrors('reserva');
+
+    expect($reserva->fresh()->adelanto_estado)->toBe(Reserva::ADELANTO_PAGADO)
+        ->and(MovimientoCaja::query()->count())->toBe(0);
+});
+
+test('si la cuenta es menor al adelanto, el sobrante se devuelve y el arqueo sigue exacto', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+    $cajero = User::query()->where('usuario', 'cajero')->firstOrFail();
+
+    abrirCajaReservas($admin);
+
+    [, $mesa, $reserva] = reservarAdelanto($admin, '511', 20, 'efectivo');
+
+    $mesa->update(['estado' => 'listo_cobrar', 'cliente' => 'Cliente reserva 511']);
+
+    $pedido = Pedido::query()->create([
+        'team_id' => $admin->current_team_id,
+        'user_id' => $admin->id,
+        'mesa_id' => $mesa->id,
+        'numero' => Pedido::generarNumero(),
+        'cliente' => 'Cliente reserva 511',
+        'productos' => [],
+        'total' => 7.5,
+        'tipo' => 'salon',
+        'estado' => 'entregado',
+        'area' => 'cocina',
+    ]);
+
+    $this->actingAs($cajero)->patch(route('mesas.cobrar', $mesa), [
+        'metodo_pago' => 'efectivo',
+        'pedido_ids' => [$pedido->id],
+        'authorization_pin' => '5678',
+    ])->assertSessionHasNoErrors();
+
+    // Solo se aplica lo consumido; el sobrante vuelve al cliente.
+    expect($reserva->fresh()->adelanto_estado)->toBe(Reserva::ADELANTO_APLICADO_PARCIAL)
+        ->and((float) $reserva->fresh()->adelanto_aplicado)->toBe(7.5)
+        ->and($pedido->fresh()->reserva_id)->toBe($reserva->id);
+
+    // El adelanto estaba en la línea de esta caja: no deja ningún movimiento.
+    expect(MovimientoCaja::query()->count())->toBe(0);
+
+    // Físicamente: 100 de fondo + 20 depositados − 12.50 de vuelto = 107.50.
+    expect((float) $pedido->fresh()->total)->toBe(7.5);
+    expect(adelantoEsperadoDe($this, $admin))->toBe(107.5);
+});
+
+test('un sobrante de un adelanto heredado deja sus dos egresos y el arqueo sigue exacto', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+
+    abrirCajaReservas($admin);
+
+    // El dinero de esa reserva viaja heredado en el monto inicial de la
+    // jornada actual, así que la línea de adelantos ya no lo cuenta.
+    $cajaHeredada = Caja::query()->create([
+        'team_id' => $admin->current_team_id,
+        'caja' => 'Caja anterior',
+        'user_id' => $admin->id,
+        'turno' => 'Todo el día',
+        'monto_inicial' => 0,
+        'estado' => 'Cerrada',
+        'fecha_apertura' => now()->subDay(),
+        'fecha_cierre' => now()->subDay(),
+    ]);
+
+    $caja = Caja::query()->where('estado', 'Abierta')->firstOrFail();
+    $caja->update(['monto_inicial' => 120.0]);
+
+    [, $mesa, $reserva] = reservarAdelanto($admin, '512', 20);
+    $reserva->update(['adelanto_caja_id' => $cajaHeredada->id]);
+
+    $mesa->update(['estado' => 'listo_cobrar', 'cliente' => 'Cliente reserva 512']);
+
+    $pedido = Pedido::query()->create([
+        'team_id' => $admin->current_team_id,
+        'user_id' => $admin->id,
+        'mesa_id' => $mesa->id,
+        'numero' => Pedido::generarNumero(),
+        'cliente' => 'Cliente reserva 512',
+        'productos' => [],
+        'total' => 5,
+        'tipo' => 'salon',
+        'estado' => 'entregado',
+        'area' => 'cocina',
+    ]);
+
+    $this->actingAs($admin)->patch(route('mesas.cobrar', $mesa), [
+        'metodo_pago' => 'efectivo',
+        'pedido_ids' => [$pedido->id],
+        'authorization_pin' => '5678',
+    ])->assertSessionHasNoErrors();
+
+    expect($reserva->fresh()->adelanto_estado)->toBe(Reserva::ADELANTO_APLICADO_PARCIAL)
+        ->and((float) $reserva->fresh()->adelanto_aplicado)->toBe(5.0);
+
+    // Aplicado y vuelto salen por separado del fondo que los heredó.
+    $egresos = MovimientoCaja::query()->where('tipo', 'egreso')->get();
+
+    expect($egresos)->toHaveCount(2)
+        ->and((float) $egresos->first(fn ($m) => str_contains($m->concepto, 'aplicado'))->monto)->toBe(5.0)
+        ->and((float) $egresos->first(fn ($m) => str_contains($m->concepto, 'Vuelto'))->monto)->toBe(15.0);
+
+    // Físicamente: 120 de fondo (incluye los 20) − 15 de vuelto = 105.
+    expect(adelantoEsperadoDe($this, $admin))->toBe(105.0);
+});
+
 test('al anular una venta en efectivo el arqueo sigue exacto', function () {
     $admin = User::query()->where('usuario', 'admin')->firstOrFail();
 
@@ -271,4 +401,79 @@ test('caja recibe las reservas de hoy y las que dejaron dinero sin resolver', fu
     expect($ids)->toContain($vigente->id)
         ->toContain($olvidada->id)
         ->not->toContain($sinDinero->id);
+});
+
+test('el adelanto solo se aplica al cobrar la cuenta completa de la mesa', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+    $cajero = User::query()->where('usuario', 'cajero')->firstOrFail();
+
+    abrirCajaReservas($admin);
+
+    [, $mesa, $reserva] = reservarAdelanto($admin, '513', 20);
+
+    $mesa->update(['estado' => 'ocupada', 'cliente' => 'Cliente reserva 513']);
+
+    $primero = Pedido::query()->create([
+        'team_id' => $admin->current_team_id,
+        'user_id' => $admin->id,
+        'mesa_id' => $mesa->id,
+        'numero' => Pedido::generarNumero(),
+        'cliente' => 'Cliente reserva 513',
+        'productos' => [],
+        'total' => 5,
+        'tipo' => 'salon',
+        'estado' => 'entregado',
+        'area' => 'cocina',
+    ]);
+
+    $segundo = Pedido::query()->create([
+        'team_id' => $admin->current_team_id,
+        'user_id' => $admin->id,
+        'mesa_id' => $mesa->id,
+        'numero' => Pedido::generarNumero(),
+        'cliente' => 'Cliente reserva 513',
+        'productos' => [],
+        'total' => 30,
+        'tipo' => 'salon',
+        'estado' => 'entregado',
+        'area' => 'cocina',
+    ]);
+
+    // Pago parcial: aún queda un pedido por cobrar, el adelanto no se toca.
+    $this->actingAs($cajero)->patch(route('mesas.cobrar', $mesa), [
+        'metodo_pago' => 'efectivo',
+        'pedido_ids' => [$primero->id],
+        'authorization_pin' => '5678',
+    ])->assertSessionHasNoErrors();
+
+    expect($reserva->fresh()->adelanto_estado)->toBe(Reserva::ADELANTO_PAGADO)
+        ->and((float) $reserva->fresh()->adelanto_aplicado)->toBe(0.0);
+
+    // Pago final: recién ahora el adelanto cubre la cuenta.
+    $this->actingAs($cajero)->patch(route('mesas.cobrar', $mesa), [
+        'metodo_pago' => 'efectivo',
+        'pedido_ids' => [$segundo->id],
+        'authorization_pin' => '5678',
+    ])->assertSessionHasNoErrors();
+
+    expect($reserva->fresh()->adelanto_estado)->toBe(Reserva::ADELANTO_APLICADO_TOTAL)
+        ->and((float) $reserva->fresh()->adelanto_aplicado)->toBe(20.0);
+});
+
+test('al cerrar la caja se avisa si quedan adelantos sin resolver', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+
+    abrirCajaReservas($admin);
+
+    reservarAdelanto(
+        $admin, '514', 20, 'efectivo',
+        Reserva::ESTADO_NO_PRESENTADO, Reserva::ADELANTO_RETENIDO
+    );
+
+    $caja = Caja::query()->where('estado', 'Abierta')->firstOrFail();
+
+    // Fondo 100 + 20 retenido en el cajón.
+    $this->actingAs($admin)->post(route('contador.cerrar', $caja->id), [
+        'montoFinal' => 120,
+    ])->assertSessionHas('success', fn (string $mensaje) => str_contains($mensaje, 'sin resolver'));
 });

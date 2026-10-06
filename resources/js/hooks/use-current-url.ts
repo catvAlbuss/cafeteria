@@ -26,37 +26,45 @@ export type UseCurrentUrlReturn = {
     whenCurrentUrl: WhenCurrentUrlFn;
 };
 
+const BASE_URL = 'http://localhost';
+
+function splitPathAndSearch(url: string): { path: string; search: string } {
+    try {
+        const parsed = new URL(url, BASE_URL);
+
+        return { path: parsed.pathname, search: parsed.search };
+    } catch {
+        return { path: url, search: '' };
+    }
+}
+
 export function useCurrentUrl(): UseCurrentUrlReturn {
     const page = usePage();
-    const currentUrlPath = new URL(
-        page.url,
-        typeof window !== 'undefined'
-            ? window.location.origin
-            : 'http://localhost',
-    ).pathname;
+    const currentUrlPath = splitPathAndSearch(page.url).path;
 
     const isCurrentUrl: IsCurrentUrlFn = (
         urlToCheck: NonNullable<InertiaLinkProps['href']>,
         currentUrl?: string,
         startsWith: boolean = false,
     ) => {
-        const urlToCompare = currentUrl ?? currentUrlPath;
-        const urlString = toUrl(urlToCheck);
+        const target = splitPathAndSearch(toUrl(urlToCheck));
+        const actual = splitPathAndSearch(currentUrl ?? page.url);
+        const pathMatches = startsWith
+            ? actual.path.startsWith(target.path)
+            : actual.path === target.path;
 
-        const comparePath = (path: string): boolean =>
-            startsWith ? urlToCompare.startsWith(path) : path === urlToCompare;
-
-        if (!urlString.startsWith('http')) {
-            return comparePath(urlString);
-        }
-
-        try {
-            const absoluteUrl = new URL(urlString);
-
-            return comparePath(absoluteUrl.pathname);
-        } catch {
+        if (!pathMatches) {
             return false;
         }
+
+        // Los destinos con query (ej. /produccion?area=cocina) solo se
+        // marcan activos si la página actual tiene exactamente esos
+        // parámetros; los de ruta simple se comparan solo por pathname.
+        if (target.search !== '') {
+            return actual.search === target.search;
+        }
+
+        return true;
     };
 
     const isCurrentOrParentUrl: IsCurrentOrParentUrlFn = (

@@ -81,10 +81,16 @@ class ReservaService
      *
      * El total del pedido NO se toca: SUNAT factura el consumo real.
      *
-     * Mientras el adelanto siga contado en la línea de adelantos de la caja
-     * actual no se mueve ni un sol: esa línea baja al pasar a aplicado y la
-     * venta sube completa, así el cajón cuadra solo. El egreso solo es
-     * necesario si el dinero viajó en el fondo heredado de otra jornada.
+     * Si la cuenta es menor que el adelanto, solo se aplica lo consumido y el
+     * sobrante vuelve al cliente: la reserva queda "aplicado_parcial" y el
+     * cajero devuelve la diferencia en mano. El arqueo cuadra solo:
+     *
+     * - Adelanto de LA caja actual: al pasar de "pagado" a "aplicado_parcial"
+     *   sale entero de la línea de adelantos; lo devuelto es justo la
+     *   diferencia (−20 + 7,50 + vuelto 12,50 = −12,50 en el cajón).
+     * - Adelanto heredado de otra jornada (en el fondo): el aplicado deja un
+     *   egreso y el sobrante otro, para que el fondo baje exactamente lo que
+     *   sale del cajón.
      *
      * @param  iterable<Pedido>  $pedidosCobrados
      */
@@ -111,26 +117,48 @@ class ReservaService
                 return null;
             }
 
+            $adelantoPagado = round((float) $reserva->adelanto_pagado, 2);
+            $totalConsumido = round((float) $pedidos->sum('total'), 2);
+            $montoAplicar = round(min($adelantoPagado, $totalConsumido), 2);
+            $sobrante = round($adelantoPagado - $montoAplicar, 2);
+
             if (self::noEstaEnCaja($reserva, $caja)) {
                 $numeros = $pedidos
                     ->map(fn (Pedido $pedido) => '#'.($pedido->numero ?? $pedido->numero_pedido ?? $pedido->id))
                     ->implode(', ');
-                $rotulo = $pedidos->count() > 1 ? 'pedidos ' : 'pedido ';
 
-                MovimientoCaja::query()->create([
-                    'team_id' => $reserva->team_id,
-                    'caja_id' => $caja->id,
-                    'user_id' => $usuario->id,
-                    'tipo' => 'egreso',
-                    'metodo_pago' => $reserva->adelanto_metodo_pago,
-                    'concepto' => "Adelanto de reserva aplicado — {$rotulo}{$numeros}",
-                    'monto' => $reserva->adelanto_pagado,
-                ]);
+                if ($montoAplicar > 0) {
+                    $rotulo = $pedidos->count() > 1 ? 'pedidos ' : 'pedido ';
+
+                    MovimientoCaja::query()->create([
+                        'team_id' => $reserva->team_id,
+                        'caja_id' => $caja->id,
+                        'user_id' => $usuario->id,
+                        'tipo' => 'egreso',
+                        'metodo_pago' => $reserva->adelanto_metodo_pago,
+                        'concepto' => "Adelanto de reserva aplicado — {$rotulo}{$numeros}",
+                        'monto' => $montoAplicar,
+                    ]);
+                }
+
+                if ($sobrante > 0) {
+                    MovimientoCaja::query()->create([
+                        'team_id' => $reserva->team_id,
+                        'caja_id' => $caja->id,
+                        'user_id' => $usuario->id,
+                        'tipo' => 'egreso',
+                        'metodo_pago' => $reserva->adelanto_metodo_pago,
+                        'concepto' => "Vuelto de sobrante de adelanto — reserva #{$reserva->id} ({$reserva->cliente})",
+                        'monto' => $sobrante,
+                    ]);
+                }
             }
 
             $reserva->update([
-                'adelanto_aplicado' => $reserva->adelanto_pagado,
-                'adelanto_estado' => Reserva::ADELANTO_APLICADO_TOTAL,
+                'adelanto_aplicado' => $montoAplicar,
+                'adelanto_estado' => $sobrante > 0
+                    ? Reserva::ADELANTO_APLICADO_PARCIAL
+                    : Reserva::ADELANTO_APLICADO_TOTAL,
             ]);
 
             $pedidos->each(

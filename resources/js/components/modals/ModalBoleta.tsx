@@ -48,6 +48,7 @@ interface ModalBoletaProps {
         subtotal: number;
         igv: number;
         total: number;
+        adelanto?: number;
     } | null;
 }
 
@@ -125,7 +126,12 @@ export default function ModalBoleta({
         subtotal,
         igv,
         total,
+        adelanto = 0,
     } = data;
+
+    const adelantoNum = Math.max(0, Number(adelanto) || 0);
+    const saldo = Math.max(0, Math.round((total - adelantoNum) * 100) / 100);
+    const sobrante = Math.max(0, Math.round((adelantoNum - total) * 100) / 100);
 
     const tipoTexto =
         tipo === 'salon' ? 'Salón' : tipo === 'llevar' ? 'Llevar' : 'Delivery';
@@ -617,6 +623,45 @@ export default function ModalBoleta({
                                         S/ {total.toFixed(2)}
                                     </span>
                                 </div>
+                                {adelantoNum > 0 && (
+                                    <div className="mt-2 rounded-lg border border-gold/30 bg-gold/10 px-2 py-1.5 text-xs text-cocoa">
+                                        <div className="flex justify-between">
+                                            <span>Adelanto de reserva</span>
+                                            <span className="font-semibold">
+                                                − S/ {adelantoNum.toFixed(2)}
+                                            </span>
+                                        </div>
+                                        {saldo > 0 ? (
+                                            <div className="mt-0.5 flex justify-between font-semibold text-ink">
+                                                <span>
+                                                    El cliente paga ahora
+                                                </span>
+                                                <span className="text-gold">
+                                                    S/ {saldo.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-0.5 flex justify-between font-semibold text-ink">
+                                                <span>
+                                                    El adelanto cubre el total
+                                                </span>
+                                                <span className="text-emerald-600">
+                                                    S/ 0.00
+                                                </span>
+                                            </div>
+                                        )}
+                                        {sobrante > 0 && (
+                                            <div className="mt-0.5 flex justify-between text-cocoa-soft">
+                                                <span>
+                                                    Queda a favor del cliente
+                                                </span>
+                                                <span className="font-medium">
+                                                    S/ {sobrante.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* DNI OPCIONAL (solo boleta) */}

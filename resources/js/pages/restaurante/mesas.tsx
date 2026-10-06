@@ -923,6 +923,7 @@ export default function MesasDistribucion() {
     const [modalConfigurarAbierto, setModalConfigurarAbierto] = useState(false);
 
     const [mesaCobro, setMesaCobro] = useState<Mesa | null>(null);
+    const [adelantoCobro, setAdelantoCobro] = useState(0);
 
     const [pedidoCobro, setPedidoCobro] = useState<any | null>(null);
 
@@ -1046,6 +1047,20 @@ export default function MesasDistribucion() {
             return;
         }
 
+        // Adelanto pendiente de la reserva atendida de esta mesa: ese monto
+        // ya fue cobrado por separado, así que el cliente solo paga el saldo.
+        const reservaConAdelanto = reservasHoyPorMesa(mesa.id).find(
+            (r) =>
+                r.estado === 'atendida' &&
+                r.adelanto_estado === 'pagado' &&
+                Number(r.adelanto_pagado ?? 0) > 0,
+        );
+        const adelantoPendiente =
+            typeof reservaConAdelanto?.adelanto_pagado === 'number'
+                ? reservaConAdelanto.adelanto_pagado
+                : Number(reservaConAdelanto?.adelanto_pagado ?? 0);
+
+        setAdelantoCobro(Math.max(0, adelantoPendiente || 0));
         setPedidoCobro(pedidosDeLaMesa);
         setMesaCobro(mesa);
         setModalCobroAbierto(true);
@@ -1790,9 +1805,11 @@ export default function MesasDistribucion() {
                 />
 
                 <ModalCobro
+                    key={`cobro-${mesaCobro?.id ?? 0}-${adelantoCobro}`}
                     isOpen={modalCobroAbierto}
                     mesa={mesaCobro}
                     pedido={pedidoCobro}
+                    adelanto={adelantoCobro}
                     onClose={() => setModalCobroAbierto(false)}
                     onSuccess={() => {
                         setModalCobroAbierto(false);

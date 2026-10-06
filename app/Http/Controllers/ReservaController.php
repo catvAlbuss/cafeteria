@@ -166,6 +166,14 @@ class ReservaController extends Controller
      */
     public function devolver(Request $request, Reserva $reserva): RedirectResponse
     {
+        $mesa = $reserva->mesa;
+
+        if ($mesa && $mesa->pedidos()->whereNotIn('estado', ['pagado', 'cancelado'])->exists()) {
+            return redirect()->back()->withErrors([
+                'reserva' => 'No puedes devolver este adelanto: la mesa tiene una cuenta por cobrar y el saldo se aplicará al pagar.',
+            ]);
+        }
+
         if (! in_array($reserva->adelanto_estado, [Reserva::ADELANTO_PAGADO, Reserva::ADELANTO_RETENIDO], true)) {
             return redirect()->back()->withErrors([
                 'reserva' => 'El adelanto de esta reserva ya no está en caja.',

@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Enums\TeamRole;
 use App\Models\Caja;
+use App\Models\Pedido;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Symfony\Component\HttpFoundation\Response;
@@ -61,12 +63,40 @@ class HandleInertiaRequests extends Middleware
                 'puedeAbrir' => $user->can('manage-cash-session'),
             ] : ['abierta' => false, 'puedeAbrir' => false],
 
+            'pendientesProduccion' => fn () => $this->pendientesProduccion($user),
+
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
                 'aviso_capacidad' => fn () => $request->session()->get('aviso_capacidad'),
-                'pedido_id' => fn () => $request->session()->get('pedido_id'), 
+                'pedido_id' => fn () => $request->session()->get('pedido_id'),
             ],
         ];
+    }
+
+    /**
+     * Contadores de pedidos pendientes/preparando por área de producción,
+     * para el puntito del sidebar. Solo con permisos de ver, y solo si hay
+     * una sede activa.
+     */
+    private function pendientesProduccion(?User $user): array
+    {
+        if (! $user || ! $user->current_team_id) {
+            return ['cocina' => 0, 'bar' => 0];
+        }
+
+        $base = Pedido::query()
+            ->where('team_id', $user->current_team_id)
+            ->whereNull('delivery_id')
+            ->whereIn('estado', ['pendiente', 'preparando']);
+
+        $cocina = $user->can('ver cocina')
+            ? (clone $base)->whereIn('area', ['cocina', 'horno', 'postres'])->count()
+            : 0;
+        $bar = $user->can('ver bar')
+            ? (clone $base)->where('area', 'bar')->count()
+            : 0;
+
+        return ['cocina' => $cocina, 'bar' => $bar];
     }
 }

@@ -1,4 +1,4 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     LayoutDashboard,
     Receipt,
@@ -18,6 +18,7 @@ import {
     PackageSearch,
     MapPin,
 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -31,6 +32,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { useSedeChannel } from '@/hooks/useSedeChannel';
 import type { NavItem } from '@/types';
 
 function SidebarBranch({ canManageTeams }: { canManageTeams: boolean }) {
@@ -76,6 +78,46 @@ export function AppSidebar() {
         ['owner', 'admin'].includes(currentTeam?.role ?? '');
     const isProductionOperator =
         roles.includes('Cocinero') || roles.includes('Bar');
+
+    // Pedidos pendientes/preparando por área, para el puntito de producción.
+    const pendientes = (page.props.pendientesProduccion ?? {
+        cocina: 0,
+        bar: 0,
+    }) as { cocina: number; bar: number };
+
+    // Tiempo real: se refresca la prop cuando llega un pedido.actualizado al
+    // canal de la sede (membership-only, sin 403 para Supervisores).
+    const puedeVerProduccion =
+        permissions.includes('ver cocina') || permissions.includes('ver bar');
+
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const refrescarPendientes = () => {
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+
+        debounceRef.current = setTimeout(() => {
+            router.reload({
+                only: ['pendientesProduccion'],
+            });
+        }, 350);
+    };
+
+    useSedeChannel(
+        'pedidos',
+        { 'pedido.actualizado': refrescarPendientes },
+        puedeVerProduccion,
+    );
+
+    useEffect(
+        () => () => {
+            if (debounceRef.current) {
+                clearTimeout(debounceRef.current);
+            }
+        },
+        [],
+    );
 
     //  TODAS LAS PÁGINAS (se filtran según el permiso de "ver" de cada rol)
     const allNavItems: NavItem[] = [
@@ -189,6 +231,18 @@ export function AppSidebar() {
         });
     }
 
+    const navItemsConPendientes = mainNavItems.map((item) => {
+        if (item.href === '/produccion?area=cocina') {
+            return { ...item, badge: pendientes.cocina };
+        }
+
+        if (item.href === '/produccion?area=bar') {
+            return { ...item, badge: pendientes.bar };
+        }
+
+        return item;
+    });
+
     return (
         <Sidebar collapsible="icon">
             {/* ZONA 1 / LOGO */}
@@ -209,7 +263,7 @@ export function AppSidebar() {
 
             {/* ZONA 3 / NAVEGACIÓN */}
             <SidebarContent className="bg-sidebar">
-                <NavMain items={mainNavItems} />
+                <NavMain items={navItemsConPendientes} />
             </SidebarContent>
 
             {/* ZONA 4 / PIE */}

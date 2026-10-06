@@ -17,6 +17,7 @@ import {
     Receipt,
     Clock,
     ChevronDown,
+    CheckCircle2,
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -96,6 +97,14 @@ const ESTADO_RESERVA: Record<string, { label: string; chip: string }> = {
     atendida: { label: 'En mesa', chip: 'bg-gold text-ink' },
     cancelada: { label: 'Cancelada', chip: 'bg-red-100 text-red-700' },
     no_presentado: { label: 'No presentado', chip: 'bg-red-100 text-red-700' },
+};
+
+const ETIQUETA_ADELANTO: Record<string, string> = {
+    pagado: 'En caja',
+    retenido: 'Retenido',
+    aplicado_total: 'Aplicado a la cuenta',
+    aplicado_parcial: 'Aplicado parcial',
+    devuelto: 'Devuelto',
 };
 
 const AvisoReservaMesa = ({ reserva }: { reserva: ReservaCaja }) => (
@@ -455,6 +464,13 @@ export default function Caja() {
         );
     };
 
+    const mesaConCuentaAbierta = (mesaId: number) =>
+        (pedidosLista ?? []).some(
+            (p) =>
+                p.mesa_id === mesaId &&
+                !['pagado', 'cancelado'].includes(p.estado),
+        );
+
     // ===== RESERVAS DE HOY AGRUPADAS PARA LA PESTAÑA DE CAJA =====
     const porLlegar = useMemo(
         () =>
@@ -467,7 +483,15 @@ export default function Caja() {
     const enSala = useMemo(
         () =>
             reservasLista
-                .filter((r) => r.estado === 'atendida')
+                .filter(
+                    (r) =>
+                        r.estado === 'atendida' &&
+                        ![
+                            'aplicado_total',
+                            'aplicado_parcial',
+                            'devuelto',
+                        ].includes(r.adelanto_estado),
+                )
                 .sort((a, b) =>
                     (a.hora_llegada ?? '').localeCompare(b.hora_llegada ?? ''),
                 ),
@@ -485,6 +509,20 @@ export default function Caja() {
                             r.adelanto_estado === 'retenido'),
                 )
                 .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio)),
+        [reservasLista],
+    );
+
+    const finalizadas = useMemo(
+        () =>
+            reservasLista
+                .filter((r) =>
+                    ['aplicado_total', 'aplicado_parcial', 'devuelto'].includes(
+                        r.adelanto_estado,
+                    ),
+                )
+                .sort((a, b) =>
+                    (a.hora_llegada ?? '').localeCompare(b.hora_llegada ?? ''),
+                ),
         [reservasLista],
     );
 
@@ -578,6 +616,20 @@ export default function Caja() {
             return Array.isArray(prods) ? prods : [];
         });
 
+        // Adelanto de la reserva atendida de esta mesa: el cliente ya pagó
+        // esa parte; ver en la bandeja que de ahora paga solo el saldo.
+        const reservaConAdelanto = reservasLista.find(
+            (r) =>
+                r.mesa_id === mesa.id &&
+                r.estado === 'atendida' &&
+                r.adelanto_estado === 'pagado' &&
+                Number(r.adelanto_pagado ?? 0) > 0,
+        );
+        const adelantoPendiente =
+            typeof reservaConAdelanto?.adelanto_pagado === 'number'
+                ? reservaConAdelanto.adelanto_pagado
+                : Number(reservaConAdelanto?.adelanto_pagado ?? 0);
+
         setDatosBoleta({
             pedidoIds: pedidosMesa.map((p) => p.id),
             mesaId: mesa.id,
@@ -588,6 +640,7 @@ export default function Caja() {
             subtotal: subtotal,
             igv: igv,
             total: total,
+            adelanto: Math.max(0, adelantoPendiente || 0),
         });
         setModalBoletaAbierto(true);
     };
@@ -1607,7 +1660,17 @@ export default function Caja() {
                                                                             'efectivo'}
                                                                     </p>
                                                                 </div>
-                                                                {puedeDevolver &&
+                                                                {r.estado ===
+                                                                    'atendida' &&
+                                                                mesaConCuentaAbierta(
+                                                                    r.mesa_id,
+                                                                ) ? (
+                                                                    <span className="shrink-0 text-[10px] font-medium text-cocoa-soft">
+                                                                        Irá a la
+                                                                        cuenta
+                                                                    </span>
+                                                                ) : (
+                                                                    puedeDevolver &&
                                                                     (r.adelanto_estado ===
                                                                         'pagado' ||
                                                                         r.adelanto_estado ===
@@ -1622,7 +1685,8 @@ export default function Caja() {
                                                                         >
                                                                             Devolver
                                                                         </button>
-                                                                    )}
+                                                                    )
+                                                                )}
                                                             </div>
                                                         ))}
                                                     </div>
@@ -1706,6 +1770,59 @@ export default function Caja() {
                                                                     </div>
                                                                 );
                                                             },
+                                                        )}
+                                                    </div>
+                                                </section>
+                                            )}
+
+                                            {finalizadas.length > 0 && (
+                                                <section>
+                                                    <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-cocoa uppercase">
+                                                        <CheckCircle2 className="h-3.5 w-3.5 text-gold" />
+                                                        Finalizadas hoy
+                                                        <span className="rounded-full bg-sand px-1.5 py-0.5 text-[10px] text-cocoa">
+                                                            {finalizadas.length}
+                                                        </span>
+                                                    </p>
+                                                    <div className="space-y-2">
+                                                        {finalizadas.map(
+                                                            (r) => (
+                                                                <div
+                                                                    key={r.id}
+                                                                    className="flex items-center gap-2 rounded-xl border border-black/5 bg-cream-pale p-2.5 text-xs"
+                                                                >
+                                                                    <span className="rounded-md bg-roast px-1.5 py-0.5 text-xs font-bold text-white">
+                                                                        {numeroDeMesa(
+                                                                            r.mesa_id,
+                                                                        )}
+                                                                    </span>
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <p className="truncate text-sm font-medium text-chocolate">
+                                                                            {
+                                                                                r.cliente
+                                                                            }
+                                                                        </p>
+                                                                        <p className="truncate text-cocoa-soft">
+                                                                            {r.hora_llegada ??
+                                                                                r.hora_inicio}{' '}
+                                                                            ·{' '}
+                                                                            {ETIQUETA_ADELANTO[
+                                                                                r
+                                                                                    .adelanto_estado
+                                                                            ] ??
+                                                                                r.adelanto_estado}
+                                                                        </p>
+                                                                    </div>
+                                                                    <span className="shrink-0 text-[11px] font-semibold text-chocolate">
+                                                                        S/{' '}
+                                                                        {Number(
+                                                                            r.adelanto_pagado,
+                                                                        ).toFixed(
+                                                                            2,
+                                                                        )}
+                                                                    </span>
+                                                                </div>
+                                                            ),
                                                         )}
                                                     </div>
                                                 </section>

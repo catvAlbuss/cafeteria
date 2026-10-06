@@ -26,6 +26,12 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                             <Link href={item.href}>
                                 {item.icon && <item.icon />}
                                 <span>{item.title}</span>
+                                {item.badge != null && item.badge > 0 && (
+                                    <span
+                                        aria-hidden="true"
+                                        className="ml-auto inline-flex size-2.5 shrink-0 rounded-full bg-emerald-400 ring-2 ring-sidebar"
+                                    />
+                                )}
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

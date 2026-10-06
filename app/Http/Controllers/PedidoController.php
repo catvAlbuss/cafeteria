@@ -300,21 +300,23 @@ class PedidoController extends Controller
                 ]);
             }
 
-            // El adelanto de la reserva atendida baja al cajón como egreso:
-            // el total del pedido no cambia, pero el cliente pone total −
-            // adelanto en efectivo.
-            $reservaAplicada = ReservaService::aplicarAdelanto(
-                $mesa,
-                $caja,
-                auth()->user(),
-                $pedidosACobrar,
-            );
-
+            // El adelanto cubre la cuenta final de la mesa: baja del cajón una
+            // sola vez, cuando se cobra completa. Si quedan pedidos por pagar
+            // de esa misma mesa, el adelanto todavía no se toca.
             $quedanPedidos = $pedidosActuales->filter(
                 function ($pedido) use ($idsEnviados) {
                     return ! $idsEnviados->contains($pedido->id);
                 }
             );
+
+            $reservaAplicada = $quedanPedidos->isEmpty()
+                ? ReservaService::aplicarAdelanto(
+                    $mesa,
+                    $caja,
+                    auth()->user(),
+                    $pedidosACobrar,
+                )
+                : null;
 
             if ($quedanPedidos->isEmpty()) {
                 $mesa->estado = 'libre';
@@ -1081,6 +1083,8 @@ class PedidoController extends Controller
         try {
             DB::beginTransaction();
 
+            $reservaAplicada = null;
+
             if (! empty($validated['mesa_id'])) {
                 $caja = Caja::query()->where('estado', 'Abierta')->lockForUpdate()->firstOrFail();
                 $mesa = Mesa::where('id', $validated['mesa_id'])->lockForUpdate()->firstOrFail();
@@ -1128,6 +1132,21 @@ class PedidoController extends Controller
                 $pedido->save();
             }
 
+            if (! empty($validated['mesa_id'])) {
+                $quedanSinCobrar = $mesa->pedidos()
+                    ->whereNotIn('estado', ['pagado', 'cancelado'])
+                    ->exists();
+
+                $reservaAplicada = $quedanSinCobrar
+                    ? null
+                    : ReservaService::aplicarAdelanto(
+                        $mesa,
+                        $caja,
+                        auth()->user(),
+                        $pedidos,
+                    );
+            }
+
             $this->clienteService->sincronizarDesdeVenta(
                 (int) auth()->user()->current_team_id,
                 $validated['tipo_documento'],
@@ -1139,6 +1158,10 @@ class PedidoController extends Controller
 
             if (isset($mesaActualizada)) {
                 broadcast(new MesaActualizada($mesaActualizada));
+            }
+
+            if (isset($reservaAplicada)) {
+                ReservaActualizada::dispatch($reservaAplicada);
             }
 
             $pedidos->each(fn (Pedido $p) => broadcast(new PedidoActualizado($p)));

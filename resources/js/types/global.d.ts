@@ -17,6 +17,7 @@ declare module '@inertiajs/core' {
             currentTeam: Team | null;
             teams: Team[];
             jornadaCaja: { abierta: boolean; puedeAbrir: boolean };
+            pendientesProduccion?: { cocina: number; bar: number };
             [key: string]: unknown;
         };
     }

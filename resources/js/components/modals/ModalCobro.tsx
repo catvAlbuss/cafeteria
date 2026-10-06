@@ -41,6 +41,7 @@ interface ModalCobroProps {
     isOpen: boolean;
     mesa: Mesa | null;
     pedido?: Pedido[];
+    adelanto?: number;
     onClose: () => void;
     onSuccess: () => void;
 }
@@ -52,11 +53,29 @@ export default function ModalCobro({
     isOpen,
     mesa,
     pedido,
+    adelanto = 0,
     onClose,
     onSuccess,
 }: ModalCobroProps) {
     const [metodoPago, setMetodoPago] = useState<string>('efectivo');
-    const [montoRecibido, setMontoRecibido] = useState<string>('');
+    const [montoRecibido, setMontoRecibido] = useState<string>(() => {
+        const a = Math.max(0, Number(adelanto) || 0);
+
+        if (a <= 0) {
+            return '';
+        }
+
+        const suma = (pedido ?? []).reduce(
+            (sum, p) =>
+                sum +
+                (typeof p.total === 'number'
+                    ? p.total
+                    : parseFloat(String(p.total)) || 0),
+            0,
+        );
+
+        return (Math.round(Math.max(0, suma - a) * 100) / 100).toFixed(2);
+    });
     const [authorizationPin, setAuthorizationPin] = useState('');
     const [cargando, setCargando] = useState(false);
     const [exito, setExito] = useState(false);
@@ -68,7 +87,6 @@ export default function ModalCobro({
             setExito(false);
             setCargando(false);
             setMetodoPago('efectivo');
-            setMontoRecibido('');
             setAuthorizationPin('');
         }
     }, [isOpen, mesa?.id]);
@@ -94,7 +112,10 @@ export default function ModalCobro({
     );
 
     const montoRecibidoNum = parseFloat(montoRecibido) || 0;
-    const cambio = montoRecibidoNum - total;
+    const adelantoNum = Math.max(0, toNum(adelanto));
+    const saldo = Math.max(0, Math.round((total - adelantoNum) * 100) / 100);
+    const sobrante = Math.max(0, Math.round((adelantoNum - total) * 100) / 100);
+    const cambio = montoRecibidoNum - saldo;
 
     const handleCobrar = () => {
         setCargando(true);
@@ -337,12 +358,12 @@ export default function ModalCobro({
 
                 {!exito ? (
                     <div className="flex-1 space-y-3 overflow-y-auto p-4">
-{/* ===== TICKET ===== */}
-                            <div
-                                ref={ticketRef}
-                                className="rounded-xl border border-black/10 bg-white p-4"
-                                id="ticket-print"
-                            >
+                        {/* ===== TICKET ===== */}
+                        <div
+                            ref={ticketRef}
+                            className="rounded-xl border border-black/10 bg-white p-4"
+                            id="ticket-print"
+                        >
                             {/* SHOP NAME - SIN IMAGEN */}
                             <div
                                 className="mb-1 pb-1 text-center"
@@ -543,6 +564,60 @@ export default function ModalCobro({
                                         {total.toFixed(2)}
                                     </span>
                                 </div>
+                                {adelantoNum > 0 && (
+                                    <>
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                fontSize: '13px',
+                                                padding: '1px 0',
+                                                color: '#000000',
+                                            }}
+                                        >
+                                            <span
+                                                style={{
+                                                    color: '#333333',
+                                                }}
+                                            >
+                                                Adelanto
+                                            </span>
+                                            <span
+                                                style={{
+                                                    fontWeight: 600,
+                                                    color: '#000000',
+                                                }}
+                                            >
+                                                −{adelantoNum.toFixed(2)}
+                                            </span>
+                                        </div>
+                                        <div
+                                            style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                fontSize: '15px',
+                                                fontWeight: 700,
+                                                color: '#000000',
+                                                padding: '2px 0',
+                                            }}
+                                        >
+                                            <span
+                                                style={{
+                                                    color: '#000000',
+                                                }}
+                                            >
+                                                SALDO A PAGAR
+                                            </span>
+                                            <span
+                                                style={{
+                                                    color: '#000000',
+                                                }}
+                                            >
+                                                {saldo.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             {/* PAGO Y CAMBIO - SOLO SI ES EFECTIVO */}
@@ -693,6 +768,28 @@ export default function ModalCobro({
                         </div>
 
                         {/* ===== EFECTIVO RECIBIDO ===== */}
+                        {adelantoNum > 0 && (
+                            <div className="flex flex-shrink-0 items-center justify-between rounded-xl bg-gold/10 px-3 py-2">
+                                <div className="text-xs text-cocoa">
+                                    <p>Adelanto descontado</p>
+                                    <p className="font-semibold text-ink">
+                                        − S/ {adelantoNum.toFixed(2)}
+                                    </p>
+                                    {sobrante > 0 && (
+                                        <p className="mt-1 text-[11px] text-cocoa-soft">
+                                            Queda S/ {sobrante.toFixed(2)} a
+                                            favor del cliente
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="text-right text-xs text-cocoa">
+                                    <p>Saldo a cobrar</p>
+                                    <p className="text-base font-bold text-gold">
+                                        S/ {saldo.toFixed(2)}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                         {metodoPago === 'efectivo' && (
                             <div className="flex-shrink-0">
                                 <label className="mb-1 block text-xs font-medium text-cocoa">
@@ -727,7 +824,8 @@ export default function ModalCobro({
                                     )}
                                 {montoRecibidoNum > 0 && cambio < 0 && (
                                     <p className="mt-1 text-xs text-red-500">
-                                        El monto recibido es menor al total
+                                        El monto recibido es menor al saldo a
+                                        cobrar
                                     </p>
                                 )}
                             </div>
@@ -766,12 +864,12 @@ export default function ModalCobro({
                                 cargando ||
                                 authorizationPin.length !== 4 ||
                                 (metodoPago === 'efectivo' &&
-                                    montoRecibidoNum < total)
+                                    montoRecibidoNum < saldo)
                             }
                             className={`flex w-full flex-shrink-0 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition ${
                                 cargando ||
                                 (metodoPago === 'efectivo' &&
-                                    montoRecibidoNum < total)
+                                    montoRecibidoNum < saldo)
                                     ? 'cursor-not-allowed bg-wheat'
                                     : 'bg-roast text-white hover:bg-ink'
                             }`}
@@ -801,11 +899,35 @@ export default function ModalCobro({
                             Mesa #{mesa.numero} liberada
                         </p>
                         <div className="mt-4 rounded-xl bg-cream-soft p-4">
-                            <p className="text-sm text-cocoa">Total cobrado</p>
+                            <p className="text-sm text-cocoa">
+                                Total de la cuenta
+                            </p>
                             <p className="text-2xl font-bold text-gold">
                                 S/ {total.toFixed(2)}
                             </p>
-                            <p className="mt-1 text-xs text-cocoa-soft">
+                            {adelantoNum > 0 && (
+                                <>
+                                    <p className="mt-3 text-sm text-cocoa">
+                                        Adelanto aplicado
+                                    </p>
+                                    <p className="text-lg font-bold text-ink">
+                                        − S/ {adelantoNum.toFixed(2)}
+                                    </p>
+                                    {sobrante > 0 && (
+                                        <p className="mt-1 text-xs text-cocoa-soft">
+                                            Queda S/ {sobrante.toFixed(2)} a
+                                            favor del cliente
+                                        </p>
+                                    )}
+                                    <p className="mt-3 text-sm text-cocoa">
+                                        Pagado ahora
+                                    </p>
+                                    <p className="text-xl font-bold text-gold">
+                                        S/ {saldo.toFixed(2)}
+                                    </p>
+                                </>
+                            )}
+                            <p className="mt-3 text-xs text-cocoa-soft">
                                 Comprobante impreso
                             </p>
                         </div>

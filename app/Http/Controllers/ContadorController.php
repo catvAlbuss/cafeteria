@@ -159,7 +159,15 @@ class ContadorController extends Controller
 
         broadcast(new CajaActualizada($caja));
 
-        return back()->with('success', 'Jornada cerrada y arqueo registrado.');
+        $mensaje = 'Jornada cerrada y arqueo registrado.';
+        $sinResolver = (float) ($caja->resumen_cierre['adelantos_sin_resolver'] ?? 0);
+
+        if ($sinResolver > 0) {
+            $mensaje .= ' Quedan S/'.number_format($sinResolver, 2)
+                .' en adelantos retenidos o de reservas canceladas sin resolver: devuélvelos o aplícalos a la cuenta del cliente.';
+        }
+
+        return back()->with('success', $mensaje);
     }
 
     public function destroy(Request $request, int $id): RedirectResponse
@@ -280,6 +288,22 @@ class ContadorController extends Controller
             ->selectRaw("COALESCE(SUM(CASE WHEN adelanto_metodo_pago IS NULL OR adelanto_metodo_pago = 'efectivo' THEN adelanto_pagado ELSE 0 END), 0) as efectivo")
             ->first();
 
+        // Dinero de la línea que ya no tiene una cuenta que lo consumirá:
+        // reservas que no llegaron (retenido) o canceladas sin devolver.
+        // Al cerrar conviene avisar para que el cajero lo resuelva.
+        $sinResolver = Reserva::query()
+            ->where('adelanto_caja_id', $caja->id)
+            ->where('adelanto_pagado', '>', 0)
+            ->where(function ($q) {
+                $q->where('adelanto_estado', Reserva::ADELANTO_RETENIDO)
+                    ->orWhere(function ($q2) {
+                        $q2->where('adelanto_estado', Reserva::ADELANTO_PAGADO)
+                            ->whereIn('estado', [Reserva::ESTADO_CANCELADA, Reserva::ESTADO_NO_PRESENTADO]);
+                    });
+            })
+            ->selectRaw('COALESCE(SUM(adelanto_pagado), 0) as total')
+            ->first();
+
         $efectivo = (float) $ventas->efectivo;
         $entradas = (float) $movimientos->entradas;
         $salidas = (float) $movimientos->salidas;
@@ -299,6 +323,7 @@ class ContadorController extends Controller
             'gastos_retiros_efectivo' => $salidasEfectivo,
             'adelantos_en_caja' => (float) $adelantos->total,
             'adelantos_en_caja_efectivo' => $adelantosEfectivo,
+            'adelantos_sin_resolver' => (float) $sinResolver->total,
             'efectivo_esperado' => round((float) $caja->monto_inicial + $efectivo + $entradasEfectivo - $salidasEfectivo + $adelantosEfectivo, 2),
         ];
     }
@@ -311,6 +336,7 @@ class ContadorController extends Controller
             'ventas_yape', 'ingresos_aportes', 'gastos_retiros',
             'ingresos_aportes_efectivo', 'gastos_retiros_efectivo',
             'adelantos_en_caja', 'adelantos_en_caja_efectivo',
+            'adelantos_sin_resolver',
             'efectivo_esperado',
         ], 0.0);
     }
