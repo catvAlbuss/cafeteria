@@ -29,12 +29,21 @@ class Reserva extends Model
         'cliente',
         'telefono',
         'personas',
+        'adelanto_pagado',
+        'adelanto_metodo',
         'notas',
         'estado',
         'fecha_cancelacion',
         'motivo_cancelacion',
         'cancelada_por',
         'hora_llegada',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'adelanto_pagado' => 'decimal:2',
     ];
 
     public function mesa(): BelongsTo

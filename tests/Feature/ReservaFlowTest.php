@@ -2,6 +2,7 @@
 
 use App\Models\Caja;
 use App\Models\Mesa;
+use App\Models\MovimientoCaja;
 use App\Models\Reserva;
 use App\Models\User;
 use Carbon\Carbon;
@@ -78,6 +79,7 @@ test('una reserva dentro de la ventana deja la mesa en estado reserva', function
         'hora_inicio' => horaFutura(5),
         'hora_fin' => horaFutura(65),
         'personas' => 3,
+        'adelanto' => 20,
     ])->assertSessionHasNoErrors();
 
     $reserva = Reserva::query()->where('mesa_id', $mesa->id)->firstOrFail();
@@ -99,6 +101,7 @@ test('una reserva lejana no bloquea la mesa y esta se sigue usando normal', func
         'hora_inicio' => horaFutura(120),
         'hora_fin' => horaFutura(180),
         'personas' => 4,
+        'adelanto' => 25,
     ])->assertSessionHasNoErrors();
 
     expect($mesa->fresh()->estado)->toBe('libre')
@@ -143,6 +146,7 @@ test('no se permite sobreponer reservas en la misma mesa', function () {
         'hora_inicio' => horaFutura(90),
         'hora_fin' => horaFutura(170),
         'personas' => 2,
+        'adelanto' => 20,
     ])->assertSessionHasErrors('reserva');
 
     expect(Reserva::query()->where('mesa_id', $mesa->id)->count())->toBe(1);
@@ -163,6 +167,7 @@ test('el margen de minutos también bloquea reservas contiguas', function () {
         'hora_inicio' => horaFutura(180),
         'hora_fin' => horaFutura(240),
         'personas' => 2,
+        'adelanto' => 20,
     ])->assertSessionHasErrors('reserva');
 
     // Sin solape real y con más de 15 min de separación: se acepta.
@@ -172,6 +177,7 @@ test('el margen de minutos también bloquea reservas contiguas', function () {
         'hora_inicio' => horaFutura(220),
         'hora_fin' => horaFutura(280),
         'personas' => 2,
+        'adelanto' => 40,
     ])->assertSessionHasNoErrors();
 
     expect(Reserva::query()->where('mesa_id', $mesa->id)->count())->toBe(2);
@@ -344,8 +350,128 @@ test('una reserva para otro día no cambia el estado operativo de la mesa', func
         'hora_inicio' => '19:00',
         'hora_fin' => '20:00',
         'personas' => 4,
+        'adelanto' => 30,
     ])->assertSessionHasNoErrors();
 
     expect($mesa->fresh()->estado)->toBe('libre')
         ->and($mesa->fresh()->cliente)->toBeNull();
+});
+
+test('un adelanto por debajo de S/ 20 no crea la reserva', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+    $mesa = crearMesaReservas($admin);
+
+    $this->actingAs($admin)->post(route('mesas.reservas.store', $mesa), [
+        'cliente' => 'Adelanto corto',
+        'fecha' => now()->toDateString(),
+        'hora_inicio' => horaFutura(5),
+        'hora_fin' => horaFutura(65),
+        'personas' => 2,
+        'adelanto' => 19.99,
+    ])->assertSessionHasErrors('adelanto');
+
+    expect(Reserva::query()->where('mesa_id', $mesa->id)->exists())->toBeFalse();
+});
+
+test('sin adelanto tampoco se reserva', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+    $mesa = crearMesaReservas($admin);
+
+    $this->actingAs($admin)->post(route('mesas.reservas.store', $mesa), [
+        'cliente' => 'Sin pago',
+        'fecha' => now()->toDateString(),
+        'hora_inicio' => horaFutura(5),
+        'hora_fin' => horaFutura(65),
+        'personas' => 2,
+    ])->assertSessionHasErrors('adelanto');
+
+    expect(Reserva::query()->where('mesa_id', $mesa->id)->exists())->toBeFalse();
+});
+
+test('el adelanto mínimo de S/ 20 se caja como ingreso', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+    $mesa = crearMesaReservas($admin);
+
+    $this->actingAs($admin)->post(route('mesas.reservas.store', $mesa), [
+        'cliente' => 'Con adelanto',
+        'fecha' => now()->toDateString(),
+        'hora_inicio' => horaFutura(5),
+        'hora_fin' => horaFutura(65),
+        'personas' => 2,
+        'adelanto' => 20,
+    ])->assertSessionHasNoErrors();
+
+    $reserva = Reserva::query()->where('mesa_id', $mesa->id)->firstOrFail();
+
+    expect((float) $reserva->adelanto_pagado)->toBe(20.0)
+        ->and($reserva->adelanto_metodo)->toBe('efectivo');
+
+    $movimiento = MovimientoCaja::query()
+        ->where('concepto', 'like', '%Con adelanto%')
+        ->firstOrFail();
+
+    expect($movimiento->tipo)->toBe('ingreso')
+        ->and((float) $movimiento->monto)->toBe(20.0)
+        ->and($movimiento->user_id)->toBe($admin->id)
+        ->and($movimiento->team_id)->toBe($admin->current_team_id);
+});
+
+test('se admite un adelanto mayor y con otro método de pago', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+    $mesa = crearMesaReservas($admin);
+
+    $this->actingAs($admin)->post(route('mesas.reservas.store', $mesa), [
+        'cliente' => 'Adelanto grande',
+        'fecha' => now()->toDateString(),
+        'hora_inicio' => horaFutura(5),
+        'hora_fin' => horaFutura(65),
+        'personas' => 4,
+        'adelanto' => 75.5,
+        'adelanto_metodo' => 'yape',
+    ])->assertSessionHasNoErrors();
+
+    $reserva = Reserva::query()->where('mesa_id', $mesa->id)->firstOrFail();
+
+    expect((float) $reserva->adelanto_pagado)->toBe(75.5)
+        ->and($reserva->adelanto_metodo)->toBe('yape');
+
+    expect(
+        (float) MovimientoCaja::query()->where('concepto', 'like', '%Adelanto grande%')->firstOrFail()->monto
+    )->toBe(75.5);
+});
+
+test('el método de pago del adelanto no puede ser cualquiera', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+    $mesa = crearMesaReservas($admin);
+
+    $this->actingAs($admin)->post(route('mesas.reservas.store', $mesa), [
+        'cliente' => 'Método raro',
+        'fecha' => now()->toDateString(),
+        'hora_inicio' => horaFutura(5),
+        'hora_fin' => horaFutura(65),
+        'personas' => 2,
+        'adelanto' => 20,
+        'adelanto_metodo' => 'bitcoin',
+    ])->assertSessionHasErrors('adelanto_metodo');
+
+    expect(Reserva::query()->where('mesa_id', $mesa->id)->exists())->toBeFalse();
+});
+
+test('sin caja abierta la reserva y su adelanto no se crean', function () {
+    $admin = User::query()->where('usuario', 'admin')->firstOrFail();
+    $mesa = crearMesaReservas($admin);
+
+    Caja::query()->update(['estado' => 'Cerrada']);
+
+    $this->actingAs($admin)->post(route('mesas.reservas.store', $mesa), [
+        'cliente' => 'Sin caja',
+        'fecha' => now()->toDateString(),
+        'hora_inicio' => horaFutura(5),
+        'hora_fin' => horaFutura(65),
+        'personas' => 2,
+        'adelanto' => 20,
+    ])->assertRedirect();
+
+    expect(Reserva::query()->where('mesa_id', $mesa->id)->exists())->toBeFalse()
+        ->and(MovimientoCaja::query()->where('concepto', 'like', '%Sin caja%')->exists())->toBeFalse();
 });

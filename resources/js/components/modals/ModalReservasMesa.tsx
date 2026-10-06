@@ -7,6 +7,7 @@ import {
     Power,
     ThermometerSun,
     Users,
+    Wallet,
     X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -27,9 +28,16 @@ export interface Reserva {
     cliente: string;
     telefono?: string | null;
     personas: number;
+    adelanto_pagado: number | string;
     notas?: string | null;
     estado: 'confirmada' | 'atendida' | 'cancelada' | 'expirada';
 }
+
+/**
+ * Todo reserva deja este adelanto en caja. Debe coincidir con
+ * `config('reservas.adelanto_minimo')`; el servidor también valida.
+ */
+const ADELANTO_MINIMO = 20;
 
 interface ModalReservasMesaProps {
     isOpen: boolean;
@@ -113,6 +121,7 @@ export default function ModalReservasMesa({
     const [horaInicio, setHoraInicio] = useState('');
     const [horaFin, setHoraFin] = useState('');
     const [personas, setPersonas] = useState('');
+    const [adelanto, setAdelanto] = useState(String(ADELANTO_MINIMO));
     const [creando, setCreando] = useState(false);
     const [liberando, setLiberando] = useState(false);
 
@@ -203,6 +212,17 @@ export default function ModalReservasMesa({
             return;
         }
 
+        const adelantoNum = Number.parseFloat(adelanto);
+
+        if (!Number.isFinite(adelantoNum) || adelantoNum < ADELANTO_MINIMO) {
+            swalError(
+                'Adelanto mínimo',
+                `Para reservar debes dejar un adelanto de al menos S/ ${ADELANTO_MINIMO.toFixed(2)}.`,
+            );
+
+            return;
+        }
+
         const confirmar = () => {
             setCreando(true);
 
@@ -215,6 +235,7 @@ export default function ModalReservasMesa({
                     hora_inicio: horaInicio,
                     hora_fin: horaFin,
                     personas: personasNum,
+                    adelanto: adelantoNum,
                 },
                 {
                     preserveScroll: true,
@@ -227,6 +248,7 @@ export default function ModalReservasMesa({
                         setHoraInicio('');
                         setHoraFin('');
                         setPersonas('');
+                        setAdelanto(String(ADELANTO_MINIMO));
                     },
                     onError: (errors) => {
                         setCreando(false);
@@ -342,6 +364,16 @@ export default function ModalReservasMesa({
                                         ? 'persona'
                                         : 'personas'}
                                 </span>
+
+                                {Number(activa.adelanto_pagado ?? 0) > 0 && (
+                                    <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                                        <Wallet className="h-4 w-4" />
+                                        Adelanto S/
+                                        {Number(
+                                            activa.adelanto_pagado,
+                                        ).toFixed(2)}
+                                    </span>
+                                )}
                             </p>
 
                             <div className="mt-4 flex flex-wrap gap-2">
@@ -411,6 +443,16 @@ export default function ModalReservasMesa({
                                     {r.personas}{' '}
                                     {r.personas === 1 ? 'persona' : 'personas'}
                                     {r.telefono ? ` · ${r.telefono}` : ''}
+
+                                    {Number(r.adelanto_pagado ?? 0) > 0 && (
+                                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                            {' '}
+                                            · Adelanto S/
+                                            {Number(r.adelanto_pagado).toFixed(
+                                                2,
+                                            )}
+                                        </span>
+                                    )}
                                 </p>
                             </div>
                         ))}
@@ -510,6 +552,35 @@ export default function ModalReservasMesa({
                                         }
                                         className={`mt-1 ${inputBase}`}
                                     />
+                                </label>
+
+                                <label className="col-span-2 block text-sm font-semibold text-chocolate">
+                                    Adelanto (S/)
+                                    <div className="relative mt-1">
+                                        <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm font-bold text-cocoa-soft">
+                                            S/
+                                        </span>
+                                        <input
+                                            type="number"
+                                            inputMode="decimal"
+                                            min={ADELANTO_MINIMO}
+                                            step="0.50"
+                                            value={adelanto}
+                                            onChange={(e) =>
+                                                setAdelanto(e.target.value)
+                                            }
+                                            placeholder={String(
+                                                ADELANTO_MINIMO,
+                                            )}
+                                            className={`${inputBase} pl-9 font-semibold`}
+                                        />
+                                    </div>
+
+                                    <span className="mt-1 block text-[11px] font-normal text-cocoa-soft">
+                                        Mínimo S/{' '}
+                                        {ADELANTO_MINIMO.toFixed(2)} · se caja
+                                        ahora y se descuenta al cobrar la mesa.
+                                    </span>
                                 </label>
                             </div>
 

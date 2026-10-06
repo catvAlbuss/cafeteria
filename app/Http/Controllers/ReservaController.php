@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Events\MesaActualizada;
 use App\Events\ReservaActualizada;
+use App\Models\Caja;
 use App\Models\Mesa;
+use App\Models\MovimientoCaja;
 use App\Models\Reserva;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ReservaController extends Controller
 {
@@ -28,6 +31,8 @@ class ReservaController extends Controller
 
         Reserva::expirarVencidas();
 
+        $minimo = (float) config('reservas.adelanto_minimo', 20);
+
         $validated = $request->validate([
             'cliente' => 'required|string|max:255',
             'telefono' => 'nullable|string|max:30',
@@ -36,6 +41,9 @@ class ReservaController extends Controller
             'hora_fin' => 'required|date_format:H:i|after:hora_inicio',
             'personas' => 'required|integer|min:1',
             'notas' => 'nullable|string|max:255',
+            // Toda reserva deja un adelanto en caja; no existe la reserva "gratis".
+            'adelanto' => "required|numeric|min:{$minimo}|max:9999",
+            'adelanto_metodo' => 'nullable|in:efectivo,tarjeta,yape',
         ]);
 
         $margen = config('reservas.margen_minutos', 15);
@@ -62,18 +70,43 @@ class ReservaController extends Controller
             ])->withInput();
         }
 
-        $reserva = Reserva::query()->create([
-            'team_id' => auth()->user()->current_team_id,
-            'mesa_id' => $mesa->id,
-            'cliente' => $validated['cliente'],
-            'telefono' => $validated['telefono'] ?? null,
-            'fecha' => $validated['fecha'],
-            'hora_inicio' => $validated['hora_inicio'],
-            'hora_fin' => $validated['hora_fin'],
-            'personas' => $validated['personas'],
-            'notas' => $validated['notas'] ?? null,
-            'estado' => Reserva::ESTADO_CONFIRMADA,
-        ]);
+        $metodo = $validated['adelanto_metodo'] ?? 'efectivo';
+
+        // La reserva y el ingreso del adelanto van juntos: una reserva creada
+        // sin su dinero en caja no es una reserva.
+        $reserva = DB::transaction(function () use ($validated, $mesa, $metodo) {
+            $caja = Caja::query()
+                ->where('team_id', auth()->user()->current_team_id)
+                ->where('estado', 'Abierta')
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $reserva = Reserva::query()->create([
+                'team_id' => auth()->user()->current_team_id,
+                'mesa_id' => $mesa->id,
+                'cliente' => $validated['cliente'],
+                'telefono' => $validated['telefono'] ?? null,
+                'fecha' => $validated['fecha'],
+                'hora_inicio' => $validated['hora_inicio'],
+                'hora_fin' => $validated['hora_fin'],
+                'personas' => $validated['personas'],
+                'adelanto_pagado' => $validated['adelanto'],
+                'adelanto_metodo' => $metodo,
+                'notas' => $validated['notas'] ?? null,
+                'estado' => Reserva::ESTADO_CONFIRMADA,
+            ]);
+
+            MovimientoCaja::query()->create([
+                'team_id' => $reserva->team_id,
+                'caja_id' => $caja->id,
+                'user_id' => auth()->id(),
+                'tipo' => 'ingreso',
+                'concepto' => "Adelanto de reserva de {$validated['cliente']}",
+                'monto' => $validated['adelanto'],
+            ]);
+
+            return $reserva;
+        });
 
         ReservaActualizada::dispatch($reserva->fresh());
 
@@ -81,7 +114,8 @@ class ReservaController extends Controller
 
         return redirect()->back()->with(
             'success',
-            "Reserva de {$validated['cliente']} a las {$validated['hora_inicio']} creada."
+            "Reserva de {$validated['cliente']} a las {$validated['hora_inicio']} creada. "
+            .'Adelanto S/ '.number_format((float) $validated['adelanto'], 2).' en caja.'
         );
     }
 

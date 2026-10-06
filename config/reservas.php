@@ -14,4 +14,10 @@ return [
     | (p. ej. 10 min antes de la hora de inicio) pasa a estado "reserva".
     */
     'margen_inicio_minutos' => env('RESERVAS_MARGEN_INICIO_MINUTOS', 10),
+
+    /*
+    | Adelanto mínimo (S/) que se exige al crear una reserva. Se caja en el
+    | momento como un ingreso y se descuenta de la cuenta al cobrar la mesa.
+    */
+    'adelanto_minimo' => (float) env('RESERVAS_ADELANTO_MINIMO', 20),
 ];
